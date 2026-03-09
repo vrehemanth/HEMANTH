@@ -27,7 +27,8 @@ namespace EGI_Backend.Infrastructure.Services
             {
                 new JwtClaim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new JwtClaim(ClaimTypes.Email, user.Email),
-                new JwtClaim(ClaimTypes.Role, user.Role.ToString())
+                new JwtClaim(ClaimTypes.Role, user.Role.ToString()),
+                new JwtClaim(ClaimTypes.Name, user.Name ?? "")
             };
 
             var expiry = DateTime.UtcNow.AddMinutes(

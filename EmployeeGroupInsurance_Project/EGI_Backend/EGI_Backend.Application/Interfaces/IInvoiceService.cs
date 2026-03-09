@@ -12,7 +12,10 @@ namespace EGI_Backend.Application.Interfaces
         Task GenerateFirstInvoiceAsync(PolicyAssignment policy);
 
         // Called for policy endorsements to bill the extra prorated amount
-        Task GenerateAdjustmentInvoiceAsync(PolicyAssignment policy, decimal adjustmentAmount);
+        Task GenerateAdjustmentInvoiceAsync(PolicyAssignment policy, decimal adjustmentAmount, DateTime? customPeriodTo = null);
+
+        // Called for removals to subtract credit from the next available invoice
+        Task ApplyCreditToNextInvoiceAsync(Guid policyAssignmentId, decimal creditAmount);
 
         // Called by background job daily
         Task GenerateDueInvoicesAsync();

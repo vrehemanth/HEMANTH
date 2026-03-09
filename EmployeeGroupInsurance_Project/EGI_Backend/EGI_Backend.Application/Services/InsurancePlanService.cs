@@ -26,6 +26,13 @@ namespace EGI_Backend.Application.Services
             return _mapper.Map<List<InsurancePlanDto>>(plans);
         }
 
+        public async Task<List<InsurancePlanDto>> GetActivePlansAsync()
+        {
+            var plans = await _insurancePlanRepository.GetAllAsync();
+            var activePlans = plans.Where(p => p.Status).ToList();
+            return _mapper.Map<List<InsurancePlanDto>>(activePlans);
+        }
+
         public async Task<InsurancePlanDto?> GetPlanByIdAsync(Guid id)
         {
             var plan = await _insurancePlanRepository.GetByIdAsync(id);

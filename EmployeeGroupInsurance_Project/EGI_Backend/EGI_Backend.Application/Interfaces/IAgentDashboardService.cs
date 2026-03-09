@@ -10,5 +10,6 @@ namespace EGI_Backend.Application.Interfaces
         Task<AgentDashboardSummaryDto> GetSummaryAsync(Guid agentId);
         Task<List<CorporateClientResponseDto>> GetMyCustomersAsync(Guid agentId);
         Task<List<PolicyAssignmentResponseDto>> GetMyPoliciesAsync(Guid agentId);
+        Task<List<AuditLogResponseDto>> GetCommissionLogsAsync(Guid agentId);
     }
 }

@@ -44,5 +44,28 @@ namespace EGI_Backend.Infrastructure.Repositories
                 .OrderByDescending(x => x.Timestamp)
                 .ToListAsync();
         }
+        public async Task<int> CountRecentLogsAsync(System.DateTime since)
+        {
+            return await _context.AuditLogs.CountAsync(x => x.Timestamp >= since);
+        }
+
+        public async Task<int> CountSignificantEventsAsync(System.DateTime since)
+        {
+            // Significant = High level business actions (Plan Creation, Client Approval, Claim, Payment, Login)
+            // We EXCLUDE (Member, Dependent, Document, Notification, AuditLog entries)
+            var ignoredEntities = new[] { "Member", "Dependent", "ClaimDocument", "Notification", "AuditLog", "AuditEntry" };
+            
+            return await _context.AuditLogs
+                .Where(x => x.Timestamp >= since && !ignoredEntities.Contains(x.EntityName))
+                .CountAsync();
+        }
+
+        public async Task<List<AuditLog>> GetTopRecentLogsAsync(int count)
+        {
+            return await _context.AuditLogs
+                .OrderByDescending(x => x.Timestamp)
+                .Take(count)
+                .ToListAsync();
+        }
     }
 }

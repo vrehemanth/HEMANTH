@@ -23,13 +23,13 @@ namespace EGI_Backend.Infrastructure.Repositories
         public async Task AddAsync(Dependent dependent)
         {
             await _context.Dependents.AddAsync(dependent);
-            await _context.SaveChangesAsync();
+            // SaveChangesAsync omitted — IUnitOfWork owns the transaction boundary
         }
 
         public async Task UpdateAsync(Dependent dependent)
         {
             _context.Dependents.Update(dependent);
-            await _context.SaveChangesAsync();
+            // SaveChangesAsync omitted — IUnitOfWork owns the transaction boundary
         }
     }
 }

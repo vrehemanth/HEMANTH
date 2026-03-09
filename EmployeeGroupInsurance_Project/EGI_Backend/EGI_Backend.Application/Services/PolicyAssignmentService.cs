@@ -41,6 +41,7 @@ namespace EGI_Backend.Application.Services
             // 1. Validations
             var plan = await _planRepo.GetByIdAsync(dto.InsurancePlanId);
             if (plan == null) throw new NotFoundException("Insurance Plan not found.");
+            if (!plan.Status) throw new BadRequestException("This insurance plan is currently inactive and cannot be purchased.");
 
             var client = await _clientRepo.GetByIdAsync(dto.CorporateClientId);
             if (client == null) throw new NotFoundException("Corporate Client not found.");
@@ -90,7 +91,7 @@ namespace EGI_Backend.Application.Services
                     Email = row.Cell(3).GetString().Trim(),
                     PhoneNo = row.Cell(4).GetString().Trim(),
                     DateOfBirth = row.Cell(5).GetDateTime(),
-                    Gender = Enum.Parse<Gender>(row.Cell(6).GetString(), true),
+                    Gender = Enum.TryParse<Gender>(row.Cell(6).GetString(), true, out var g) ? g : Gender.Male,
                     SumInsured = employeeSumInsured,
                     Status = true
                 };
@@ -112,8 +113,10 @@ namespace EGI_Backend.Application.Services
                     var empCode = row.Cell(1).GetString().Trim();
                     if (string.IsNullOrEmpty(empCode) || !membersMap.ContainsKey(empCode)) continue;
 
-                    var relationship = Enum.Parse<RelationshipType>(row.Cell(3).GetString().Replace(" ", ""), true);
-                    
+                    var relationshipStr = row.Cell(3).GetString().Replace(" ", "");
+                    if (!Enum.TryParse<RelationshipType>(relationshipStr, true, out var relationship))
+                        relationship = RelationshipType.Other;
+
                     decimal dependentSumInsured = 0m;
                     foreach (var coverage in plan.Coverages)
                     {
@@ -136,7 +139,7 @@ namespace EGI_Backend.Application.Services
                         FullName = row.Cell(2).GetString().Trim(),
                         Relationship = relationship,
                         DateOfBirth = row.Cell(4).GetDateTime(),
-                        Gender = Enum.Parse<Gender>(row.Cell(5).GetString(), true),
+                        Gender = Enum.TryParse<Gender>(row.Cell(5).GetString(), true, out var dg) ? dg : Gender.Male,
                         SumInsured = dependentSumInsured
                     };
 
@@ -156,22 +159,16 @@ namespace EGI_Backend.Application.Services
                 totalAnnualPremium = totalAnnualPremium * 0.95m;
             }
 
-            // 6. Calculate Agent Commission
-            decimal commissionPercentage = client.BusinessCategory switch
-            {
-                BusinessCategory.Enterprise => 0.02m,
-                BusinessCategory.Large => 0.04m,
-                BusinessCategory.Medium => 0.06m,
-                BusinessCategory.Small => 0.08m,
-                _ => 0.08m
-            };
-            decimal commissionAmount = totalAnnualPremium * commissionPercentage;
+            // 6. AUTO-CATEGORIZATION: Determine Category based on THIS POLICY size only
+            int currentPolicyHeadcount = membersMap.Count + (dto.DependentsFile != null ? membersMap.Values.Sum(m => m.Dependents.Count) : 0);
+            
+            policyAssignment.BusinessCategory = EGI_Backend.Domain.Constants.BusinessRules.GetCategoryByHeadcount(currentPolicyHeadcount);
 
             // 7. Finalize and Save
             policyAssignment.AnnualPremium = totalAnnualPremium;
             policyAssignment.TotalPremium = totalAnnualPremium * dto.DurationInYears;
-            policyAssignment.CommissionAmount = commissionAmount;
-            
+            policyAssignment.CommissionAmount = 0m; // Initial commission is 0 until payment is made
+
             await _policyAssignmentRepo.AddAsync(policyAssignment);
             await _unitOfWork.SaveChangesAsync();
 

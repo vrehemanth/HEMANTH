@@ -83,6 +83,9 @@ namespace EGI_Backend.Application.Services
                 }
                 else
                 {
+                    if (corporateClient.IsBlocked)
+                        throw new UnauthorizedException("Your account has been permanently blocked due to multiple verification failures. Please contact EGI support.");
+
                     response.IsProfileCompleted =
                         !string.IsNullOrEmpty(corporateClient.CompanyName) &&
                         !string.IsNullOrEmpty(corporateClient.Address);
@@ -132,18 +135,18 @@ namespace EGI_Backend.Application.Services
         public async Task ForgotPassword(ForgotPasswordRequest req)
         {
             var user = await _repo.GetByEmailAsync(req.Email);
-            if (user == null) return; 
+            if (user == null) return;
 
             // Generate a secure temporary password
             var tempPassword = GenerateTemporaryPassword();
-            
+
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(tempPassword);
             user.MustChangePassword = true; // Force them to change it on next login
             user.ResetToken = null;
             user.ResetTokenExpires = null;
 
             await _repo.UpdateAsync(user);
-            
+
             // Re-using the Credentials email logic as it sends a temporary password
             await _emailService.SendCredentialsEmailAsync(user.Email, tempPassword);
         }

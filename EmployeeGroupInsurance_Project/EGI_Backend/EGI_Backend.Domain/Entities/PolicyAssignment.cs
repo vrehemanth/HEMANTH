@@ -33,11 +33,12 @@ namespace EGI_Backend.Domain.Entities
 
         [Column(TypeName = "decimal(18,2)")]
         public decimal TotalPremium { get; set; }
-        
+
         [Column(TypeName = "decimal(18,2)")]
         public decimal CommissionAmount { get; set; } = 0m;
-        
+
         public BillingFrequency BillingFrequency { get; set; }
+        public BusinessCategory BusinessCategory { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

@@ -21,7 +21,8 @@ namespace EGI_Backend.WebAPI.Mapping
                 .ForMember(dest => dest.DependentName, opt => opt.MapFrom(src => src.Dependent != null ? src.Dependent.FullName : null))
                 .ForMember(dest => dest.ClaimType, opt => opt.MapFrom(src => src.ClaimType.ToString()))
                 .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()))
-                .ForMember(dest => dest.ReviewedByName, opt => opt.MapFrom(src => src.ReviewedByUser != null ? src.ReviewedByUser.Name : null));
+                .ForMember(dest => dest.ReviewedByName, opt => opt.MapFrom(src => src.ReviewedByUser != null && src.Status != ClaimStatus.InReview ? src.ReviewedByUser.Name : null))
+                .ForMember(dest => dest.InReviewByOfficerName, opt => opt.MapFrom(src => src.ReviewedByUser != null && src.Status == ClaimStatus.InReview ? src.ReviewedByUser.Name : null));
 
             CreateMap<Claim, ClaimDetailResponseDto>()
                 .ForMember(dest => dest.PolicyNo, opt => opt.MapFrom(src => src.PolicyAssignment != null ? src.PolicyAssignment.PolicyNo : string.Empty))
@@ -34,8 +35,9 @@ namespace EGI_Backend.WebAPI.Mapping
                 .ForMember(dest => dest.ReviewedByName, opt => opt.MapFrom(src => src.ReviewedByUser != null ? src.ReviewedByUser.Name : null));
 
             CreateMap<ClaimDocument, ClaimDocumentDto>()
-                .ForMember(dest => dest.DocumentType, opt => opt.MapFrom(src => src.DocumentType.ToString()));
-            
+                .ForMember(dest => dest.DocumentType, opt => opt.MapFrom(src => src.DocumentType.ToString()))
+                .ForMember(dest => dest.FileUrl, opt => opt.MapFrom(src => "/uploads/" + System.IO.Path.GetFileName(src.FilePath)));
+
             // Invoice mappings
             CreateMap<Invoice, InvoiceResponseDto>()
                 .ForMember(dest => dest.PolicyNo, opt => opt.MapFrom(src => src.PolicyAssignment != null ? src.PolicyAssignment.PolicyNo : string.Empty))
@@ -64,8 +66,14 @@ namespace EGI_Backend.WebAPI.Mapping
 
             CreateMap<Member, MemberResponseDto>()
                 .ForMember(dest => dest.PolicyNo, opt => opt.MapFrom(src => src.PolicyAssignment != null ? src.PolicyAssignment.PolicyNo : null));
-            
-            // Corporate Client mappings are already in AuthMappingProfile, but we can centralize them later if needed
+
+            CreateMap<Dependent, DependentResponseDto>()
+                .ForMember(dest => dest.Relationship, opt => opt.MapFrom(src => src.Relationship.ToString()))
+                .ForMember(dest => dest.Gender, opt => opt.MapFrom(src => src.Gender.ToString()));
+
+            CreateMap<PolicyEndorsement, EndorsementResponseDto>()
+                .ForMember(dest => dest.Type, opt => opt.MapFrom(src => src.Type.ToString()))
+                .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()));
         }
     }
 }

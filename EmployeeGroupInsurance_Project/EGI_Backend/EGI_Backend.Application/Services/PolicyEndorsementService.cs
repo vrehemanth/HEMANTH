@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using AutoMapper;
 using EGI_Backend.Application.DTOs;
+using EGI_Backend.Application.Exceptions;
 using EGI_Backend.Application.Interfaces;
 using EGI_Backend.Domain.Entities;
 using EGI_Backend.Domain.Enums;
@@ -17,28 +19,57 @@ namespace EGI_Backend.Application.Services
         private readonly IMemberRepository _memberRepo;
         private readonly IDependentRepository _dependentRepo;
         private readonly IInvoiceService _invoiceService;
+        private readonly ICorporateClientRepository _clientRepo;
+        private readonly IUnitOfWork _unitOfWork;
+        private readonly IMapper _mapper;
 
         public PolicyEndorsementService(
             IPolicyEndorsementRepository endorsementRepo,
             IPolicyAssignmentRepository policyRepo,
             IMemberRepository memberRepo,
             IDependentRepository dependentRepo,
-            IInvoiceService invoiceService)
+            ICorporateClientRepository clientRepo,
+            IInvoiceService invoiceService,
+            IUnitOfWork unitOfWork,
+            IMapper mapper)
         {
             _endorsementRepo = endorsementRepo;
             _policyRepo = policyRepo;
             _memberRepo = memberRepo;
             _dependentRepo = dependentRepo;
+            _clientRepo = clientRepo;
             _invoiceService = invoiceService;
+            _unitOfWork = unitOfWork;
+            _mapper = mapper;
         }
 
         public async Task<EndorsementResponseDto> SubmitEndorsementAsync(Guid customerId, SubmitEndorsementDto dto)
         {
             var policy = await _policyRepo.GetByIdWithDetailsAsync(dto.PolicyAssignmentId);
-            if (policy == null) throw new Exception("Policy not found.");
+            if (policy == null) throw new NotFoundException("Policy not found.");
 
             // Flatten the EndorsementData to a string for DB storage
             string jsonData = JsonSerializer.Serialize(dto.EndorsementData);
+            using var jsonDoc = JsonDocument.Parse(jsonData);
+            var root = jsonDoc.RootElement;
+
+            // VALIDATION: Prevent removing already inactive members/dependents
+            if (dto.Type == EndorsementType.RemoveMember)
+            {
+                if (!root.TryGetProperty("MemberId", out var idProp) || !Guid.TryParse(idProp.GetString(), out var mid))
+                    throw new BadRequestException("MemberId is required.");
+                
+                var m = await _memberRepo.GetByIdAsync(mid);
+                if (m == null || !m.Status) throw new BadRequestException("This member is already inactive or not found.");
+            }
+            else if (dto.Type == EndorsementType.RemoveDependent)
+            {
+                if (!root.TryGetProperty("DependentId", out var idProp) || !Guid.TryParse(idProp.GetString(), out var did))
+                    throw new BadRequestException("DependentId is required.");
+
+                var d = await _dependentRepo.GetByIdAsync(did);
+                if (d == null || !d.IsActive) throw new BadRequestException("This dependent is already inactive or not found.");
+            }
 
             // Calculate estimated premium adjustment
             decimal adjustment = CalculateProratedAdjustment(policy, dto.Type, jsonData);
@@ -51,77 +82,94 @@ namespace EGI_Backend.Application.Services
                 Description = dto.Description,
                 EndorsementData = jsonData,
                 Status = EndorsementStatus.Pending,
-                PremiumAdjustment = adjustment, // Show the calculated cost immediately
+                PremiumAdjustment = adjustment,
                 RequestedByUserId = customerId,
                 CreatedAt = DateTime.UtcNow
             };
 
             await _endorsementRepo.AddAsync(endorsement);
+            await _unitOfWork.SaveChangesAsync();
 
-            return MapToResponseDto(endorsement);
+            return _mapper.Map<EndorsementResponseDto>(endorsement);
         }
 
         public async Task<EndorsementResponseDto> ReviewEndorsementAsync(Guid agentId, Guid endorsementId, ReviewEndorsementDto dto)
         {
             var endorsement = await _endorsementRepo.GetByIdAsync(endorsementId);
-            if (endorsement == null) throw new Exception("Endorsement not found.");
+            if (endorsement == null) throw new NotFoundException("Endorsement not found.");
 
             if (endorsement.Status != EndorsementStatus.Pending)
-                throw new Exception("Endorsement has already been processed.");
+                throw new BadRequestException("Endorsement has already been processed.");
 
             var policy = await _policyRepo.GetByIdWithDetailsAsync(endorsement.PolicyAssignmentId);
-            
+            if (policy == null) throw new NotFoundException("Associated policy not found.");
+
             endorsement.Status = dto.Status;
             endorsement.ReviewedByUserId = agentId;
             endorsement.ReviewedAt = DateTime.UtcNow;
 
             if (dto.Status == EndorsementStatus.Approved)
             {
-                // Apply the physical changes (Add member/dependent)
+                // 1. Calculate the FULL annual rate impact (un-prorated)
+                decimal fullAnnualImpact = CalculateFullAnnualRate(policy, endorsement.Type, endorsement.EndorsementData);
+
+                // 2. Apply the physical changes (Add member/dependent, soft-delete removed ones)
                 await ApplyEndorsementChanges(policy, endorsement);
 
-                // Use the FINAL adjustment amount (from DB or updated by agent)
-                policy.AnnualPremium += endorsement.PremiumAdjustment;
+                // 3. Update Policy master premium data
+                policy.AnnualPremium += fullAnnualImpact;
+                policy.TotalPremium += Math.Round(fullAnnualImpact * (decimal)((policy.EndDate.Date - DateTime.UtcNow.Date).TotalDays / 365.0), 2);
+
+                // 4. Calculate and record the COMMISSION ADJUSTMENT for this endorsement
+                // RE-CATEGORIZATION: Recalculate THIS POLICY size based on the NEW member headcounts
+                int policyLives = policy.Members.Count + policy.Members.Sum(m => m.Dependents.Count(d => d.IsActive));
+                
+                policy.BusinessCategory = EGI_Backend.Domain.Constants.BusinessRules.GetCategoryByHeadcount(policyLives);
+                decimal commissionPercentage = EGI_Backend.Domain.Constants.BusinessRules.GetCommissionRate(policy.BusinessCategory);
+                
+                endorsement.CommissionAdjustment = Math.Round(endorsement.PremiumAdjustment * commissionPercentage, 2);
+
                 await _policyRepo.UpdateAsync(policy);
 
-                // If they owe money, generate the prorated adjustment invoice for ONLY the difference
+                // 4. Financial adjustments
                 if (endorsement.PremiumAdjustment > 0)
                 {
-                    await _invoiceService.GenerateAdjustmentInvoiceAsync(policy, endorsement.PremiumAdjustment);
+                    DateTime? customPeriodTo = null;
+                    if (policy.BillingFrequency == BillingFrequency.Monthly)
+                    {
+                        var cycleStart = policy.StartDate.Date;
+                        while (cycleStart.AddMonths(1) <= DateTime.UtcNow.Date)
+                            cycleStart = cycleStart.AddMonths(1);
+                        customPeriodTo = cycleStart.AddMonths(1).AddDays(-1);
+                    }
+
+                    await _invoiceService.GenerateAdjustmentInvoiceAsync(policy, endorsement.PremiumAdjustment, customPeriodTo);
+                }
+                else if (endorsement.PremiumAdjustment < 0)
+                {
+                    await _invoiceService.ApplyCreditToNextInvoiceAsync(policy.Id, Math.Abs(endorsement.PremiumAdjustment));
                 }
             }
 
             await _endorsementRepo.UpdateAsync(endorsement);
-            return MapToResponseDto(endorsement);
+            await _unitOfWork.SaveChangesAsync();
+
+            return _mapper.Map<EndorsementResponseDto>(endorsement);
         }
 
         public async Task<List<EndorsementResponseDto>> GetEndorsementsByPolicyAsync(Guid policyAssignmentId)
         {
             var endorsements = await _endorsementRepo.GetByPolicyIdAsync(policyAssignmentId);
-            return endorsements.Select(MapToResponseDto).ToList();
+            return _mapper.Map<List<EndorsementResponseDto>>(endorsements);
         }
 
         public async Task<List<EndorsementResponseDto>> GetPendingEndorsementsAsync()
         {
             var endorsements = await _endorsementRepo.GetPendingAsync();
-            return endorsements.Select(MapToResponseDto).ToList();
+            return _mapper.Map<List<EndorsementResponseDto>>(endorsements);
         }
 
-        private EndorsementResponseDto MapToResponseDto(PolicyEndorsement e)
-        {
-            return new EndorsementResponseDto
-            {
-                Id = e.Id,
-                PolicyAssignmentId = e.PolicyAssignmentId,
-                Type = e.Type.ToString(),
-                Description = e.Description,
-                EndorsementData = e.EndorsementData,
-                Status = e.Status.ToString(),
-                PremiumAdjustment = e.PremiumAdjustment,
-                CreatedAt = e.CreatedAt,
-                ReviewedAt = e.ReviewedAt
-            };
-        }
+        // ─── Private Helpers ────────────────────────────────────────────────────
 
         private async Task ApplyEndorsementChanges(PolicyAssignment policy, PolicyEndorsement e)
         {
@@ -132,41 +180,55 @@ namespace EGI_Backend.Application.Services
             {
                 case EndorsementType.AddMember:
                     string firstName = root.TryGetProperty("FirstName", out var fn) ? fn.GetString() ?? "" : "";
-                    string lastName = root.TryGetProperty("LastName", out var ln) ? ln.GetString() ?? "" : "";
-                    string fullName = root.TryGetProperty("FullName", out var fullN) ? fullN.GetString() ?? "" : $"{firstName} {lastName}".Trim();
+                    string lastName  = root.TryGetProperty("LastName",  out var ln) ? ln.GetString() ?? "" : "";
+                    string fullName  = root.TryGetProperty("FullName",  out var fullN) ? fullN.GetString() ?? "" : $"{firstName} {lastName}".Trim();
 
                     var member = new Member
                     {
-                        Id = Guid.NewGuid(),
+                        Id               = Guid.NewGuid(),
                         PolicyAssignmentId = policy.Id,
-                        EmployeeCode = root.TryGetProperty("EmployeeCode", out var ec) ? ec.GetString() ?? "" : "",
-                        FullName = fullName,
-                        Email = root.TryGetProperty("Email", out var em) ? em.GetString() ?? "" : "",
-                        PhoneNo = root.TryGetProperty("PhoneNo", out var ph) ? ph.GetString() ?? "" : "",
-                        DateOfBirth = DateTime.Parse(root.TryGetProperty("DateOfBirth", out var dob) ? dob.GetString() ?? DateTime.MinValue.ToString() : DateTime.MinValue.ToString()),
-                        Gender = root.TryGetProperty("Gender", out var gen) ? ParseEnum<Gender>(gen) : Gender.Male,
-                        SumInsured = GetHealthSumInsured(policy.InsurancePlan, CoveredGroup.EmployeeOnly),
-                        Status = true,
-                        CreatedAt = DateTime.UtcNow
+                        EmployeeCode     = root.TryGetProperty("EmployeeCode", out var ec)  ? ec.GetString()  ?? "" : "",
+                        FullName         = fullName,
+                        Email            = root.TryGetProperty("Email",        out var em)  ? em.GetString()  ?? "" : "",
+                        PhoneNo          = root.TryGetProperty("PhoneNo",      out var ph)  ? ph.GetString()  ?? "" : "",
+                        DateOfBirth      = DateTime.TryParse(
+                                               root.TryGetProperty("DateOfBirth", out var dob) ? dob.GetString() : null,
+                                               out var parsedDob) ? parsedDob : DateTime.MinValue,
+                        Gender           = root.TryGetProperty("Gender",       out var gen) ? ParseEnum<Gender>(gen) : Gender.Male,
+                        SumInsured       = GetHealthSumInsured(policy.InsurancePlan, CoveredGroup.EmployeeOnly),
+                        Status           = true,
+                        CreatedAt        = DateTime.UtcNow
                     };
                     await _memberRepo.AddAsync(member);
                     break;
 
                 case EndorsementType.AddDependent:
-                    var memberIdString = root.GetProperty("MemberId").GetString() ?? throw new Exception("MemberId is required for AddDependent endorsement.");
-                    var memberId = Guid.Parse(memberIdString);
+                    if (!root.TryGetProperty("MemberId", out var midProp) || string.IsNullOrEmpty(midProp.GetString()))
+                        throw new BadRequestException("MemberId is required for AddDependent endorsement.");
+
+                    var memberId  = Guid.Parse(midProp.GetString()!);
+                    var depFullName = root.TryGetProperty("FullName", out var dfn)
+                        ? dfn.GetString() ?? "" : "";
+
+                    if (!root.TryGetProperty("Relationship", out var relPropDep))
+                        throw new BadRequestException("Relationship is required for AddDependent endorsement.");
+
+                    var relationship = ParseEnum<RelationshipType>(relPropDep);
+
                     var dependent = new Dependent
                     {
-                        Id = Guid.NewGuid(),
-                        MemberId = memberId,
-                        FullName = root.GetProperty("FullName").GetString() ?? "",
-                        Relationship = ParseEnum<RelationshipType>(root.GetProperty("Relationship")),
-                        DateOfBirth = DateTime.Parse(root.GetProperty("DateOfBirth").GetString() ?? DateTime.MinValue.ToString()),
-                        Gender = ParseEnum<Gender>(root.GetProperty("Gender")),
-                        SumInsured = 0 
+                        Id           = Guid.NewGuid(),
+                        MemberId     = memberId,
+                        FullName     = depFullName,
+                        Relationship = relationship,
+                        DateOfBirth  = DateTime.TryParse(
+                                           root.TryGetProperty("DateOfBirth", out var ddob) ? ddob.GetString() : null,
+                                           out var parsedDepDob) ? parsedDepDob : DateTime.MinValue,
+                        Gender       = root.TryGetProperty("Gender", out var dgen) ? ParseEnum<Gender>(dgen) : Gender.Male,
+                        SumInsured   = 0,
+                        IsActive     = true
                     };
-                    
-                    // Set sum insured based on relationship - Looking specifically for Health Coverage (Type 0)
+
                     if (policy.InsurancePlan != null)
                     {
                         var targetGroup = MapToCoveredGroup(dependent.Relationship);
@@ -177,143 +239,167 @@ namespace EGI_Backend.Application.Services
                     break;
 
                 case EndorsementType.RemoveMember:
-                    var mId = Guid.Parse(root.GetProperty("MemberId").GetString() ?? throw new Exception("MemberId is required for RemoveMember endorsement."));
-                    var m = await _memberRepo.GetByIdAsync(mId);
-                    if (m != null)
-                    {
-                        m.Status = false;
-                        await _memberRepo.UpdateAsync(m);
-                    }
+                    if (!root.TryGetProperty("MemberId", out var rmProp) || string.IsNullOrEmpty(rmProp.GetString()))
+                        throw new BadRequestException("MemberId is required for RemoveMember endorsement.");
+
+                    var mId = Guid.Parse(rmProp.GetString()!);
+                    var m   = await _memberRepo.GetByIdAsync(mId);
+                    if (m == null) throw new NotFoundException($"Member with ID '{mId}' not found.");
+
+                    m.Status = false; // Soft-delete
+                    await _memberRepo.UpdateAsync(m);
                     break;
 
                 case EndorsementType.RemoveDependent:
-                    // Since Dependent doesn't have status, we could delete it or mark it somehow (currently deleting is common for these)
-                    // But in a real app you might add a Status column to Dependents. For now we will do nothing or throw.
-                    throw new Exception("RemoveDependent is not fully implemented: Dependents currently lack a Status column.");
+                    if (!root.TryGetProperty("DependentId", out var rdProp) || string.IsNullOrEmpty(rdProp.GetString()))
+                        throw new BadRequestException("DependentId is required for RemoveDependent endorsement.");
+
+                    var depId = Guid.Parse(rdProp.GetString()!);
+                    var dep   = await _dependentRepo.GetByIdAsync(depId);
+                    if (dep == null) throw new NotFoundException($"Dependent with ID '{depId}' not found.");
+
+                    dep.IsActive = false; // Soft-delete (preserves claim history)
+                    await _dependentRepo.UpdateAsync(dep);
+                    break;
+
+                default:
+                    throw new BadRequestException($"Unsupported endorsement type: {e.Type}");
             }
         }
 
-        private T ParseEnum<T>(JsonElement element) where T : struct, Enum
+        private static T ParseEnum<T>(JsonElement element) where T : struct, Enum
         {
             if (element.ValueKind == JsonValueKind.Number)
-            {
                 return (T)(object)element.GetInt32();
-            }
+
             if (element.ValueKind == JsonValueKind.String)
             {
-                if (Enum.TryParse<T>(element.GetString() ?? "", true, out T result))
-                {
+                if (Enum.TryParse<T>(element.GetString() ?? "", true, out var result))
                     return result;
-                }
             }
-            return default(T);
+
+            return default;
         }
 
-        private CoveredGroup MapToCoveredGroup(RelationshipType relationship)
-        {
-            return relationship switch
+        private static CoveredGroup MapToCoveredGroup(RelationshipType relationship) =>
+            relationship switch
             {
                 RelationshipType.Spouse => CoveredGroup.EmployeeAndFamily,
-                RelationshipType.Child => CoveredGroup.EmployeeAndFamily,
+                RelationshipType.Child  => CoveredGroup.EmployeeAndFamily,
                 RelationshipType.Father => CoveredGroup.EmployeeFamilyAndParents,
                 RelationshipType.Mother => CoveredGroup.EmployeeFamilyAndParents,
-                _ => CoveredGroup.EmployeeOnly
+                _                       => CoveredGroup.EmployeeOnly
             };
-        }
 
-        private decimal GetHealthSumInsured(InsurancePlan? plan, CoveredGroup targetGroup)
+        private static decimal GetHealthSumInsured(InsurancePlan? plan, CoveredGroup targetGroup)
         {
-            if (plan == null || plan.Coverages == null) return 0;
+            if (plan?.Coverages == null) return 0;
 
-            // Priority logic for Health Sum Insured:
-            // 1. Exact match for the target group (e.g. EmployeeOnly)
-            // 2. Fallback to family tiers (if the plan is defined broadly)
             var coverage = plan.Coverages
                 .Where(c => c.Type == CoverageType.Health && c.IsActive)
-                .OrderByDescending(c => c.CoveredGroup == targetGroup) // Exact match first
-                .ThenBy(c => (int)c.CoveredGroup) // Then pick the lowest available tier (EmployeeOnly -> Family -> Parents)
-                .FirstOrDefault();
-
-            // If we still haven't found a match specifically for the group, 
-            // pick ANY available Health coverage as a last resort, 
-            // since this policy is of type 'Health' and should have a value.
-            if (coverage == null)
-            {
-                coverage = plan.Coverages
-                    .Where(c => c.Type == CoverageType.Health && c.IsActive)
-                    .OrderBy(c => (int)c.CoveredGroup)
-                    .FirstOrDefault();
-            }
+                .OrderByDescending(c => c.CoveredGroup == targetGroup)
+                .ThenBy(c => (int)c.CoveredGroup)
+                .FirstOrDefault()
+                           ?? plan.Coverages
+                              .Where(c => c.Type == CoverageType.Health && c.IsActive)
+                              .OrderBy(c => (int)c.CoveredGroup)
+                              .FirstOrDefault();
 
             return coverage?.CoverageAmount ?? 0;
         }
 
+        private decimal CalculateFullAnnualRate(PolicyAssignment policy, EndorsementType type, string jsonStr)
+        {
+            if (policy.InsurancePlan == null) return 0;
+
+            decimal cost = policy.InsurancePlan.BasePremium * GetMultiplier(type, jsonStr);
+
+            if (type == EndorsementType.RemoveMember || type == EndorsementType.RemoveDependent)
+                cost *= -1m;
+
+            return Math.Round(cost, 2);
+        }
+
         private decimal CalculateProratedAdjustment(PolicyAssignment policy, EndorsementType type, string jsonStr)
         {
-            if (policy.InsurancePlan == null) return 0; // Guard clause
+            var annualRate = CalculateFullAnnualRate(policy, type, jsonStr);
+            if (annualRate == 0) return 0;
 
-            decimal baseRate = policy.InsurancePlan.BasePremium;
-            decimal multiplier = 1.0m;
+            var today = DateTime.UtcNow.Date;
+            if (today >= policy.EndDate.Date) return 0;
 
-            // Determine Multiplier based on Rule
-            if (type == EndorsementType.AddMember || type == EndorsementType.RemoveMember)
+            // Determine the "Reference End Date" for the adjustment invoice
+            // For Annual payers: Charge/Credit until the end of the policy year.
+            // For Monthly payers: Charge/Credit ONLY for the remaining days of the CURRENT month.
+            // This is because future months will automatically use the updated monthly rate.
+            DateTime referenceEndDate;
+            if (policy.BillingFrequency == BillingFrequency.Monthly)
             {
-                multiplier = 1.0m; // Employee
+                var cycleStart = policy.StartDate.Date;
+                while (cycleStart.AddMonths(1) <= today)
+                {
+                    cycleStart = cycleStart.AddMonths(1);
+                }
+                referenceEndDate = cycleStart.AddMonths(1).AddDays(-1);
+
+                // Boundary check
+                if (referenceEndDate > policy.EndDate.Date)
+                    referenceEndDate = policy.EndDate.Date;
             }
-            else if (type == EndorsementType.AddDependent || type == EndorsementType.RemoveDependent)
+            else
+            {
+                referenceEndDate = policy.EndDate.Date;
+            }
+
+            const decimal daysInYear = 365m;
+            var daysInAdjustmentPeriod = (decimal)(referenceEndDate - today).TotalDays;
+
+            // Ensure non-negative or at least partial-day credit handling if needed
+            if (daysInAdjustmentPeriod < 0) daysInAdjustmentPeriod = 0;
+
+            return Math.Round(annualRate * (daysInAdjustmentPeriod / daysInYear), 2);
+        }
+
+        private static decimal GetMultiplier(EndorsementType type, string jsonStr)
+        {
+            if (type == EndorsementType.AddMember || type == EndorsementType.RemoveMember)
+                return 1.0m;
+
+            if (type == EndorsementType.AddDependent || type == EndorsementType.RemoveDependent)
             {
                 try
                 {
                     using var doc = JsonDocument.Parse(jsonStr);
                     if (doc.RootElement.TryGetProperty("Relationship", out var relProp))
                     {
-                        string relString = string.Empty;
+                        string relStr = "";
+                        
                         if (relProp.ValueKind == JsonValueKind.String)
                         {
-                            relString = relProp.GetString()?.ToLower() ?? "";
+                            var s = relProp.GetString() ?? "";
+                            if (int.TryParse(s, out int relInt))
+                            {
+                                relStr = ((RelationshipType)relInt).ToString().ToLower();
+                            }
+                            else
+                            {
+                                relStr = s.ToLower();
+                            }
                         }
                         else if (relProp.ValueKind == JsonValueKind.Number)
                         {
-                            var relInt = relProp.GetInt32();
-                            relString = ((RelationshipType)relInt).ToString().ToLower();
+                            relStr = ((RelationshipType)relProp.GetInt32()).ToString().ToLower();
                         }
 
-                        if (relString == "spouse") multiplier = 0.8m;
-                        else if (relString == "child") multiplier = 0.4m;
-                        else if (relString.Contains("parent") || relString == "father" || relString == "mother") multiplier = 1.2m;
+                        if (relStr == "spouse")                                                return 0.8m;
+                        if (relStr == "child")                                                 return 0.4m;
+                        if (relStr is "father" or "mother" || relStr.Contains("parent"))       return 1.2m;
                     }
                 }
-                catch
-                {
-                    // Fallback to 1.0 multiplier
-                }
-            }
-            else
-            {
-                return 0; // No premium change for "Other"
+                catch { /* malformed JSON — fall through to default */ }
             }
 
-            decimal targetAnnualCost = baseRate * multiplier;
-
-            // Calculate Days Remaining in the Policy Year
-            var today = DateTime.UtcNow.Date;
-            if (today >= policy.EndDate.Date) return 0; // Policy already expired
-
-            var totalDaysInYear = (policy.EndDate.Date - policy.StartDate.Date).TotalDays;
-            if (totalDaysInYear <= 0) totalDaysInYear = 365;
-
-            var daysRemaining = (policy.EndDate.Date - today).TotalDays;
-            
-            // Decimal Math: Target Cost * (Days Left / Total Days)
-            decimal proratedCost = targetAnnualCost * ((decimal)daysRemaining / (decimal)totalDaysInYear);
-
-            // If it's a REMOVAL, it's a negative adjustment (refund)
-            if (type == EndorsementType.RemoveMember || type == EndorsementType.RemoveDependent)
-            {
-                proratedCost = proratedCost * -1m;
-            }
-
-            return Math.Round(proratedCost, 2);
+            return 1.0m;
         }
     }
 }

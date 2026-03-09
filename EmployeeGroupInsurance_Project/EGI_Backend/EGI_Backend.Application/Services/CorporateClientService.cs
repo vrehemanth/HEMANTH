@@ -2,10 +2,13 @@ using AutoMapper;
 using EGI_Backend.Application.DTOs;
 using EGI_Backend.Application.Interfaces;
 using EGI_Backend.Application.Exceptions;
+using EGI_Backend.Application.Utilities;
 using EGI_Backend.Domain.Entities;
 using EGI_Backend.Domain.Enums;
 using System.Security.Claims;
 
+namespace EGI_Backend.Application.Services
+{
 public class CorporateClientService : ICorporateClientService
 {
     private readonly ICorporateClientRepository _clientRepo;
@@ -35,30 +38,35 @@ public class CorporateClientService : ICorporateClientService
         _mapper = mapper;
         _agentCustomerService = agentCustomerService;
     }
-    private string GenerateTemporaryPassword()
-    {
-        const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%";
-        var random = new Random();
-        return new string(Enumerable.Repeat(chars, 10)
-            .Select(s => s[random.Next(s.Length)]).ToArray());
-    }
+
     public async Task CreateProfileAsync(Guid userId, CreateCorporateProfileDto dto)
     {
         var existing = await _clientRepo.GetByUserIdAsync(userId);
 
         if (existing != null)
-            throw new ConflictException("Profile already exists.");
-
-        var client = new CorporateClient
         {
-            Id = Guid.NewGuid(),
-            UserId = userId,
-            CompanyName = dto.CompanyName,
-            Address = dto.Address,
-            Status = VerificationStatus.Draft
-        };
+            if (existing.Status == VerificationStatus.Approved || existing.Status == VerificationStatus.Pending)
+                throw new ConflictException("Profile is already active or under review.");
 
-        await _clientRepo.AddAsync(client);
+            existing.CompanyName = dto.CompanyName;
+            existing.Address = dto.Address;
+            existing.Phone = dto.Phone;
+            // Keep status as Draft or Rejected until documents are uploaded via UploadDocumentAsync
+        }
+        else
+        {
+            var client = new CorporateClient
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                CompanyName = dto.CompanyName,
+                Address = dto.Address,
+                Phone = dto.Phone,
+                Status = VerificationStatus.Draft
+            };
+            await _clientRepo.AddAsync(client);
+        }
+
         await _unitOfWork.SaveChangesAsync();
     }
 
@@ -79,14 +87,6 @@ public class CorporateClientService : ICorporateClientService
 
         if (client.Status == VerificationStatus.Rejected)
         {
-            client.ReSubmissionCount++;
-            if (client.ReSubmissionCount > 3)
-            {
-                client.IsBlocked = true;
-                await _unitOfWork.SaveChangesAsync();
-
-                throw new BadRequestException("You have exceeded the maximum re-submission attempts. Please contact customer care.");
-            }
             client.Status = VerificationStatus.Pending;
             client.RejectionReason = null;
             client.ReviewedBy = Guid.Empty;
@@ -140,15 +140,15 @@ public class CorporateClientService : ICorporateClientService
         if (dto.IsApproved)
         {
             client.Status = VerificationStatus.Approved;
-            client.BusinessCategory = dto.BusinessCategory;
+            client.ReSubmissionCount = 0; // reset on approval
             client.RejectionReason = null;
+
             if (user.MustChangePassword)
             {
-                var tempPassword = GenerateTemporaryPassword();
+                var tempPassword = PasswordHelper.GenerateTemporaryPassword();
                 user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(tempPassword);
                 user.Status = UserStatus.Active;
-
-                await _emailService.SendCredentialsEmailAsync(user.Email,tempPassword);
+                await _emailService.SendCredentialsEmailAsync(user.Email, tempPassword);
             }
 
             // AUTO-ASSIGNMENT LOGIC: Find the Least Loaded Agent ONLY if no agent is currently assigned
@@ -158,14 +158,25 @@ public class CorporateClientService : ICorporateClientService
         {
             client.Status = VerificationStatus.Rejected;
             client.RejectionReason = dto.RejectionReason;
+            client.ReSubmissionCount++; // Increment count on rejection
+            
             user.Status = UserStatus.Inactive; // keep inactive
 
+            if (client.ReSubmissionCount >= 3)
+            {
+                client.IsBlocked = true;
+                user.Status = UserStatus.Inactive; // Ensure blocked users can't login easily
+                await _emailService.SendBlockNotificationEmailAsync(user.Email);
+            }
+            else
+            {
+                await _emailService.SendRejectionEmailAsync(
+                    user.Email,
+                    dto.RejectionReason ?? "Documents did not meet verification requirements."
+                );
+            }
+            
             await _unitOfWork.SaveChangesAsync();
-
-            await _emailService.SendRejectionEmailAsync(
-                user.Email,
-                dto.RejectionReason ?? "Documents did not meet verification requirements."
-            );
         }
 
         client.ReviewedBy = adminId;
@@ -173,4 +184,7 @@ public class CorporateClientService : ICorporateClientService
 
         await _unitOfWork.SaveChangesAsync();
     }
+
+    }
 }
+ // end namespace EGI_Backend.Application.Services

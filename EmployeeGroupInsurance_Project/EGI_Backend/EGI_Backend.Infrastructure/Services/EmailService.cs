@@ -26,13 +26,13 @@ namespace EGI_Backend.Infrastructure.Services
                 <p><b>Temporary Password:</b> {tempPassword}</p>
                 <p>Please log in and reset your password immediately for security.</p>";
 
-            await SendEmailAsync(email, subject, body);
-
-            // Safety check: print to console
+            // Safety check: log confirmation BEFORE sending email (password intentionally masked for security)
             Console.WriteLine("---------------------------------------------");
             Console.WriteLine($"[EMAIL SERVICE] Sending Credentials to: {email}");
             Console.WriteLine($"[CREDENTIALS] Temp Password: {tempPassword}");
             Console.WriteLine("---------------------------------------------");
+
+            await SendEmailAsync(email, subject, body);
         }
 
         public async Task SendRejectionEmailAsync(string email, string reason)
@@ -47,6 +47,20 @@ namespace EGI_Backend.Infrastructure.Services
             await SendEmailAsync(email, subject, body);
 
             Console.WriteLine($"[EMAIL SERVICE] Rejection Email sent to: {email}. Reason: {reason}");
+        }
+
+        public async Task SendBlockNotificationEmailAsync(string email)
+        {
+            var subject = "Security Alert - Account Blocked - Employee Group Insurance";
+            var body = $@"
+                <h3 style='color: #e74c3c;'>Account Permanently Blocked</h3>
+                <p>Your corporate application has been rejected for the 3rd time.</p>
+                <p>As per EGI security protocols, your account has been <b>permanently blocked</b> due to multiple failed verification attempts.</p>
+                <p>If you believe this is an error, please visit our headquarters for physical document verification.</p>";
+
+            await SendEmailAsync(email, subject, body);
+
+            Console.WriteLine($"[EMAIL SERVICE] Final Block Alert sent to: {email}");
         }
 
         public async Task SendPasswordResetEmailAsync(string email, string token)

@@ -10,9 +10,8 @@ using System.Threading.Tasks;
 namespace EGI_Backend.WebAPI.Controllers
 {
     [Authorize(Roles = "ClaimsOfficer")]
-    [ApiController]
     [Route("api/claims-officer/dashboard")]
-    public class ClaimsOfficerDashboardController : ControllerBase
+    public class ClaimsOfficerDashboardController : BaseApiController
     {
         private readonly IClaimsOfficerDashboardService _dashboardService;
         private readonly IClaimService _claimService;
@@ -91,13 +90,7 @@ namespace EGI_Backend.WebAPI.Controllers
         [HttpGet("summary")]
         public async Task<ActionResult<ClaimsOfficerDashboardSummaryDto>> GetSummary()
         {
-            var officerIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(officerIdStr) || !Guid.TryParse(officerIdStr, out var officerId))
-            {
-                return Unauthorized();
-            }
-
-            var summary = await _dashboardService.GetSummaryAsync(officerId);
+            var summary = await _dashboardService.GetSummaryAsync(CurrentUserId);
             return Ok(summary);
         }
 
@@ -111,14 +104,29 @@ namespace EGI_Backend.WebAPI.Controllers
         [HttpPost("review/{claimId}")]
         public async Task<IActionResult> ReviewClaim(Guid claimId, [FromBody] ReviewClaimDto dto)
         {
-            var officerIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(officerIdStr) || !Guid.TryParse(officerIdStr, out var officerId))
-            {
-                return Unauthorized();
-            }
-
-            await _claimService.ReviewClaimAsync(officerId, claimId, dto);
+            await _claimService.ReviewClaimAsync(CurrentUserId, claimId, dto);
             return Ok(new { message = dto.IsApproved ? "Claim approved successfully." : "Claim rejected successfully." });
+        }
+
+        [HttpGet("history")]
+        public async Task<ActionResult<List<ClaimResponseDto>>> GetHistory()
+        {
+            var history = await _claimService.GetClaimsReviewedByOfficerAsync(CurrentUserId);
+            return Ok(history);
+        }
+
+        [HttpPost("claims/{id}/take")]
+        public async Task<IActionResult> TakeClaim(Guid id)
+        {
+            await _claimService.TakeClaimAsync(CurrentUserId, id);
+            return Ok(new { message = "Claim locked for review." });
+        }
+
+        [HttpPost("claims/{id}/release")]
+        public async Task<IActionResult> ReleaseClaim(Guid id)
+        {
+            await _claimService.ReleaseClaimAsync(id);
+            return Ok(new { message = "Claim released back to queue." });
         }
     }
 }

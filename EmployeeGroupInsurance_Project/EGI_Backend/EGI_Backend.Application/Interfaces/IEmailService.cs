@@ -11,5 +11,6 @@ namespace EGI_Backend.Application.Interfaces
         Task SendCredentialsEmailAsync(string Email, string tempPassword);
         Task SendRejectionEmailAsync(string email, string reason);
         Task SendPasswordResetEmailAsync(string email, string token);
+        Task SendBlockNotificationEmailAsync(string email);
     }
 }

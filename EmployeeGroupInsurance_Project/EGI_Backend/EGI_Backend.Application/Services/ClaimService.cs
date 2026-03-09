@@ -17,8 +17,10 @@ namespace EGI_Backend.Application.Services
         private readonly IDocumentStorageService _storage;
         private readonly IMemberRepository _memberRepo;
         private readonly IDependentRepository _dependentRepo;
+        private readonly IInvoiceRepository _invoiceRepo;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
+        private readonly INotificationService _notificationService;
 
         public ClaimService(
             IClaimRepository claimRepo,
@@ -29,8 +31,10 @@ namespace EGI_Backend.Application.Services
             IDocumentStorageService storage,
             IMemberRepository memberRepo,
             IDependentRepository dependentRepo,
+            IInvoiceRepository invoiceRepo,
             IUnitOfWork unitOfWork,
-            IMapper mapper)
+            IMapper mapper,
+            INotificationService notificationService)
         {
             _claimRepo = claimRepo;
             _policyRepo = policyRepo;
@@ -40,8 +44,10 @@ namespace EGI_Backend.Application.Services
             _storage = storage;
             _memberRepo = memberRepo;
             _dependentRepo = dependentRepo;
+            _invoiceRepo = invoiceRepo;
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _notificationService = notificationService;
         }
 
         public async Task<string> SubmitClaimAsync(Guid corporateClientUserId, SubmitClaimDto dto)
@@ -59,10 +65,25 @@ namespace EGI_Backend.Application.Services
             if (client == null || policy.CorporateClientId != client.Id)
                 throw new ForbiddenException("You are not authorized to submit claims for this policy.");
 
+            // 2.1 Verify Premium Payment (Strict check)
+            var invoices = await _invoiceRepo.GetByPolicyAssignmentIdAsync(dto.PolicyAssignmentId);
+            var unpaidInvoice = invoices
+                .Where(i => i.Status != InvoiceStatus.Paid)
+                .OrderBy(i => i.InvoiceDate)
+                .FirstOrDefault();
+
+            if (unpaidInvoice != null)
+            {
+                throw new BadRequestException("Premium not paid. Please settle your outstanding invoices to activate benefit claims.");
+            }
+
             // 3. Verify the Member belongs to this policy
             var member = policy.Members.FirstOrDefault(m => m.Id == dto.MemberId);
             if (member == null)
                 throw new NotFoundException("Member does not belong to this policy.");
+
+            if (!member.Status)
+                throw new BadRequestException("This member is currently inactive. Claims cannot be processed for inactive members.");
 
             // 4. Verify the Dependent (if provided) belongs to this Member
             Dependent? dependent = null;
@@ -71,6 +92,9 @@ namespace EGI_Backend.Application.Services
                 dependent = member.Dependents.FirstOrDefault(d => d.Id == dto.DependentId.Value);
                 if (dependent == null)
                     throw new NotFoundException("Dependent does not belong to this member.");
+
+                if (!dependent.IsActive)
+                    throw new BadRequestException("This dependent is currently inactive. Claims cannot be processed for inactive dependents.");
             }
 
             // 5. Verify the Plan covers this ClaimType
@@ -168,7 +192,7 @@ namespace EGI_Backend.Application.Services
             if (claim == null)
                 throw new NotFoundException("Claim not found.");
 
-            if (claim.Status != ClaimStatus.Pending)
+            if (claim.Status != ClaimStatus.Pending && claim.Status != ClaimStatus.InReview)
                 throw new BadRequestException("Claim has already been reviewed.");
 
             claim.ReviewedBy = claimsOfficerUserId;
@@ -209,6 +233,47 @@ namespace EGI_Backend.Application.Services
             }
 
             await _unitOfWork.SaveChangesAsync();
+
+            // Send in-app notifications
+            try
+            {
+                var policy = await _policyRepo.GetByIdWithDetailsAsync(claim.PolicyAssignmentId);
+                if (policy != null)
+                {
+                    var client = await _clientRepo.GetByIdAsync(policy.CorporateClientId);
+
+                    string title = $"Claim {claim.Status}";
+                    string msgBase = $"Claim {claim.ClaimNumber} for {claim.ClaimType} has been {claim.Status.ToString().ToLower()}.";
+                    string type = claim.Status == ClaimStatus.Approved ? "Success" : "Error";
+
+                    // Notify Corporate Client
+                    if (client != null)
+                    {
+                        await _notificationService.CreateNotificationAsync(client.UserId, title, msgBase, type);
+                    }
+
+                    // Notify Agent
+                    if (policy.AgentId != Guid.Empty)
+                    {
+                        await _notificationService.CreateNotificationAsync(policy.AgentId, title, msgBase, type);
+                    }
+
+                    // Notify Member
+                    var member = await _memberRepo.GetByIdAsync(claim.MemberId);
+                    if (member != null && !string.IsNullOrEmpty(member.Email))
+                    {
+                        var memberUser = await _userRepo.GetByEmailAsync(member.Email);
+                        if (memberUser != null)
+                        {
+                            await _notificationService.CreateNotificationAsync(memberUser.Id, title, msgBase, type);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[WARNING] Failed to send notifications for claim {claimId}: {ex.Message}");
+            }
         }
 
         public async Task<List<ClaimResponseDto>> GetClaimsByPolicyAsync(Guid policyAssignmentId)
@@ -296,7 +361,53 @@ namespace EGI_Backend.Application.Services
                 });
             }
 
+            // Aggregate totals using the Member/Dependent SumInsured as the master limit
+            summary.TotalLimitAllowed = dependent?.SumInsured ?? member.SumInsured;
+            summary.TotalAmountUtilized = await _claimRepo.GetApprovedClaimsTotalAsync(memberId, dependentId, null);
+            summary.RemainingBalance = Math.Max(0, summary.TotalLimitAllowed - summary.TotalAmountUtilized);
+
             return summary;
+        }
+
+        public async Task<List<ClaimResponseDto>> GetClaimsReviewedByOfficerAsync(Guid officerId)
+        {
+            var claims = await _claimRepo.GetReviewedByOfficerAsync(officerId);
+            return _mapper.Map<List<ClaimResponseDto>>(claims);
+        }
+
+        public async Task TakeClaimAsync(Guid officerId, Guid claimId)
+        {
+            var claim = await _claimRepo.GetByIdAsync(claimId);
+            if (claim == null) throw new NotFoundException("Claim not found.");
+
+            if (claim.Status == ClaimStatus.InReview && claim.ReviewedBy != officerId)
+            {
+                throw new BadRequestException("This claim is already being reviewed by another officer.");
+            }
+
+            if (claim.Status != ClaimStatus.Pending && claim.Status != ClaimStatus.InReview)
+            {
+                throw new BadRequestException("This claim has already been adjudicated.");
+            }
+
+            claim.Status = ClaimStatus.InReview;
+            claim.ReviewedBy = officerId;
+            // Note: We don't set ReviewedAt yet, only on final decision
+            
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        public async Task ReleaseClaimAsync(Guid claimId)
+        {
+            var claim = await _claimRepo.GetByIdAsync(claimId);
+            if (claim == null) return;
+
+            if (claim.Status == ClaimStatus.InReview)
+            {
+                claim.Status = ClaimStatus.Pending;
+                claim.ReviewedBy = null;
+                await _unitOfWork.SaveChangesAsync();
+            }
         }
     }
 }

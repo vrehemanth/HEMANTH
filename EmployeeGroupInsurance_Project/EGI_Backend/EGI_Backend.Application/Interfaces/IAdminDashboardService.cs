@@ -16,6 +16,6 @@ namespace EGI_Backend.Application.Interfaces
         Task<bool> ToggleUserStatusAsync(Guid userId);
         Task<List<CorporateClientResponseDto>> GetAllClientsAsync();
         Task<List<AuditLogResponseDto>> GetAuditLogsAsync(string? userId = null, string? entityName = null);
-        Task<int> RecalculateAllCommissionsAsync();
+
     }
 }

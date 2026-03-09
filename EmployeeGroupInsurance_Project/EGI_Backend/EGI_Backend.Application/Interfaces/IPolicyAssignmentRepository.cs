@@ -13,9 +13,11 @@ namespace EGI_Backend.Application.Interfaces
         Task<List<PolicyAssignment>> GetByAgentIdAsync(Guid agentId);
         Task<decimal> GetTotalPremiumForAgentAsync(Guid agentId);
         Task<decimal> GetTotalCommissionForAgentAsync(Guid agentId);
+        Task<Dictionary<Guid, decimal>> GetTotalCommissionsForAgentsAsync(List<Guid> agentIds);
         Task<decimal> GetTotalCommissionAsync();
         Task<int> CountActiveForAgentAsync(Guid agentId);
         Task<List<PolicyAssignment>> GetByClientIdAsync(Guid clientId);
         Task<int> CountByClientIdAsync(Guid clientId);
+        Task<Dictionary<Guid, int>> GetPolicyCountsForAgentsAsync(List<Guid> agentIds);
     }
 }

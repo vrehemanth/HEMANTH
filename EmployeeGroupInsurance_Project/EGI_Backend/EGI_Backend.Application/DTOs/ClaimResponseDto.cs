@@ -20,5 +20,6 @@ namespace EGI_Backend.Application.DTOs
         public string? RejectionReason { get; set; }
         public DateTime? ReviewedAt { get; set; }
         public string? ReviewedByName { get; set; }
+        public string? InReviewByOfficerName { get; set; }
     }
 }

@@ -29,12 +29,13 @@ namespace EGI_Backend.WebAPI.Controllers
         public async Task<IActionResult> RegisterAdmin(AdminRegisterRequest request)
         {
             var result = await _authService.RegisterAdmin(request);
-            return Ok();
+            return Ok(result);
         }
 
         [HttpPost("login")]
         public async Task<IActionResult> Login(LoginRequest req)
         {
+            //throw new Exception("MANUAL TEST: Simulating a massive database deadlock 500 error!");
             var result = await _authService.Login(req);
             return Ok(result);
         }
@@ -51,11 +52,11 @@ namespace EGI_Backend.WebAPI.Controllers
         [HttpPost("change-password")]
         public async Task<IActionResult> ChangePassword(ChangePasswordRequest req)
         {
-            var userId = Guid.Parse(
-                User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized();
 
             await _authService.ChangePassword(userId, req.NewPassword);
-
             return Ok("Password changed successfully.");
         }
 

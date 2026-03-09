@@ -1,0 +1,164 @@
+<div class="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-950 font-outfit p-4 md:p-8">
+
+    <!-- MAIN 75% CARD CONTAINER -->
+    <div
+        class="w-full lg:w-3/4 max-w-7xl bg-white dark:bg-slate-900 rounded-[40px] shadow-2xl overflow-hidden flex flex-col lg:flex-row min-h-[700px] border border-white dark:border-slate-800">
+
+        <!-- LEFT PANEL: THE PROXY / INFO (45%) -->
+        <div class="hidden lg:flex lg:w-[45%] relative overflow-hidden bg-emerald-950">
+            <!-- Background Image -->
+            <img src="/register_left_banner_premium_1772551657872.png" alt="Growth Background"
+                class="absolute inset-0 w-full h-full object-cover opacity-30">
+
+            <!-- Glass Overlay -->
+            <div class="absolute inset-0 bg-gradient-to-br from-emerald-900/60 to-slate-900/90 backdrop-blur-[2px]">
+            </div>
+
+            <div class="relative z-10 p-12 flex flex-col justify-between h-full">
+                <!-- Mini Logo -->
+                <div class="flex items-center gap-3 cursor-pointer" routerLink="/">
+                    <div
+                        class="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                        </svg>
+                    </div>
+                    <span class="text-xl font-black text-white tracking-widest uppercase">EGI Network</span>
+                </div>
+
+                <div class="space-y-8">
+                    <div class="space-y-4">
+                        <div class="w-12 h-1 bg-emerald-500 rounded-full"></div>
+                        <h2 class="text-4xl font-extrabold text-white leading-tight">Scale your <br /> <span
+                                class="text-emerald-400">Ambition.</span></h2>
+                    </div>
+
+                    <p class="text-emerald-100/70 text-lg font-medium leading-relaxed italic">
+                        "EGI's infrastructure is built for growth. Join the next generation of corporate protection and
+                        manage your assets with precision."
+                    </p>
+
+                    <ul class="space-y-4">
+                        @for (benefit of ['Instant Activation', 'Neural Claim Routing', 'Global Compliance']; track
+                        benefit) {
+                        <li
+                            class="flex items-center gap-3 text-emerald-100/80 font-bold text-[10px] uppercase tracking-widest">
+                            <div class="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                                <svg class="h-3 w-3 text-emerald-400" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3"
+                                        d="M5 13l4 4L19 7" />
+                                </svg>
+                            </div>
+                            {{benefit}}
+                        </li>
+                        }
+                    </ul>
+                </div>
+
+                <div class="text-emerald-900/60 text-[10px] font-black uppercase tracking-widest">
+                    Verified Enterprise Gateway
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT PANEL: REGISTER FORM (55%) -->
+        <div class="w-full lg:w-[55%] flex items-center justify-center p-8 md:p-12 bg-white dark:bg-slate-900">
+            <div class="w-full max-w-md space-y-8">
+
+                <!-- MOBILE LOGO -->
+                <div class="lg:hidden flex justify-center mb-8">
+                    <div
+                        class="w-14 h-14 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shadow-2xl">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <h2 class="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Create Profile</h2>
+                    <p class="text-slate-500 dark:text-slate-400 font-medium text-sm">Join the enterprise insurance
+                        ecosystem</p>
+                </div>
+
+                <form [formGroup]="registerForm" (ngSubmit)="onSubmit()" class="space-y-5">
+
+                    <!-- Full Name -->
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Name
+                        </label>
+                        <input type="text" formControlName="name"
+                            class="w-full px-5 py-4 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-900 outline-none transition-all text-slate-900 dark:text-white font-medium text-sm shadow-sm"
+                            placeholder="e.g. John Doe">
+                        @if (registerForm.controls.name.touched && registerForm.controls.name.errors?.['required']) {
+                        <p class="text-[10px] font-black uppercase tracking-widest text-red-500 mt-1 ml-1">Identity
+                            verification required</p>
+                        }
+                    </div>
+
+                    <!-- Email -->
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">
+                            Email</label>
+                        <input type="email" formControlName="email"
+                            class="w-full px-5 py-4 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-900 outline-none transition-all text-slate-900 dark:text-white font-medium text-sm shadow-sm"
+                            placeholder="executive@gmail.com">
+                        @if (registerForm.controls.email.touched && registerForm.controls.email.errors?.['email']) {
+                        <p class="text-[10px] font-black uppercase tracking-widest text-red-500 mt-1 ml-1">Valid
+                            enterprise email required</p>
+                        }
+                        @if (registerForm.controls.email.touched && registerForm.controls.email.errors?.['pattern']) {
+                        <p class="text-[10px] font-black uppercase tracking-widest text-red-500 mt-1 ml-1">Must be an
+                            @gmail.com address</p>
+                        }
+                    </div>
+
+                    <!-- Password -->
+                    <div class="space-y-2">
+                        <label
+                            class="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Password</label>
+                        <input type="password" formControlName="password" (paste)="onPasswordPaste($event)"
+                            class="w-full px-5 py-4 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-900 outline-none transition-all text-slate-900 dark:text-white font-medium text-sm shadow-sm"
+                            placeholder="••••••••">
+                        @if (registerForm.controls.password.touched &&
+                        registerForm.controls.password.errors?.['minlength']) {
+                        <p class="text-[10px] font-black uppercase tracking-widest text-red-500 mt-1 ml-1">Insufficient
+                            complexity (Min 6)</p>
+                        }
+                    </div>
+
+                    <button type="submit" [disabled]="isLoading()"
+                        class="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm uppercase tracking-widest shadow-xl shadow-emerald-500/20 active:scale-[0.98] transition-all disabled:opacity-50">
+                        @if (isLoading()) {
+                        <div class="flex items-center justify-center gap-2">
+                            <svg class="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"
+                                    fill="none"></circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
+                            </svg>
+                            <span>Deploying Profile...</span>
+                        </div>
+                        } @else {
+                        Generate Account
+                        }
+                    </button>
+                </form>
+
+                <div class="pt-8 text-center border-t dark:border-slate-800">
+                    <p class="text-slate-500 dark:text-slate-400 text-sm font-medium">
+                        Already Registered?
+                        <a routerLink="/auth/login"
+                            class="text-emerald-600 font-black hover:underline underline-offset-4 ml-1">Sign In</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -17,6 +17,6 @@ namespace EGI_Backend.Domain.Entities
         public required DocumentType DocumentType { get; set; }
         public required string FileName { get; set; }
         public required string FilePath { get; set; }
-        public DateTime UploadedAt { get; set; }=DateTime.UtcNow;
+        public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
     }
 }

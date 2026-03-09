@@ -14,19 +14,19 @@ namespace EGI_Backend.Domain.Entities
         public Guid Id { get; set; }
 
         [MaxLength(50)]
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         [EmailAddress]
-        public string Email { get; set; }
+        public string Email { get; set; } = string.Empty;
 
-        public string PasswordHash { get; set; }
+        public string PasswordHash { get; set; } = string.Empty;
 
         public UserRole Role { get; set; }
 
         public UserStatus Status { get; set; }
 
         public bool MustChangePassword { get; set; } = false;
- 
+
         public string? ResetToken { get; set; }
         public DateTime? ResetTokenExpires { get; set; }
 

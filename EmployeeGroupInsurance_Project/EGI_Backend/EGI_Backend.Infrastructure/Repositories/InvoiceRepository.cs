@@ -62,15 +62,14 @@ namespace EGI_Backend.Infrastructure.Repositories
         {
             var today = DateTime.UtcNow.Date;
             return await _context.Invoices
-                .Where(i => i.Status == InvoiceStatus.Pending && i.DueDate.Date < today)
+                .Where(i => (i.Status == InvoiceStatus.Pending || i.Status == InvoiceStatus.PartiallyPaid) && i.DueDate.Date < today)
                 .ToListAsync();
         }
 
         public async Task<decimal> GetTotalRevenueAsync()
         {
             return await _context.Invoices
-                .Where(i => i.Status == InvoiceStatus.Paid)
-                .SumAsync(i => i.Amount);
+                .SumAsync(i => i.TotalPaid);
         }
 
         public async Task<int> CountUnpaidByClientAsync(Guid clientId)
@@ -85,7 +84,7 @@ namespace EGI_Backend.Infrastructure.Repositories
             return await _context.Invoices
                 .Include(i => i.PolicyAssignment)
                 .Where(i => i.PolicyAssignment.CorporateClientId == clientId && i.Status != InvoiceStatus.Paid)
-                .SumAsync(i => i.Amount);
+                .SumAsync(i => i.Amount - i.TotalPaid);
         }
 
         public async Task<List<Invoice>> GetByClientIdAsync(Guid clientId)
@@ -95,6 +94,15 @@ namespace EGI_Backend.Infrastructure.Repositories
                 .Where(i => i.PolicyAssignment.CorporateClientId == clientId)
                 .OrderByDescending(i => i.BillingPeriodFrom)
                 .ToListAsync();
+        }
+        public async Task<Dictionary<Guid, decimal>> GetBalancesByClientsAsync(List<Guid> clientIds)
+        {
+            return await _context.Invoices
+                .Include(i => i.PolicyAssignment)
+                .Where(i => i.PolicyAssignment != null && clientIds.Contains(i.PolicyAssignment.CorporateClientId) && i.Status != InvoiceStatus.Paid)
+                .GroupBy(i => i.PolicyAssignment.CorporateClientId)
+                .Select(g => new { ClientId = g.Key, Balance = g.Sum(x => x.Amount - x.TotalPaid) })
+                .ToDictionaryAsync(x => x.ClientId, x => x.Balance);
         }
     }
 }

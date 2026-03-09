@@ -14,6 +14,9 @@ namespace EGI_Backend.Application.DTOs
         public DateTime BillingPeriodFrom { get; set; }
         public DateTime BillingPeriodTo { get; set; }
         public decimal Amount { get; set; }
+        public decimal TotalPaid { get; set; }
+        public decimal BalanceAmount => Math.Max(0, Amount - TotalPaid);
+        public decimal CommissionEarned { get; set; }
         public DateTime DueDate { get; set; }
         public string Status { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }

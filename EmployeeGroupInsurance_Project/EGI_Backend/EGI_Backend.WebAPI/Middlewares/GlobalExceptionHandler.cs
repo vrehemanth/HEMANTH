@@ -3,6 +3,7 @@ using EGI_Backend.WebAPI.Models;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
+using System.Text.Json;
 
 namespace EGI_Backend.WebAPI.Middlewares
 {
@@ -26,7 +27,7 @@ namespace EGI_Backend.WebAPI.Middlewares
             {
                 StatusCode = (int)HttpStatusCode.InternalServerError,
                 Message = "An internal server error occurred.",
-                Detail = exception.Message, 
+                Detail = exception.Message,
                 TraceId = httpContext.TraceIdentifier
             };
 
@@ -46,6 +47,11 @@ namespace EGI_Backend.WebAPI.Middlewares
             {
                 errorResponse.StatusCode = (int)HttpStatusCode.NotFound;
                 errorResponse.Message = "The requested resource was not found.";
+            }
+            else if (exception is JsonException)
+            {
+                errorResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                errorResponse.Message = "Invalid JSON in the request body.";
             }
 
             httpContext.Response.StatusCode = errorResponse.StatusCode;

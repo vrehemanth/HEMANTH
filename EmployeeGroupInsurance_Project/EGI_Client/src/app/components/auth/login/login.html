@@ -1,0 +1,326 @@
+<div class="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-950 font-outfit p-4 md:p-8">
+
+    <!-- MAIN 75% CARD CONTAINER -->
+    <div
+        class="w-full lg:w-3/4 max-w-7xl bg-white dark:bg-slate-900 rounded-[40px] shadow-2xl overflow-hidden flex flex-col lg:flex-row min-h-[600px] border border-white dark:border-slate-800">
+
+        <!-- LEFT PANEL: ABOUT COMPANY (45%) -->
+        <div class="hidden lg:flex lg:w-[45%] relative overflow-hidden bg-slate-900">
+            <!-- Background Image -->
+            <img src="https://images.unsplash.com/photo-1497215728101-856f4ea42174?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80"
+                alt="Corporate Business Background"
+                class="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-110 transition-transform duration-1000">
+
+            <!-- Glass Overlay -->
+            <div class="absolute inset-0 bg-gradient-to-br from-blue-900/60 to-slate-900/90 backdrop-blur-[2px]"></div>
+
+            <div class="relative z-10 p-12 flex flex-col justify-between h-full">
+                <!-- Mini Logo -->
+                <div class="flex items-center gap-3 cursor-pointer" routerLink="/">
+                    <div
+                        class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                    </div>
+                    <span class="text-xl font-black text-white tracking-widest uppercase">EGI</span>
+                </div>
+
+                <div class="space-y-8">
+                    <div class="space-y-4">
+                        <div class="w-12 h-1 bg-blue-500 rounded-full"></div>
+                        <h2 class="text-4xl font-extrabold text-white leading-tight">Empowering Global <br /> <span
+                                class="text-blue-400">Enterprises.</span></h2>
+                    </div>
+
+                    <p class="text-slate-300 text-lg font-medium leading-relaxed italic">
+                        "EGI provides the most comprehensive group insurance infrastructure, helping companies protect
+                        what matters most—their people."
+                    </p>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="p-4 rounded-2xl bg-white/5 border border-white/10">
+                            <div class="text-2xl font-black text-white">99.9%</div>
+                            <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">SLA
+                                Guarantee</div>
+                        </div>
+                        <div class="p-4 rounded-2xl bg-white/5 border border-white/10">
+                            <div class="text-2xl font-black text-white">2.5s</div>
+                            <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Claim
+                                Payout</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-slate-500 text-[10px] font-black uppercase tracking-widest">
+                    Enterprise Group Insurance · v4.0
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT PANEL: SIGN-IN FORM (55%) -->
+        <div class="w-full lg:w-[55%] flex items-center justify-center p-8 md:p-12 bg-white dark:bg-slate-900">
+            <div class="w-full max-w-md space-y-8">
+
+                <!-- MOBILE LOGO (Only visible on small screens) -->
+                <div class="lg:hidden flex justify-center mb-8">
+                    <div
+                        class="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-2xl">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <h2 class="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Welcome Back</h2>
+                    <p class="text-slate-500 dark:text-slate-400 font-medium text-sm">Sign in to manage your corporate
+                        assets</p>
+                </div>
+
+                <!-- Error Alert -->
+                @if (errorMessage()) {
+                <div
+                    class="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 flex items-center gap-3 animate-slide-in">
+                    <svg class="h-5 w-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                            clip-rule="evenodd" />
+                    </svg>
+                    <p class="text-xs font-bold text-red-700 dark:text-red-400">{{ errorMessage() }}</p>
+                </div>
+                }
+
+                <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="space-y-6">
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">
+                            Email</label>
+                        <input type="email" formControlName="email"
+                            class="w-full px-5 py-4 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-900 outline-none transition-all text-slate-900 dark:text-white font-medium text-sm shadow-sm"
+                            placeholder="john.doe@gmail.com">
+                        @if (loginForm.controls.email.touched && loginForm.controls.email.errors?.['pattern']) {
+                        <p class="text-[10px] font-black uppercase tracking-widest text-red-500 mt-1 ml-1">Must be an
+                            @gmail.com address</p>
+                        }
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between ml-1">
+                            <label
+                                class="text-[10px] font-black uppercase tracking-widest text-slate-400">Password</label>
+                            <a routerLink="/auth/forgot-password"
+                                class="text-[10px] font-black text-blue-600 hover:text-blue-500 uppercase tracking-widest">Forgot
+                                Password</a>
+                        </div>
+                        <input type="password" formControlName="password" (paste)="onPasswordPaste($event)"
+                            class="w-full px-5 py-4 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-900 outline-none transition-all text-slate-900 dark:text-white font-medium text-sm shadow-sm"
+                            placeholder="••••••••">
+                    </div>
+
+                    <!-- reCAPTCHA Mock Interface -->
+                    <div class="w-full bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl p-3 flex items-center justify-between shadow-sm hover:border-slate-300 dark:hover:border-slate-600 transition-colors cursor-pointer"
+                        (click)="openCaptcha()">
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="w-7 h-7 bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-600 rounded flex items-center justify-center transition-all">
+                                @if (isCaptchaVerified()) {
+                                <svg class="w-5 h-5 text-green-500 animate-slide-in" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="3">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                                } @else {
+                                <!-- Empty checkbox box -->
+                                }
+                            </div>
+                            <span class="font-bold text-slate-700 dark:text-slate-300 text-sm tracking-wide">I'm not a
+                                robot</span>
+                        </div>
+                        <div class="flex flex-col items-center">
+                            <div class="flex flex-col items-center justify-center gap-[2px]">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-blue-500"
+                                    viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm-2 14.5v-9l6 4.5-6 4.5z" />
+                                </svg>
+                            </div>
+                            <span
+                                class="text-[8px] text-slate-400 font-bold uppercase tracking-widest mt-1">reCAPTCHA</span>
+                        </div>
+                    </div>
+
+                    <button type="submit" [disabled]="isLoading() || !isCaptchaVerified()"
+                        class="w-full py-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-sm uppercase tracking-widest shadow-xl shadow-blue-500/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                        @if (isLoading()) {
+                        <div class="flex items-center justify-center gap-2">
+                            <svg class="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"
+                                    fill="none"></circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
+                            </svg>
+                            <span>Verifying...</span>
+                        </div>
+                        } @else {
+                        Login
+                        }
+                    </button>
+                </form>
+
+                <div class="pt-8 text-center border-t dark:border-slate-800">
+                    <p class="text-slate-500 dark:text-slate-400 text-sm font-medium">
+                        New Partner?
+                        <a routerLink="/auth/register"
+                            class="text-blue-600 font-black hover:underline underline-offset-4 ml-1">Register
+                            Company</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (isAccountBlocked()) {
+<div
+    class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-2xl animate-fade-in">
+    <div
+        class="max-w-md w-full bg-white dark:bg-slate-900 rounded-[3rem] p-12 shadow-2xl border border-red-500/20 text-center transform animate-slide-up">
+        <div
+            class="w-28 h-28 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-[2.5rem] mx-auto flex items-center justify-center mb-10 shadow-inner group">
+            <svg class="w-14 h-14 group-hover:scale-110 transition-transform duration-500" fill="none"
+                stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 15v2m0 0h.01M12 11h.01M12 7h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+        </div>
+
+        <h1 class="text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tighter mb-4 leading-none">
+            Security Lock</h1>
+        <p class="text-slate-500 dark:text-slate-400 font-medium text-sm leading-relaxed mb-10">
+            This account has been <span class="text-red-600 font-bold">permanently restricted</span> after 3
+            verification rejections.
+        </p>
+
+        <div class="space-y-3 mb-12">
+            <div
+                class="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800/50 text-left">
+                <div
+                    class="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 flex items-center justify-center shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                            d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-[10px] font-black uppercase text-slate-400 tracking-widest">Reason</p>
+                    <p class="text-xs font-bold dark:text-white mt-0.5">Automated Fraud Prevention</p>
+                </div>
+            </div>
+
+            <div
+                class="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800/50 text-left">
+                <div
+                    class="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-[10px] font-black uppercase text-slate-400 tracking-widest">Action Required</p>
+                    <p class="text-xs font-bold dark:text-white mt-0.5">Visit EGI HQ for physical KYC</p>
+                </div>
+            </div>
+        </div>
+
+        <button (click)="isAccountBlocked.set(false)"
+            class="w-full py-5 bg-slate-900 dark:bg-white dark:text-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:scale-[1.02] shadow-2xl active:scale-[0.98] transition-all">
+            Understood
+        </button>
+
+        <div class="mt-8 flex justify-center gap-6">
+            <a href="mailto:support@egi.com"
+                class="text-[10px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-widest transition-colors">Support
+                Portal</a>
+            <div class="w-1 h-1 bg-slate-800 rounded-full my-auto"></div>
+            <a href="#"
+                class="text-[10px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-widest transition-colors">Safety
+                Guidelines</a>
+        </div>
+    </div>
+</div>
+}
+
+<!-- CAPTCHA Overlay Modal -->
+@if (showCaptchaModal()) {
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+    <div
+        class="bg-white dark:bg-slate-900 rounded-lg shadow-2xl w-full max-w-[400px] border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col">
+        <!-- Header -->
+        <div class="p-6 bg-blue-600 text-white flex flex-col gap-2">
+            <span class="text-xs uppercase tracking-widest font-bold opacity-80">Select all images containing</span>
+            <span class="text-3xl font-black">{{ captchaTarget }}</span>
+            <span class="text-xs opacity-80 font-medium">Click verify once you have selected all matching images.</span>
+        </div>
+
+        <!-- Image Grid -->
+        <div class="p-2 grid grid-cols-3 gap-1 bg-slate-50 dark:bg-slate-800">
+            @for (img of captchaImages; track $index) {
+            <div class="relative w-full aspect-square cursor-pointer overflow-hidden rounded bg-slate-200"
+                (click)="toggleCaptchaImage($index)">
+
+                <img [src]="img" class="w-full h-full object-cover transition-transform"
+                    [class.scale-90]="selectedCaptchaIndices().includes($index)" alt="Captcha grid item">
+
+                <!-- Selected Check Overlay -->
+                @if (selectedCaptchaIndices().includes($index)) {
+                <div class="absolute inset-0 bg-blue-600/30 flex items-center justify-center">
+                    <div
+                        class="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center -translate-y-4 translate-x-4 shadow border border-white">
+                        <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                            stroke-width="3">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                </div>
+                }
+            </div>
+            }
+        </div>
+
+        <!-- Footer / Error -->
+        <div
+            class="p-4 bg-white dark:bg-slate-900 flex items-center justify-between border-t border-slate-200 dark:border-slate-800">
+            <div class="flex items-center gap-2">
+                <button (click)="refreshCaptcha()" title="Get new challenge"
+                    class="p-2 text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-full transition-all">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                        class="w-5 h-5 hover:rotate-180 transition-transform duration-500" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                        <path d="M3 3v5h5" />
+                    </svg>
+                </button>
+                @if (captchaError()) {
+                <p class="text-red-500 font-bold text-[10px] md:text-xs">Incorrect! Try again.</p>
+                }
+            </div>
+
+            <div class="flex gap-3 items-center">
+                <button (click)="closeCaptcha()"
+                    class="px-4 py-2 font-black text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 uppercase tracking-widest text-xs">
+                    Cancel
+                </button>
+                <button (click)="verifyCaptcha()"
+                    class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-widest rounded shadow-[0_0_15px_rgba(37,99,235,0.3)] transition-all active:scale-95">
+                    Verify
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+}

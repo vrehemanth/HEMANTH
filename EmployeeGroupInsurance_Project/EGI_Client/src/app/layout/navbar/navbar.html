@@ -1,0 +1,259 @@
+<div class="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden relative">
+
+    <!-- Mobile Backdrop Overlay -->
+    @if (isSidebarOpen()) {
+    <div (click)="isSidebarOpen.set(false)"
+        class="fixed inset-0 bg-black/50 backdrop-blur-sm z-20 md:hidden transition-opacity duration-300">
+    </div>
+    }
+
+    <!-- Sidebar -->
+    <aside [class.translate-x-0]="isSidebarOpen()" [class.-translate-x-full]="!isSidebarOpen()"
+        class="fixed inset-y-0 left-0 w-64 md:relative md:translate-x-0 flex flex-col transition-transform duration-300 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 shadow-sm z-30 overflow-hidden">
+
+        <div class="h-16 flex items-center justify-between px-6 border-b border-gray-200 dark:border-gray-700">
+            <div class="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    class="text-primary-600 dark:text-primary-500">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+                <h1
+                    class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-primary-500 uppercase tracking-tighter">
+                    EGI
+                </h1>
+            </div>
+            <!-- Close button for mobile -->
+            <button (click)="isSidebarOpen.set(false)"
+                class="md:hidden text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 6 6 18" />
+                    <path d="m6 6 12 12" />
+                </svg>
+            </button>
+        </div>
+
+        <nav class="flex-1 overflow-y-auto py-6 px-3 space-y-1">
+            @for (link of getNavigationLinks(); track link.path) {
+            <a [routerLink]="link.path" (click)="isSidebarOpen.set(false)"
+                [class.pointer-events-none]="userRole.toLowerCase() === 'customer' && !isProfileApproved() && !link.path.includes('/profile')"
+                [class.opacity-50]="userRole.toLowerCase() === 'customer' && !isProfileApproved() && !link.path.includes('/profile')"
+                routerLinkActive="bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 border-l-4 border-primary-600"
+                [routerLinkActiveOptions]="{exact: false}"
+                class="flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-all group group-[.active]:shadow-sm">
+                <span [innerHTML]="link.icon"
+                    class="text-gray-400 group-hover:text-primary-500 group-[.active]:text-primary-600 transition-colors w-5 h-5"></span>
+                {{ link.label }}
+            </a>
+            }
+        </nav>
+
+        <div class="p-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
+            @if (!authService.currentUser()?.requirePasswordChange) {
+            <a routerLink="/settings/change-password" (click)="isSidebarOpen.set(false)"
+                class="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded-lg transition-colors cursor-pointer">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                Change Password
+            </a>
+            }
+            <button (click)="logout()"
+                class="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all group">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    class="group-hover:-translate-x-1 transition-transform">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" x2="9" y1="12" y2="12" />
+                </svg>
+                Sign Out
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col overflow-hidden relative">
+
+        <!-- App Bar -->
+        <header
+            class="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm flex items-center justify-between px-4 md:px-6 z-10 transition-colors duration-300">
+            <div class="flex items-center gap-3">
+                <!-- Hamburger Menu for mobile -->
+                <button (click)="isSidebarOpen.set(true)"
+                    class="p-2 md:hidden text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="3" x2="21" y1="6" y2="6" />
+                        <line x1="3" x2="21" y1="12" y2="12" />
+                        <line x1="3" x2="21" y1="18" y2="18" />
+                    </svg>
+                </button>
+                <h2 class="text-lg font-bold text-gray-800 dark:text-gray-200 truncate max-w-[150px] md:max-w-none">Hi,
+                    {{ userName }}</h2>
+            </div>
+
+            <div class="flex items-center gap-2 md:gap-4">
+
+                <!-- Theme Toggle -->
+                <button (click)="themeService.toggleTheme()"
+                    class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-all rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 group">
+                    @if (themeService.isDarkMode()) {
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                        class="group-hover:rotate-12 transition-transform">
+                        <circle cx="12" cy="12" r="4" />
+                        <path d="M12 2v2" />
+                        <path d="M12 20v2" />
+                        <path d="m4.93 4.93 1.41 1.41" />
+                        <path d="m17.66 17.66 1.41 1.41" />
+                        <path d="M2 12h2" />
+                        <path d="M20 12h2" />
+                        <path d="m6.34 17.66-1.41 1.41" />
+                        <path d="m19.07 4.93-1.41 1.41" />
+                    </svg>
+                    } @else {
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                        class="group-hover:-rotate-12 transition-transform">
+                        <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+                    </svg>
+                    }
+                </button>
+
+                <!-- Notifications Bell -->
+                <div class="relative">
+                    @if (!authService.currentUser()?.requirePasswordChange) {
+                    <button (click)="toggleNotifications()"
+                        class="relative w-10 h-10 rounded-xl flex items-center justify-center text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all group">
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                            class="h-6 w-6 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
+                        @if (notificationService.unreadCount() > 0) {
+                        <span
+                            class="absolute top-2 right-2 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800 animate-bounce">
+                            {{ notificationService.unreadCount() }}
+                        </span>
+                        <span
+                            class="absolute top-2 right-2 w-4 h-4 bg-red-500 rounded-full animate-ping opacity-75"></span>
+                        }
+                    </button>
+                    }
+
+                    <!-- Notification Dropdown -->
+                    @if (showNotifications()) {
+                    <div
+                        class="fixed md:absolute right-4 md:right-0 mt-2 w-[calc(100vw-32px)] md:w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 z-[60] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 max-h-[80vh] flex flex-col">
+                        <div
+                            class="p-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between shrink-0">
+                            <h3 class="font-bold text-gray-900 dark:text-white">Recent Activity</h3>
+                            <button (click)="notificationService.markAllAsRead()"
+                                class="text-xs font-black text-primary-600 hover:text-primary-500 uppercase tracking-wider">Mark
+                                all read</button>
+                        </div>
+
+                        <div class="overflow-y-auto">
+                            @if (notificationService.notifications().length === 0) {
+                            <div class="p-8 text-center">
+                                <div
+                                    class="w-12 h-12 rounded-full bg-gray-50 dark:bg-gray-900 flex items-center justify-center mx-auto mb-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-400" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                                    </svg>
+                                </div>
+                                <p class="text-sm font-medium text-gray-500">Inbox is empty</p>
+                            </div>
+                            } @else {
+                            @for (n of notificationService.notifications(); track n.id) {
+                            <div (click)="notificationService.markAsRead(n.id)"
+                                class="p-4 border-b border-gray-50 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer transition-colors relative"
+                                [class.bg-blue-50/30]="!n.isRead" [class.dark:bg-primary-900/10]="!n.isRead">
+                                @if (!n.isRead) {
+                                <div
+                                    class="absolute top-4 right-4 w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-sm shadow-red-500/50">
+                                </div>
+                                }
+                                <div class="flex gap-3">
+                                    <div [class]="'w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-black/5 ' + 
+                                (n.type === 'Success' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/40' : 
+                                 n.type === 'Error' ? 'bg-red-50 text-red-600 dark:bg-red-900/40' : 
+                                 'bg-blue-50 text-blue-600 dark:bg-blue-900/40')">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none"
+                                            viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </div>
+                                    <div class="space-y-1">
+                                        <p class="text-sm font-bold text-gray-900 dark:text-white leading-tight">{{
+                                            n.title }}</p>
+                                        <p
+                                            class="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed">
+                                            {{ n.message }}
+                                        </p>
+                                        <p class="text-[10px] text-gray-400 font-black uppercase tracking-widest">{{
+                                            n.createdAt |
+                                            date:'shortTime' }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            }
+                            }
+                        </div>
+
+                        <div
+                            class="p-4 text-center border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 shrink-0">
+                            <a routerLink="/notifications/history" (click)="showNotifications.set(false)"
+                                class="text-xs font-black text-primary-600 hover:text-primary-500 flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-widest">
+                                Expand History
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <path d="M5 12h14" />
+                                    <path d="m12 5 7 7-7 7" />
+                                </svg>
+                            </a>
+                        </div>
+                    </div>
+                    }
+                </div>
+
+                <!-- User Profile -->
+                <div class="flex items-center gap-3 pl-2 md:pl-4 border-l border-gray-200 dark:border-gray-700">
+                    <div
+                        class="w-8 h-8 md:w-9 md:h-9 rounded-full bg-primary-100 dark:bg-primary-900/50 flex items-center justify-center text-primary-700 dark:text-primary-400 font-black text-xs md:text-sm border border-primary-200 dark:border-primary-800">
+                        {{ userInitials }}
+                    </div>
+                    <div class="hidden lg:block text-sm">
+                        <p class="font-bold text-gray-700 dark:text-gray-200 leading-tight">{{ userName }}
+                        </p>
+                        <p
+                            class="text-[10px] text-primary-600 dark:text-primary-400 font-black uppercase tracking-widest">
+                            {{ userRole }}</p>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <!-- Main Workspace -->
+        <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-8 relative">
+            <div
+                class="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-primary-600/5 to-transparent dark:from-primary-900/10 pointer-events-none -z-10">
+            </div>
+
+            <!-- Content Area wrapper for better spacing on mobile -->
+            <div class="max-w-7xl mx-auto pb-12">
+                <router-outlet></router-outlet>
+            </div>
+        </main>
+    </div>
+</div>

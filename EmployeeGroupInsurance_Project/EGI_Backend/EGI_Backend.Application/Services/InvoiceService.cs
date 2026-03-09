@@ -12,21 +12,27 @@ namespace EGI_Backend.Application.Services
         private readonly IInvoiceRepository _invoiceRepo;
         private readonly IPaymentRepository _paymentRepo;
         private readonly ICorporateClientRepository _clientRepo;
+        private readonly IPolicyAssignmentRepository _policyRepo;
+        private readonly IAuditLogRepository _auditLogRepo;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
 
-        private const int DueDaysGrace = 7; // Invoice due 7 days after generation
+
 
         public InvoiceService(
             IInvoiceRepository invoiceRepo,
             IPaymentRepository paymentRepo,
             ICorporateClientRepository clientRepo,
+            IPolicyAssignmentRepository policyRepo,
+            IAuditLogRepository auditLogRepo,
             IUnitOfWork unitOfWork,
             IMapper mapper)
         {
             _invoiceRepo = invoiceRepo;
             _paymentRepo = paymentRepo;
             _clientRepo = clientRepo;
+            _policyRepo = policyRepo;
+            _auditLogRepo = auditLogRepo;
             _unitOfWork = unitOfWork;
             _mapper = mapper;
         }
@@ -68,7 +74,7 @@ namespace EGI_Backend.Application.Services
                 BillingPeriodFrom = periodFrom,
                 BillingPeriodTo = periodTo > policy.EndDate.Date ? policy.EndDate.Date : periodTo,
                 Amount = CalculateInvoiceAmount(policy),
-                DueDate = DateTime.UtcNow.AddDays(DueDaysGrace),
+                DueDate = DateTime.UtcNow.AddDays(EGI_Backend.Domain.Constants.BusinessRules.InvoiceDueGraceDays),
                 Status = InvoiceStatus.Pending,
                 CreatedAt = DateTime.UtcNow
             };
@@ -77,15 +83,55 @@ namespace EGI_Backend.Application.Services
             await _unitOfWork.SaveChangesAsync();
         }
 
-        public async Task GenerateAdjustmentInvoiceAsync(PolicyAssignment policy, decimal adjustmentAmount)
+        public async Task ApplyCreditToNextInvoiceAsync(Guid policyAssignmentId, decimal creditAmount)
         {
-            // Only generate if there is a positive adjustment
-            if (adjustmentAmount <= 0) return;
+            if (creditAmount <= 0) return;
+
+            // Find all invoices that aren't paid yet
+            var invoices = await _invoiceRepo.GetByPolicyAssignmentIdAsync(policyAssignmentId);
+            var pendingInvoices = invoices
+                .Where(i => i.Status == InvoiceStatus.Pending || i.Status == InvoiceStatus.Overdue)
+                .OrderBy(i => i.BillingPeriodFrom) // Apply to the SOONEST available invoices first (Waterfall)
+                .ToList();
+
+            if (!pendingInvoices.Any()) return;
+
+            decimal remainingCredit = creditAmount;
+
+            foreach (var targetInvoice in pendingInvoices)
+            {
+                if (remainingCredit <= 0) break;
+
+                // Check if this invoice can swallow the whole credit or just part of it
+                if (targetInvoice.Amount <= remainingCredit)
+                {
+                    // Credit is larger than or equal to this invoice
+                    remainingCredit -= targetInvoice.Amount;
+                    targetInvoice.Amount = 0;
+                    targetInvoice.Status = InvoiceStatus.Paid;
+                }
+                else
+                {
+                    // Credit is smaller than this invoice
+                    targetInvoice.Amount = Math.Round(targetInvoice.Amount - remainingCredit, 2);
+                    remainingCredit = 0;
+                }
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        public async Task GenerateAdjustmentInvoiceAsync(PolicyAssignment policy, decimal adjustmentAmount, DateTime? customPeriodTo = null)
+        {
+            decimal roundedAmount = Math.Round(adjustmentAmount, 2);
+
+            // Only generate if there is a positive adjustment after rounding
+            if (roundedAmount <= 0) return;
 
             // An adjustment invoice covers from "Today" until the end of the CURRENT billing period.
-            // For simplicity, we align it to the end of the policy's first year if it's an annual plan.
+            // For Monthly payers, this is the current month. For Annual, it's the year-end.
             var periodFrom = DateTime.UtcNow.Date;
-            var periodTo = policy.EndDate.Date; // Until end of the policy year
+            var periodTo = (customPeriodTo ?? policy.EndDate).Date; 
 
             var invoice = new Invoice
             {
@@ -95,8 +141,8 @@ namespace EGI_Backend.Application.Services
                 InvoiceDate = DateTime.UtcNow,
                 BillingPeriodFrom = periodFrom,
                 BillingPeriodTo = periodTo,
-                Amount = adjustmentAmount, // ONLY the extra amount, not the new total
-                DueDate = DateTime.UtcNow.AddDays(DueDaysGrace),
+                Amount = roundedAmount, // ONLY the extra amount, not the new total
+                DueDate = DateTime.UtcNow.AddDays(EGI_Backend.Domain.Constants.BusinessRules.InvoiceDueGraceDays),
                 Status = InvoiceStatus.Pending,
                 CreatedAt = DateTime.UtcNow
             };
@@ -123,12 +169,12 @@ namespace EGI_Backend.Application.Services
                 // We don't want to generate invoices for Year 2030 while we are in 2026!
                 if (nextPeriodFrom > DateTime.UtcNow.AddDays(30))
                 {
-                    continue; 
+                    continue;
                 }
 
                 // Don't generate beyond the policy EndDate or if the next period hasn't started yet
                 if (nextPeriodFrom > policy.EndDate.Date) continue;
-                
+
                 // CRITICAL: Check if we have already generated an invoice for this year to avoid duplicates on app restarts
                 var alreadyExists = await _invoiceRepo.GetByPolicyAssignmentIdAsync(policy.Id);
                 if (alreadyExists.Any(i => i.BillingPeriodFrom.Date == nextPeriodFrom.Date && !i.InvoiceNo.EndsWith("-ADJ")))
@@ -145,7 +191,7 @@ namespace EGI_Backend.Application.Services
                     BillingPeriodFrom = nextPeriodFrom,
                     BillingPeriodTo = nextPeriodTo > policy.EndDate.Date ? policy.EndDate.Date : nextPeriodTo,
                     Amount = CalculateInvoiceAmount(policy),
-                    DueDate = DateTime.UtcNow.AddDays(DueDaysGrace),
+                    DueDate = DateTime.UtcNow.AddDays(EGI_Backend.Domain.Constants.BusinessRules.InvoiceDueGraceDays),
                     Status = InvoiceStatus.Pending,
                     CreatedAt = DateTime.UtcNow
                 };
@@ -176,8 +222,12 @@ namespace EGI_Backend.Application.Services
             if (invoice.Status == InvoiceStatus.Paid)
                 throw new BadRequestException("Invoice is already paid.");
 
-            if (dto.PaidAmount < invoice.Amount)
-                throw new BadRequestException($"Paid amount (₹{dto.PaidAmount}) is less than the invoice amount (₹{invoice.Amount}).");
+            decimal balanceBefore = invoice.Amount - invoice.TotalPaid;
+            if (dto.PaidAmount <= 0)
+                throw new BadRequestException("Paid amount must be greater than zero.");
+
+            if (dto.PaidAmount > balanceBefore)
+                throw new BadRequestException($"Paid amount (₹{dto.PaidAmount}) exceeds the remaining balance (₹{balanceBefore}).");
 
             var payment = new Payment
             {
@@ -192,7 +242,42 @@ namespace EGI_Backend.Application.Services
                 CreatedAt = DateTime.UtcNow
             };
 
-            invoice.Status = InvoiceStatus.Paid;
+            invoice.TotalPaid += dto.PaidAmount;
+            
+            if (invoice.TotalPaid >= invoice.Amount)
+                invoice.Status = InvoiceStatus.Paid;
+            else
+                invoice.Status = InvoiceStatus.PartiallyPaid;
+
+            // COMMISSION CALCULATION: Based on THIS POLICY'S categorized size
+            var policy = await _policyRepo.GetByIdWithDetailsAsync(invoice.PolicyAssignmentId);
+            if (policy != null)
+            {
+                decimal commissionPercentage = EGI_Backend.Domain.Constants.BusinessRules.GetCommissionRate(policy.BusinessCategory);
+
+                // Commission is earned on the CURRENT paid amount
+                decimal earnedCommission = Math.Round(dto.PaidAmount * commissionPercentage, 2);
+                invoice.CommissionEarned += earnedCommission; // Accumulate as they pay
+                policy.CommissionAmount += earnedCommission;
+                
+                await _policyRepo.UpdateAsync(policy);
+
+                // AUDIT LOGGING: CommissionEvent for transparency
+                var agentName = policy.Agent?.Name ?? "Unknown Agent";
+                var ratePercent = (int)(commissionPercentage * 100);
+                var logMessage = $"Commission of ₹{earnedCommission} calculated for Agent {agentName} on Invoice #{invoice.InvoiceNo} (Amount: ₹{dto.PaidAmount}, Rate: {ratePercent}%)";
+
+                await _auditLogRepo.AddAsync(new AuditLog
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = policy.AgentId.ToString(),
+                    Action = "CommissionCalculation",
+                    EntityName = "Invoice",
+                    EntityId = invoice.Id.ToString(),
+                    NewValues = logMessage,
+                    Timestamp = DateTime.UtcNow
+                });
+            }
 
             await _paymentRepo.AddAsync(payment);
             await _unitOfWork.SaveChangesAsync();

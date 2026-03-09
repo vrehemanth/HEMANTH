@@ -1,0 +1,49 @@
+<div class="flex items-center justify-center py-20 animate-in fade-in zoom-in duration-300">
+    <div
+        class="max-w-md w-full bg-white dark:bg-gray-800 rounded-3xl p-8 text-center shadow-2xl border border-red-100 dark:border-red-900/30">
+        <div
+            class="w-24 h-24 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-6 relative">
+            <div class="absolute inset-0 bg-red-100 dark:bg-red-900/40 rounded-full animate-ping opacity-25"></div>
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                class="text-red-600 dark:text-red-500 relative z-10">
+                <rect width="20" height="14" x="2" y="5" rx="2" />
+                <line x1="2" x2="22" y1="10" y2="10" />
+                <path d="m11 15 2-2" />
+                <path d="m13 15-2-2" />
+            </svg>
+        </div>
+
+        <h2 class="text-2xl font-black text-gray-900 dark:text-white mb-2">Policy Benefits Blocked</h2>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-8 leading-relaxed">
+            Your claim submission request has been halted. We detected an <strong
+                class="text-red-600 dark:text-red-400">unpaid premium invoice</strong> associated with your account. You
+            cannot file benefit claims until all outstanding balances have been completely settled.
+        </p>
+
+        <div
+            class="bg-gray-50 dark:bg-gray-900/50 rounded-2xl p-4 mb-8 text-left border border-gray-100 dark:border-gray-800">
+            <h4 class="text-[10px] font-black uppercase text-gray-400 tracking-wider mb-2">Required Action</h4>
+            <ul class="text-xs font-semibold text-gray-600 dark:text-gray-300 space-y-2">
+                <li class="flex items-center gap-2">
+                    <div class="w-1 h-1 bg-red-500 rounded-full"></div> Let billing ledger load.
+                </li>
+                <li class="flex items-center gap-2">
+                    <div class="w-1 h-1 bg-red-500 rounded-full"></div> Locate your Unpaid Invoices.
+                </li>
+                <li class="flex items-center gap-2">
+                    <div class="w-1 h-1 bg-red-500 rounded-full"></div> Settle balance to unlock claims platform.
+                </li>
+            </ul>
+        </div>
+
+        <button (click)="goToBilling()"
+            class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-red-500/25 transition-all outline-none">
+            Go to Billing Ledger &rarr;
+        </button>
+        <button (click)="goToBilling()"
+            class="mt-4 text-[11px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 underline font-medium">
+            Take me back to billing overview
+        </button>
+    </div>
+</div>

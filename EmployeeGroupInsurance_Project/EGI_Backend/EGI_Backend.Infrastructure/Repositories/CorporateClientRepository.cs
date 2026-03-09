@@ -21,9 +21,11 @@ namespace EGI_Backend.Infrastructure.Repositories
         }
 
         public async Task<CorporateClient?> GetByUserIdAsync(Guid userId)
-        =>   await _context.CorporateClients
+        => await _context.CorporateClients
+            .Include(c => c.User)
+            .Include(c => c.Documents)
             .FirstOrDefaultAsync(c => c.UserId == userId);
-        
+
 
         public async Task AddAsync(CorporateClient client)
             => await _context.CorporateClients.AddAsync(client);
@@ -31,6 +33,7 @@ namespace EGI_Backend.Infrastructure.Repositories
         public async Task<List<CorporateClient>> GetPendingAsync()
             => await _context.CorporateClients
                 .Include(c => c.User)
+                .Include(c => c.Documents)
                 .Where(c => c.Status == VerificationStatus.Pending)
                 .ToListAsync();
 
@@ -40,6 +43,7 @@ namespace EGI_Backend.Infrastructure.Repositories
         public async Task<List<CorporateClient>> GetAllAsync()
             => await _context.CorporateClients
                 .Include(c => c.User)
+                .Include(c => c.Documents)
                 .ToListAsync();
 
         public async Task SaveChangesAsync()
@@ -48,6 +52,24 @@ namespace EGI_Backend.Infrastructure.Repositories
         public async Task<CorporateClient?> GetByIdAsync(Guid id)
             => await _context.CorporateClients
                 .Include(c => c.User)
+                .Include(c => c.Documents)
                 .FirstOrDefaultAsync(c => c.Id == id);
+
+        public async Task<int> GetTotalLiveMembersCountAsync(Guid clientId)
+        {
+            var activePolicies = await _context.PolicyAssignments
+                .Where(p => p.CorporateClientId == clientId && p.Status == PolicyStatus.Active)
+                .Include(p => p.Members)
+                    .ThenInclude(m => m.Dependents)
+                .ToListAsync();
+
+            int count = 0;
+            foreach (var policy in activePolicies)
+            {
+                count += policy.Members.Count;
+                count += policy.Members.Sum(m => m.Dependents.Count);
+            }
+            return count;
+        }
     }
 }

@@ -8,9 +8,9 @@ namespace EGI_Backend.Domain.Enums
 {
     public enum VerificationStatus
     {
-        Draft=0,
-        Pending=1,
-        Approved=2,
-        Rejected=3
+        Draft = 0,
+        Pending = 1,
+        Approved = 2,
+        Rejected = 3
     }
 }

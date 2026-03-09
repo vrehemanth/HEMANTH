@@ -8,7 +8,7 @@ namespace EGI_Backend.Application.DTOs
         public Guid PolicyAssignmentId { get; set; }
         public EndorsementType Type { get; set; }
         public string Description { get; set; } = string.Empty;
-        
+
         // Use object here so Swagger allows direct JSON entry instead of escaped string!
         public object EndorsementData { get; set; } = null!;
     }
@@ -27,6 +27,7 @@ namespace EGI_Backend.Application.DTOs
         public string EndorsementData { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public decimal PremiumAdjustment { get; set; }
+        public decimal CommissionAdjustment { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? ReviewedAt { get; set; }
     }

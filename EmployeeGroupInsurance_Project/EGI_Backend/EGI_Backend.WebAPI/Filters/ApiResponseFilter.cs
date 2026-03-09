@@ -20,7 +20,7 @@ namespace EGI_Backend.WebAPI.Filters
                 // Wrap the successful result
                 var resultType = objectResult.Value.GetType();
                 var wrapperType = typeof(ApiResponse<>).MakeGenericType(resultType);
-                
+
                 var wrappedResult = Activator.CreateInstance(wrapperType, true, "Operation successful", objectResult.Value, null);
 
                 objectResult.Value = wrappedResult;

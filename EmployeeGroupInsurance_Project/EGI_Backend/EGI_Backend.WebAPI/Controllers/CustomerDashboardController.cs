@@ -5,16 +5,15 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace EGI_Backend.WebAPI.Controllers
 {
     [Authorize(Roles = "Customer")]
-    [ApiController]
+    [Authorize(Roles = "Customer")]
     [Route("api/customer/dashboard")]
-    public class CustomerDashboardController : ControllerBase
+    public class CustomerDashboardController : BaseApiController
     {
         private readonly ICustomerDashboardService _dashboardService;
         private readonly ICorporateClientService _clientService;
@@ -22,6 +21,7 @@ namespace EGI_Backend.WebAPI.Controllers
         private readonly IInvoiceService _invoiceService;
         private readonly IClaimService _claimService;
         private readonly IPolicyEndorsementService _endorsementService;
+        private readonly IInsurancePlanService _planService;
 
         public CustomerDashboardController(
             ICustomerDashboardService dashboardService,
@@ -29,21 +29,52 @@ namespace EGI_Backend.WebAPI.Controllers
             IPolicyAssignmentService policyService,
             IInvoiceService invoiceService,
             IClaimService claimService,
-            IPolicyEndorsementService endorsementService)
+            IPolicyEndorsementService endorsementService,
+            IInsurancePlanService planService)
         {
-            _dashboardService = dashboardService;
-            _clientService = clientService;
-            _policyService = policyService;
-            _invoiceService = invoiceService;
-            _claimService = claimService;
-            _endorsementService = endorsementService;
+            _dashboardService    = dashboardService;
+            _clientService       = clientService;
+            _policyService       = policyService;
+            _invoiceService      = invoiceService;
+            _claimService        = claimService;
+            _endorsementService  = endorsementService;
+            _planService         = planService;
         }
+
+
+
+        // ─── Profile ──────────────────────────────────────────────
+
+        [HttpGet("profile")]
+        public async Task<IActionResult> GetProfile()
+        {
+            var result = await _dashboardService.GetProfileAsync(CurrentUserId);
+            return Ok(result);
+        }
+
+        // ─── Insurance Plans ─────────────────────────────────────
+
+        [HttpGet("insurance-plans")]
+        public async Task<ActionResult<List<InsurancePlanDto>>> GetAllPlans()
+        {
+            var plans = await _planService.GetActivePlansAsync();
+            return Ok(plans);
+        }
+
+        [HttpGet("insurance-plans/{id}")]
+        public async Task<IActionResult> GetInsurancePlanById(Guid id)
+        {
+            var plan = await _planService.GetPlanByIdAsync(id);
+            if (plan == null) return NotFound("Plan not found");
+            return Ok(plan);
+        }
+
+        // ─── Endorsements ────────────────────────────────────────
 
         [HttpPost("submit-endorsement")]
         public async Task<IActionResult> SubmitEndorsement([FromBody] SubmitEndorsementDto dto)
         {
-            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            var result = await _endorsementService.SubmitEndorsementAsync(userId, dto);
+            var result = await _endorsementService.SubmitEndorsementAsync(CurrentUserId, dto);
             return Ok(result);
         }
 
@@ -54,21 +85,23 @@ namespace EGI_Backend.WebAPI.Controllers
             return Ok(result);
         }
 
+        // ─── Profile & Documents ─────────────────────────────────
+
         [HttpPost("complete-profile")]
         public async Task<IActionResult> CompleteProfile(CreateCorporateProfileDto dto)
         {
-            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            await _clientService.CreateProfileAsync(userId, dto);
+            await _clientService.CreateProfileAsync(CurrentUserId, dto);
             return Ok(new { message = "Profile created successfully." });
         }
 
         [HttpPost("upload-document")]
         public async Task<IActionResult> UploadDocument([FromForm] UploadCorporateDocumentDto dto)
         {
-            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            var result = await _clientService.UploadDocumentAsync(userId, dto);
+            var result = await _clientService.UploadDocumentAsync(CurrentUserId, dto);
             return Ok(result);
         }
+
+        // ─── Members ─────────────────────────────────────────────
 
         [HttpPost("upload-members")]
         public async Task<IActionResult> UploadMembersExcel([FromForm] UploadMembersDto dto)
@@ -83,6 +116,8 @@ namespace EGI_Backend.WebAPI.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+
+        // ─── Invoices ────────────────────────────────────────────
 
         [HttpGet("invoices/{invoiceId}")]
         public async Task<IActionResult> GetInvoiceDetail(Guid invoiceId)
@@ -101,17 +136,8 @@ namespace EGI_Backend.WebAPI.Controllers
         [HttpPost("pay-invoice/{invoiceId}")]
         public async Task<IActionResult> PayInvoice(Guid invoiceId, [FromBody] PayInvoiceDto dto)
         {
-            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            var result = await _invoiceService.PayInvoiceAsync(invoiceId, userId, dto);
+            var result = await _invoiceService.PayInvoiceAsync(invoiceId, CurrentUserId, dto);
             return Ok(result);
-        }
-
-        [HttpPost("submit-claim")]
-        public async Task<IActionResult> SubmitClaim([FromForm] SubmitClaimDto dto)
-        {
-            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            var result = await _claimService.SubmitClaimAsync(userId, dto);
-            return Ok(new { message = result });
         }
 
         [HttpGet("invoices/policy/{policyAssignmentId}")]
@@ -121,6 +147,15 @@ namespace EGI_Backend.WebAPI.Controllers
             return Ok(invoices);
         }
 
+        // ─── Claims ──────────────────────────────────────────────
+
+        [HttpPost("submit-claim")]
+        public async Task<IActionResult> SubmitClaim([FromForm] SubmitClaimDto dto)
+        {
+            var result = await _claimService.SubmitClaimAsync(CurrentUserId, dto);
+            return Ok(new { message = result });
+        }
+
         [HttpGet("claims/policy/{policyAssignmentId}")]
         public async Task<IActionResult> GetClaimsByPolicy(Guid policyAssignmentId)
         {
@@ -128,69 +163,55 @@ namespace EGI_Backend.WebAPI.Controllers
             return Ok(claims);
         }
 
+        // ─── Dashboard Aggregates ─────────────────────────────────
+
+        [HttpGet("overview")]
+        public async Task<IActionResult> GetOverview()
+        {
+            var overview = await _dashboardService.GetOverviewAsync(CurrentUserId);
+            return Ok(overview);
+        }
+
         [HttpGet("summary")]
         public async Task<ActionResult<CustomerDashboardSummaryDto>> GetSummary()
         {
-            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userId))
-            {
-                return Unauthorized();
-            }
-
-            var summary = await _dashboardService.GetSummaryAsync(userId);
+            var summary = await _dashboardService.GetSummaryAsync(CurrentUserId);
             return Ok(summary);
         }
 
         [HttpGet("my-policies")]
         public async Task<ActionResult<List<PolicyAssignmentResponseDto>>> GetMyPolicies()
         {
-            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userId))
-            {
-                return Unauthorized();
-            }
-
-            var policies = await _dashboardService.GetMyPoliciesAsync(userId);
+            var policies = await _dashboardService.GetMyPoliciesAsync(CurrentUserId);
             return Ok(policies);
         }
 
         [HttpGet("my-members")]
         public async Task<ActionResult<List<MemberResponseDto>>> GetMyMembers()
         {
-            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userId))
-            {
-                return Unauthorized();
-            }
-
-            var members = await _dashboardService.GetMyMembersAsync(userId);
+            var members = await _dashboardService.GetMyMembersAsync(CurrentUserId);
             return Ok(members);
         }
 
         [HttpGet("my-claims")]
         public async Task<ActionResult<List<ClaimResponseDto>>> GetMyClaims()
         {
-            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userId))
-            {
-                return Unauthorized();
-            }
-
-            var claims = await _dashboardService.GetMyClaimsAsync(userId);
+            var claims = await _dashboardService.GetMyClaimsAsync(CurrentUserId);
             return Ok(claims);
         }
 
         [HttpGet("my-invoices")]
         public async Task<ActionResult<List<InvoiceResponseDto>>> GetMyInvoices()
         {
-            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userId))
-            {
-                return Unauthorized();
-            }
-
-            var invoices = await _dashboardService.GetMyInvoicesAsync(userId);
+            var invoices = await _dashboardService.GetMyInvoicesAsync(CurrentUserId);
             return Ok(invoices);
+        }
+
+        [HttpGet("my-endorsements")]
+        public async Task<ActionResult<List<EndorsementResponseDto>>> GetMyEndorsements()
+        {
+            var endorsements = await _dashboardService.GetMyEndorsementsAsync(CurrentUserId);
+            return Ok(endorsements);
         }
     }
 }

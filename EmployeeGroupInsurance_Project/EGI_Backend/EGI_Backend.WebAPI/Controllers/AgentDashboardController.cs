@@ -12,9 +12,8 @@ using System.Threading.Tasks;
 namespace EGI_Backend.WebAPI.Controllers
 {
     [Authorize(Roles = "Agent")]
-    [ApiController]
     [Route("api/agent/dashboard")]
-    public class AgentDashboardController : ControllerBase
+    public class AgentDashboardController : BaseApiController
     {
         private readonly IAgentDashboardService _dashboardService;
         private readonly IAgentCustomerService _agentCustService;
@@ -45,11 +44,7 @@ namespace EGI_Backend.WebAPI.Controllers
         [HttpPost("review-endorsement/{id}")]
         public async Task<IActionResult> ReviewEndorsement(Guid id, [FromBody] ReviewEndorsementDto dto)
         {
-            var agentIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(agentIdStr) || !Guid.TryParse(agentIdStr, out var agentId))
-                return Unauthorized();
-
-            var result = await _endorsementService.ReviewEndorsementAsync(agentId, id, dto);
+            var result = await _endorsementService.ReviewEndorsementAsync(CurrentUserId, id, dto);
             return Ok(result);
         }
 
@@ -70,18 +65,14 @@ namespace EGI_Backend.WebAPI.Controllers
         [HttpPost("create-customer")]
         public async Task<IActionResult> CreateCustomer([FromForm] AgentCreateCustomerDto dto)
         {
-            var agentIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(agentIdStr) || !Guid.TryParse(agentIdStr, out var agentId))
-                return Unauthorized();
-
-            await _agentCustService.CreateCustomerByAgentAsync(agentId, dto);
+            await _agentCustService.CreateCustomerByAgentAsync(CurrentUserId, dto);
             return Ok(new { message = "Customer created and documents uploaded successfully." });
         }
 
         [HttpGet("insurance-plans")]
         public async Task<ActionResult<List<InsurancePlanDto>>> GetAllPlans()
         {
-            var plans = await _planService.GetAllPlansAsync();
+            var plans = await _planService.GetActivePlansAsync();
             return Ok(plans);
         }
 
@@ -131,40 +122,29 @@ namespace EGI_Backend.WebAPI.Controllers
         [HttpGet("summary")]
         public async Task<ActionResult<AgentDashboardSummaryDto>> GetSummary()
         {
-            var agentIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(agentIdStr) || !Guid.TryParse(agentIdStr, out var agentId))
-            {
-                return Unauthorized();
-            }
-
-            var summary = await _dashboardService.GetSummaryAsync(agentId);
+            var summary = await _dashboardService.GetSummaryAsync(CurrentUserId);
             return Ok(summary);
         }
 
         [HttpGet("my-customers")]
         public async Task<ActionResult<List<CorporateClientResponseDto>>> GetMyCustomers()
         {
-            var agentIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(agentIdStr) || !Guid.TryParse(agentIdStr, out var agentId))
-            {
-                return Unauthorized();
-            }
-
-            var customers = await _dashboardService.GetMyCustomersAsync(agentId);
+            var customers = await _dashboardService.GetMyCustomersAsync(CurrentUserId);
             return Ok(customers);
         }
 
         [HttpGet("my-policies")]
         public async Task<ActionResult<List<PolicyAssignmentResponseDto>>> GetMyPolicies()
         {
-            var agentIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(agentIdStr) || !Guid.TryParse(agentIdStr, out var agentId))
-            {
-                return Unauthorized();
-            }
-
-            var policies = await _dashboardService.GetMyPoliciesAsync(agentId);
+            var policies = await _dashboardService.GetMyPoliciesAsync(CurrentUserId);
             return Ok(policies);
+        }
+
+        [HttpGet("commissions")]
+        public async Task<ActionResult<List<AuditLogResponseDto>>> GetCommissions()
+        {
+            var logs = await _dashboardService.GetCommissionLogsAsync(CurrentUserId);
+            return Ok(logs);
         }
     }
 }

@@ -8,6 +8,7 @@ namespace EGI_Backend.Application.Interfaces
     public interface IInsurancePlanService
     {
         Task<List<InsurancePlanDto>> GetAllPlansAsync();
+        Task<List<InsurancePlanDto>> GetActivePlansAsync();
         Task<InsurancePlanDto?> GetPlanByIdAsync(Guid id);
         Task<InsurancePlanDto> CreatePlanAsync(CreateInsurancePlanDto dto);
         Task<InsurancePlanDto> UpdatePlanAsync(Guid id, UpdateInsurancePlanDto dto);

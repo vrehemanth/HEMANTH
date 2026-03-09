@@ -3,6 +3,8 @@ using EGI_Backend.Application.DTOs;
 using EGI_Backend.Application.Interfaces;
 using EGI_Backend.Domain.Entities;
 using EGI_Backend.Domain.Enums;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,73 +14,191 @@ namespace EGI_Backend.Application.Services
 {
     public class AdminDashboardService : IAdminDashboardService
     {
-        private readonly IUserRepository _userRepo;
-        private readonly ICorporateClientRepository _clientRepo;
-        private readonly IClaimRepository _claimRepo;
-        private readonly IPolicyAssignmentRepository _policyRepo;
-        private readonly IAuditLogRepository _auditRepo;
-        private readonly IInvoiceRepository _invoiceRepo;
+        private readonly IServiceScopeFactory _scopeFactory;
         private readonly ICorporateClientService _corporateService;
         private readonly IMapper _mapper;
+        private readonly IMemoryCache _cache;
+
+        private const string CacheKey = "AdminDashboardSummary";
 
         public AdminDashboardService(
-            IUserRepository userRepo,
-            ICorporateClientRepository clientRepo,
-            IClaimRepository claimRepo,
-            IPolicyAssignmentRepository policyRepo,
-            IAuditLogRepository auditRepo,
-            IInvoiceRepository invoiceRepo,
+            IServiceScopeFactory scopeFactory,
             ICorporateClientService corporateService,
-            IMapper mapper)
+            IMapper mapper,
+            IMemoryCache cache)
         {
-            _userRepo = userRepo;
-            _clientRepo = clientRepo;
-            _claimRepo = claimRepo;
-            _policyRepo = policyRepo;
-            _auditRepo = auditRepo;
-            _invoiceRepo = invoiceRepo;
+            _scopeFactory = scopeFactory;
             _corporateService = corporateService;
             _mapper = mapper;
+            _cache = cache;
         }
 
         public async Task<DashboardSummaryDto> GetSummaryAsync()
         {
-            return new DashboardSummaryDto
+            // Instant load from cache if available (5s sliding)
+            if (_cache.TryGetValue(CacheKey, out DashboardSummaryDto cachedSummary))
             {
-                AgentCount = await _userRepo.CountByRoleAsync(UserRole.Agent),
-                CustomerCount = await _userRepo.CountByRoleAsync(UserRole.Customer),
-                ClaimsOfficerCount = await _userRepo.CountByRoleAsync(UserRole.ClaimsOfficer),
-                PendingClientsCount = await _clientRepo.CountPendingAsync(),
-                TotalClaimsCount = await _claimRepo.CountAsync(),
-                PendingClaimsCount = await _claimRepo.CountPendingAsync(),
-                TotalPoliciesCount = await _policyRepo.CountAsync(),
-                TotalRevenue = await _invoiceRepo.GetTotalRevenueAsync(),
-                TotalPayouts = await _claimRepo.GetTotalPayoutsAsync(),
-                TotalCommissionPayouts = await _policyRepo.GetTotalCommissionAsync()
+                return cachedSummary;
+            }
+
+            // TRUE PARALLELISM: Use separate scopes/contexts for each metric
+            // This bypasses the thread-safety limitation of a single DbContext
+            
+            var agentCountTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IUserRepository>().CountByRoleAsync(UserRole.Agent);
+            });
+
+            var customerCountTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IUserRepository>().CountByRoleAsync(UserRole.Customer);
+            });
+
+            var officerCountTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IUserRepository>().CountByRoleAsync(UserRole.ClaimsOfficer);
+            });
+
+            var pendingClientsTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<ICorporateClientRepository>().CountPendingAsync();
+            });
+
+            var totalClaimsTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IClaimRepository>().CountAsync();
+            });
+
+            var pendingClaimsTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IClaimRepository>().CountPendingAsync();
+            });
+
+            var totalPoliciesTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IPolicyAssignmentRepository>().CountAsync();
+            });
+
+            var totalRevenueTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IInvoiceRepository>().GetTotalRevenueAsync();
+            });
+
+            var totalPayoutsTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IClaimRepository>().GetTotalPayoutsAsync();
+            });
+
+            var totalCommissionTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IPolicyAssignmentRepository>().GetTotalCommissionAsync();
+            });
+
+            var approvalRateTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IClaimRepository>().GetApprovalRateAsync();
+            });
+
+            var avgClaimTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IClaimRepository>().GetAverageClaimAmountAsync();
+            });
+
+            var recentLogsCountTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IAuditLogRepository>().CountSignificantEventsAsync(DateTime.UtcNow.AddDays(-1));
+            });
+
+            var topLogsTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IAuditLogRepository>().GetTopRecentLogsAsync(5);
+            });
+
+            await Task.WhenAll(
+                agentCountTask, customerCountTask, officerCountTask, pendingClientsTask,
+                totalClaimsTask, pendingClaimsTask, totalPoliciesTask, totalRevenueTask,
+                totalPayoutsTask, totalCommissionTask, approvalRateTask, avgClaimTask,
+                recentLogsCountTask, topLogsTask
+            );
+
+            var summary = new DashboardSummaryDto
+            {
+                AgentCount = agentCountTask.Result,
+                CustomerCount = customerCountTask.Result,
+                ClaimsOfficerCount = officerCountTask.Result,
+                PendingClientsCount = pendingClientsTask.Result,
+                TotalClaimsCount = totalClaimsTask.Result,
+                PendingClaimsCount = pendingClaimsTask.Result,
+                TotalPoliciesCount = totalPoliciesTask.Result,
+                TotalRevenue = totalRevenueTask.Result,
+                TotalPayouts = totalPayoutsTask.Result,
+                TotalCommissionPayouts = totalCommissionTask.Result,
+                ClaimApprovalRate = approvalRateTask.Result,
+                AverageClaimAmount = avgClaimTask.Result,
+                RecentActivitiesCount = recentLogsCountTask.Result,
+                TopRecentLogs = topLogsTask.Result.Select(l => new RecentAuditLogDto
+                {
+                    Action = l.Action,
+                    Entity = l.EntityName,
+                    Timestamp = l.Timestamp
+                }).ToList()
             };
+
+            // Process Top Agents (Sequential is fine here as it's just one part)
+            using (var scope = _scopeFactory.CreateScope())
+            {
+                var userRepo = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+                var policyRepo = scope.ServiceProvider.GetRequiredService<IPolicyAssignmentRepository>();
+
+                var agents = await userRepo.GetAllByRoleAsync(UserRole.Agent);
+                if (agents.Any())
+                {
+                    var agentIds = agents.Select(a => a.Id).ToList();
+                    var commissions = await policyRepo.GetTotalCommissionsForAgentsAsync(agentIds);
+                    var policyCounts = await policyRepo.GetPolicyCountsForAgentsAsync(agentIds);
+
+                    summary.TopAgents = agents.Select(a => new TopAgentDto
+                    {
+                        AgentId = a.Id,
+                        Name = a.Name,
+                        TotalCommission = commissions.TryGetValue(a.Id, out var val) ? val : 0m,
+                        PolicyCount = policyCounts.TryGetValue(a.Id, out var count) ? count : 0
+                    })
+                    .OrderByDescending(x => x.TotalCommission)
+                    .Take(5)
+                    .ToList();
+                }
+            }
+
+            _cache.Set(CacheKey, summary, TimeSpan.FromSeconds(5));
+            return summary;
         }
 
         public async Task<List<CorporateClientResponseDto>> GetPendingClientsAsync()
         {
-            var pending = await _clientRepo.GetPendingAsync();
+            using var scope = _scopeFactory.CreateScope();
+            var pending = await scope.ServiceProvider.GetRequiredService<ICorporateClientRepository>().GetPendingAsync();
             return _mapper.Map<List<CorporateClientResponseDto>>(pending);
         }
 
         public async Task<bool> ReviewClientAsync(Guid id, Guid adminId, ReviewCorporateClientDto dto)
         {
             await _corporateService.ReviewClientAsync(id, adminId, dto);
+            _cache.Remove(CacheKey);
             return true;
         }
 
         public async Task<List<PolicyAssignmentResponseDto>> GetAllPolicyAssignmentsAsync()
         {
-            var assignments = await _policyRepo.GetAllWithDetailsAsync();
+            using var scope = _scopeFactory.CreateScope();
+            var assignments = await scope.ServiceProvider.GetRequiredService<IPolicyAssignmentRepository>().GetAllWithDetailsAsync();
             return _mapper.Map<List<PolicyAssignmentResponseDto>>(assignments);
         }
 
         public async Task<List<ClaimResponseDto>> GetAllClaimsAsync()
         {
-            var claims = await _claimRepo.GetAllAsync();
+            using var scope = _scopeFactory.CreateScope();
+            var claims = await scope.ServiceProvider.GetRequiredService<IClaimRepository>().GetAllAsync();
             return _mapper.Map<List<ClaimResponseDto>>(claims);
         }
 
@@ -87,76 +207,84 @@ namespace EGI_Backend.Application.Services
             if (!Enum.TryParse<UserRole>(role, true, out var userRole))
                 return new List<UserResponseDto>();
 
-            var staff = await _userRepo.GetAllByRoleAsync(userRole);
+            using var scope = _scopeFactory.CreateScope();
+            var userRepo = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+            var policyRepo = scope.ServiceProvider.GetRequiredService<IPolicyAssignmentRepository>();
+
+            var staff = await userRepo.GetAllByRoleAsync(userRole);
             var dtos = _mapper.Map<List<UserResponseDto>>(staff);
 
             if (userRole == UserRole.Agent)
             {
+                var agentIds = dtos.Select(d => d.Id).ToList();
+                var commissions = await policyRepo.GetTotalCommissionsForAgentsAsync(agentIds);
                 foreach (var dto in dtos)
                 {
-                    dto.CommissionEarned = await _policyRepo.GetTotalCommissionForAgentAsync(dto.Id);
+                    dto.CommissionEarned = commissions.TryGetValue(dto.Id, out var val) ? val : 0m;
                 }
             }
-
             return dtos;
         }
 
         public async Task<bool> ToggleUserStatusAsync(Guid userId)
         {
-            var user = await _userRepo.GetByIdAsync(userId);
+            using var scope = _scopeFactory.CreateScope();
+            var userRepo = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+            var user = await userRepo.GetByIdAsync(userId);
             if (user == null) return false;
 
             user.Status = user.Status == UserStatus.Active ? UserStatus.Inactive : UserStatus.Active;
-            await _userRepo.UpdateAsync(user);
+            await userRepo.UpdateAsync(user);
+            _cache.Remove(CacheKey);
             return true;
         }
 
         public async Task<List<CorporateClientResponseDto>> GetAllClientsAsync()
         {
-            var clients = await _clientRepo.GetAllAsync();
+            using var scope = _scopeFactory.CreateScope();
+            var clients = await scope.ServiceProvider.GetRequiredService<ICorporateClientRepository>().GetAllAsync();
             return _mapper.Map<List<CorporateClientResponseDto>>(clients);
         }
 
         public async Task<List<AuditLogResponseDto>> GetAuditLogsAsync(string? userId = null, string? entityName = null)
         {
-            var logs = await _auditRepo.GetFilteredAsync(userId, entityName);
-            return _mapper.Map<List<AuditLogResponseDto>>(logs);
-        }
+            using var scope = _scopeFactory.CreateScope();
+            var auditRepo = scope.ServiceProvider.GetRequiredService<IAuditLogRepository>();
+            var userRepo = scope.ServiceProvider.GetRequiredService<IUserRepository>();
 
-        public async Task<int> RecalculateAllCommissionsAsync()
-        {
-            var policies = await _policyRepo.GetAllWithDetailsAsync();
-            int updatedCount = 0;
+            var logs = await auditRepo.GetFilteredAsync(userId, entityName);
+            var dtos = _mapper.Map<List<AuditLogResponseDto>>(logs);
+            
+            var userGuids = dtos
+                .Where(d => !string.IsNullOrEmpty(d.UserId) && Guid.TryParse(d.UserId, out _))
+                .Select(d => Guid.Parse(d.UserId!))
+                .Distinct()
+                .ToList();
 
-            foreach (var policy in policies)
+            if (userGuids.Any())
             {
-                if (policy.CorporateClient != null)
+                var users = await userRepo.GetByIdsAsync(userGuids);
+                var userDict = users.ToDictionary(u => u.Id.ToString(), u => u.Name);
+                foreach (var dto in dtos)
                 {
-                    decimal commissionPercentage = policy.CorporateClient.BusinessCategory switch
-                    {
-                        BusinessCategory.Enterprise => 0.02m,
-                        BusinessCategory.Large => 0.04m,
-                        BusinessCategory.Medium => 0.06m,
-                        BusinessCategory.Small => 0.08m,
-                        _ => 0.08m
-                    };
-
-                    decimal newCommission = policy.AnnualPremium * commissionPercentage;
-                    int years = policy.EndDate.Year - policy.StartDate.Year;
-                    if (years <= 0) years = 1; // Fallback
-                    decimal newTotalPremium = policy.AnnualPremium * years;
-                    
-                    if (policy.CommissionAmount != newCommission || policy.TotalPremium != newTotalPremium)
-                    {
-                        policy.CommissionAmount = newCommission;
-                        policy.TotalPremium = newTotalPremium;
-                        await _policyRepo.UpdateAsync(policy);
-                        updatedCount++;
-                    }
+                    if (dto.UserId != null && userDict.TryGetValue(dto.UserId, out var name))
+                        dto.UserName = name;
                 }
             }
 
-            return updatedCount;
+            foreach (var dto in dtos)
+            {
+                if (dto.Action == "Unchanged")
+                {
+                    bool hasOld = !string.IsNullOrEmpty(dto.OldValues) && dto.OldValues != "null" && dto.OldValues != "{}";
+                    bool hasNew = !string.IsNullOrEmpty(dto.NewValues) && dto.NewValues != "null" && dto.NewValues != "{}";
+
+                    if (!hasOld && hasNew) dto.Action = "Added";
+                    else if (hasOld && !hasNew) dto.Action = "Deleted";
+                    else if (hasOld && hasNew) dto.Action = "Modified";
+                }
+            }
+            return dtos;
         }
     }
 }

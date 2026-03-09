@@ -1,4 +1,3 @@
-using EGI_Backend.Application.Interfaces;
 using EGI_Backend.Application.Services;
 using EGI_Backend.Infrastructure.Persistence;
 using EGI_Backend.WebAPI.Mapping;
@@ -11,6 +10,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using EGI_Backend.WebAPI.Middlewares;
 using EGI_Backend.WebAPI.Filters;
+using EGI_Backend.Application.Interfaces;
 namespace EGI_Backend.WebAPI
 {
     public class Program
@@ -21,11 +21,11 @@ namespace EGI_Backend.WebAPI
                 var jwt = builder.Configuration.GetSection("JwtSettings");
 
                 // Add services to the container.
+                builder.Services.AddMemoryCache();
                 builder.Services.AddHttpContextAccessor();
                 builder.Services.AddDbContext<EGIDbContext>(options=>
                     options.UseSqlServer(builder.Configuration.GetConnectionString("EGIConnection")));
                 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
-                //builder.Services.AddScoped<ICorporateClientService, CorporateClientService>();
 
                 builder.Services.AddScoped<ICorporateClientRepository, CorporateClientRepository>();
                 builder.Services.AddScoped<IAgentCustomerRepository, AgentCustomerRepository>();
@@ -37,6 +37,7 @@ namespace EGI_Backend.WebAPI
                 builder.Services.AddScoped<IDocumentStorageService, LocalFileStorageService>();
                 builder.Services.AddScoped<ICorporateClientService, CorporateClientService>();
                 builder.Services.AddScoped<IEmailService, EmailService>();
+                builder.Services.AddScoped<INotificationService, NotificationService>();
                 builder.Services.AddScoped<IInsurancePlanRepository, InsurancePlanRepository>();
                 builder.Services.AddScoped<IInsurancePlanService, InsurancePlanService>();
                 builder.Services.AddScoped<IClaimRepository, ClaimRepository>();
@@ -48,7 +49,7 @@ namespace EGI_Backend.WebAPI
                 builder.Services.AddScoped<IPolicyEndorsementRepository, PolicyEndorsementRepository>();
                 builder.Services.AddScoped<IPolicyEndorsementService, PolicyEndorsementService>();
                 builder.Services.AddScoped<IInvoiceService, InvoiceService>();
-                builder.Services.AddHostedService<InvoiceGenerationJob>();
+                builder.Services.AddHostedService<EGI_Backend.Infrastructure.BackgroundServices.InsuranceAutomationWorker>();
                 builder.Services.AddScoped<IAuthService, AuthService>();
                 builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
                 builder.Services.AddScoped<IAdminDashboardService, AdminDashboardService>();
@@ -86,6 +87,9 @@ namespace EGI_Backend.WebAPI
             builder.Services.AddControllers(options => 
             {
                 options.Filters.Add<ApiResponseFilter>();
+            }).AddJsonOptions(options =>
+            {
+                options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
             });
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
@@ -109,19 +113,28 @@ namespace EGI_Backend.WebAPI
                 });
 
                 options.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
-    {
-        {
-            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
-            {
-                Reference = new Microsoft.OpenApi.Models.OpenApiReference
                 {
-                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            new string[] {}
-        }
-    });
+                    {
+                        new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+                        {
+                            Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                            {
+                                Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                                Id = "Bearer"
+                            }
+                        },
+                        new string[] {}
+                    }
+                });
+            });
+
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AllowAll",
+                    builder => builder
+                        .AllowAnyOrigin()
+                        .AllowAnyMethod()
+                        .AllowAnyHeader());
             });
 
             var app = builder.Build();
@@ -137,9 +150,17 @@ namespace EGI_Backend.WebAPI
 
             app.UseExceptionHandler();
             app.UseHttpsRedirection();
+            app.UseCors("AllowAll");
             app.UseAuthentication();
             app.UseAuthorization();
 
+
+            app.UseStaticFiles(new StaticFileOptions
+            {
+                FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(
+                    Path.Combine(Directory.GetCurrentDirectory(), "Uploads")),
+                RequestPath = "/uploads"
+            });
 
             app.MapControllers();
 

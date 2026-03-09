@@ -31,7 +31,7 @@ namespace EGI_Backend.WebAPI.Middlewares
                 var response = context.Response;
 
                 // Log the outgoing response with performance time
-                _logger.LogInformation("HTTP Response: {Method} {Path} responded {StatusCode} in {ElapsedMilliseconds}ms", 
+                _logger.LogInformation("HTTP Response: {Method} {Path} responded {StatusCode} in {ElapsedMilliseconds}ms",
                     request.Method, request.Path, response.StatusCode, stopwatch.ElapsedMilliseconds);
             }
         }

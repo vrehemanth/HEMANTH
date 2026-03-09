@@ -19,10 +19,11 @@ namespace EGI_Backend.Application.Interfaces
 
         // Pending invoices past their due date (for marking Overdue)
         Task<List<Invoice>> GetOverduePendingInvoicesAsync();
-        
+
         Task<decimal> GetTotalRevenueAsync();
         Task<int> CountUnpaidByClientAsync(Guid clientId);
         Task<decimal> GetTotalBalanceByClientAsync(Guid clientId);
+        Task<Dictionary<Guid, decimal>> GetBalancesByClientsAsync(List<Guid> clientIds);
         Task<List<Invoice>> GetByClientIdAsync(Guid clientId);
     }
 }

@@ -24,5 +24,8 @@ namespace EGI_Backend.Domain.Entities
 
         [Column(TypeName = "decimal(18,2)")]
         public decimal SumInsured { get; set; }
+
+        // Soft-delete flag — false means this dependent was removed via endorsement
+        public bool IsActive { get; set; } = true;
     }
 }

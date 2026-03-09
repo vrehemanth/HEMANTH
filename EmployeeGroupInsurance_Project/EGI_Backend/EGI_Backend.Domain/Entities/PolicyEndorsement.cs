@@ -19,12 +19,14 @@ namespace EGI_Backend.Domain.Entities
 
         // Stores the details of the member/dependent being added or removed as a JSON string
         // so that the agent can review exactly what is being endorsed before applying it.
-        public string EndorsementData { get; set; } = string.Empty; 
+        public string EndorsementData { get; set; } = string.Empty;
 
         public EndorsementStatus Status { get; set; } = EndorsementStatus.Pending;
 
         [Column(TypeName = "decimal(18,2)")]
         public decimal PremiumAdjustment { get; set; } = 0m;
+
+        public decimal CommissionAdjustment { get; set; } = 0m;
 
         public Guid RequestedByUserId { get; set; }
         public User RequestedByUser { get; set; }

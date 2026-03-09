@@ -9,6 +9,7 @@ namespace EGI_Backend.Application.DTOs
     public class CreateCorporateProfileDto
     {
         public string CompanyName { get; set; } = string.Empty;
-        public string Address { get; set; } = string.Empty;    
+        public string Address { get; set; } = string.Empty;
+        public string Phone { get; set; } = string.Empty;
     }
 }

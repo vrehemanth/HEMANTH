@@ -19,6 +19,9 @@ namespace EGI_Backend.Application.DTOs
         public Guid? DependentId { get; set; }
         public string? DependentName { get; set; }
         public string PolicyNo { get; set; } = string.Empty;
+        public decimal TotalLimitAllowed { get; set; }
+        public decimal TotalAmountUtilized { get; set; }
+        public decimal RemainingBalance { get; set; }
         public List<CoverageItemDto> CoverageBreakdown { get; set; } = new();
     }
 }

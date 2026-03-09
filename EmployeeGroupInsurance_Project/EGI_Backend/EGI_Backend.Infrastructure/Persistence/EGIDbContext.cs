@@ -35,12 +35,13 @@ namespace EGI_Backend.Infrastructure.Persistence
         public DbSet<PlanCoverage> PlanCoverages { get; set; }
         public DbSet<AgentCustomer> AgentCustomers { get; set; }
         public DbSet<PolicyEndorsement> PolicyEndorsements { get; set; }
+        public DbSet<Notification> Notifications { get; set; }
 
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
             var auditEntries = OnBeforeSaveChanges();
             var result = await base.SaveChangesAsync(cancellationToken);
-            await OnAfterSaveChanges(auditEntries);
+            await OnAfterSaveChanges(auditEntries, cancellationToken);
             return result;
         }
 
@@ -48,7 +49,10 @@ namespace EGI_Backend.Infrastructure.Persistence
         {
             ChangeTracker.DetectChanges();
             var auditEntries = new List<AuditEntry>();
-            var userId = _httpContextAccessor?.HttpContext?.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "System";
+            var user = _httpContextAccessor?.HttpContext?.User;
+            var userId = user?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value 
+                         ?? user?.FindFirst("sub")?.Value 
+                         ?? "System";
 
             foreach (var entry in ChangeTracker.Entries())
             {
@@ -99,10 +103,10 @@ namespace EGI_Backend.Infrastructure.Persistence
             return auditEntries.Where(_ => _.Entry.Properties.Any(p => p.Metadata.IsPrimaryKey())).ToList();
         }
 
-        private Task OnAfterSaveChanges(List<AuditEntry> auditEntries)
+        private async Task OnAfterSaveChanges(List<AuditEntry> auditEntries, CancellationToken cancellationToken = default)
         {
             if (auditEntries == null || auditEntries.Count == 0)
-                return Task.CompletedTask;
+                return;
 
             foreach (var auditEntry in auditEntries)
             {
@@ -116,7 +120,7 @@ namespace EGI_Backend.Infrastructure.Persistence
                 AuditLogs.Add(auditEntry.ToAuditLog());
             }
 
-            return base.SaveChangesAsync();
+            await base.SaveChangesAsync(cancellationToken);
         }
 
 
@@ -127,6 +131,18 @@ namespace EGI_Backend.Infrastructure.Persistence
             modelBuilder.Entity<User>()
                 .HasIndex(u => u.Email)
                 .IsUnique();
+
+            modelBuilder.Entity<AuditLog>()
+                .HasIndex(al => al.Timestamp);
+
+            modelBuilder.Entity<Claim>()
+                .HasIndex(c => c.Status);
+
+            modelBuilder.Entity<Claim>()
+                .HasIndex(c => c.ClaimDate);
+
+            modelBuilder.Entity<PolicyAssignment>()
+                .HasIndex(pa => pa.Status);
 
             modelBuilder.Entity<CorporateClient>(entity =>
             {
@@ -146,18 +162,23 @@ namespace EGI_Backend.Infrastructure.Persistence
                       .OnDelete(DeleteBehavior.Restrict);
             });
 
-            modelBuilder.Entity<PolicyEndorsement>()
-                .HasOne(pe => pe.RequestedByUser)
-                .WithMany()
-                .HasForeignKey(pe => pe.RequestedByUserId)
-                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<PolicyEndorsement>(entity =>
+            {
+                entity.HasKey(pe => pe.Id);
+                entity.Property(pe => pe.PremiumAdjustment).HasPrecision(18, 2);
+                entity.Property(pe => pe.CommissionAdjustment).HasPrecision(18, 2);
 
-            modelBuilder.Entity<PolicyEndorsement>()
-                .HasOne(pe => pe.ReviewedByUser)
-                .WithMany()
-                .HasForeignKey(pe => pe.ReviewedByUserId)
-                .OnDelete(DeleteBehavior.Restrict);
-            
+                entity.HasOne(pe => pe.RequestedByUser)
+                      .WithMany()
+                      .HasForeignKey(pe => pe.RequestedByUserId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(pe => pe.ReviewedByUser)
+                      .WithMany()
+                      .HasForeignKey(pe => pe.ReviewedByUserId)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
+
             modelBuilder.Entity<CorporateClientDocument>(entity =>
             {
                 entity.HasKey(d => d.Id);
@@ -282,6 +303,8 @@ namespace EGI_Backend.Infrastructure.Persistence
                       .OnDelete(DeleteBehavior.Restrict);
 
                 entity.Property(i => i.Amount).HasPrecision(18, 2);
+                entity.Property(i => i.TotalPaid).HasPrecision(18, 2);
+                entity.Property(i => i.CommissionEarned).HasPrecision(18, 2);
             });
 
             modelBuilder.Entity<Payment>(entity =>

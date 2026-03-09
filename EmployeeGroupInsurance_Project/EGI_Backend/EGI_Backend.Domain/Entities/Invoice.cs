@@ -23,6 +23,10 @@ namespace EGI_Backend.Domain.Entities
         public DateTime BillingPeriodTo { get; set; }
 
         public decimal Amount { get; set; }
+        
+        public decimal TotalPaid { get; set; } = 0m;
+        
+        public decimal CommissionEarned { get; set; } = 0m;
 
         public DateTime DueDate { get; set; }
 

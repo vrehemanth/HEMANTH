@@ -12,5 +12,7 @@ namespace EGI_Backend.Application.DTOs
         public decimal SumInsured { get; set; }
         public bool Status { get; set; }
         public string? PolicyNo { get; set; }
+        public Guid PolicyAssignmentId { get; set; }
+        public List<DependentResponseDto> Dependents { get; set; } = new();
     }
 }

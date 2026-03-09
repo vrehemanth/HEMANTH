@@ -22,7 +22,6 @@ namespace EGI_Backend.Infrastructure.Repositories
         public async Task AddAsync(PolicyEndorsement endorsement)
         {
             await _context.PolicyEndorsements.AddAsync(endorsement);
-            await _context.SaveChangesAsync();
         }
 
         public async Task<PolicyEndorsement?> GetByIdAsync(Guid id)
@@ -36,7 +35,7 @@ namespace EGI_Backend.Infrastructure.Repositories
         public async Task UpdateAsync(PolicyEndorsement endorsement)
         {
             _context.PolicyEndorsements.Update(endorsement);
-            await _context.SaveChangesAsync();
+            // SaveChangesAsync is intentionally omitted — IUnitOfWork owns the transaction boundary
         }
 
         public async Task<List<PolicyEndorsement>> GetByPolicyIdAsync(Guid policyAssignmentId)
@@ -53,6 +52,15 @@ namespace EGI_Backend.Infrastructure.Repositories
                 .Include(pe => pe.PolicyAssignment)
                 .Where(pe => pe.Status == EndorsementStatus.Pending)
                 .OrderBy(pe => pe.CreatedAt)
+                .ToListAsync();
+        }
+
+        public async Task<List<PolicyEndorsement>> GetByClientIdAsync(Guid clientId)
+        {
+            return await _context.PolicyEndorsements
+                .Include(pe => pe.PolicyAssignment)
+                .Where(pe => pe.PolicyAssignment.CorporateClientId == clientId)
+                .OrderByDescending(pe => pe.CreatedAt)
                 .ToListAsync();
         }
     }

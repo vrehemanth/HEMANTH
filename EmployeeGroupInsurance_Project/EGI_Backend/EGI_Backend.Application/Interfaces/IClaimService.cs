@@ -15,5 +15,8 @@ namespace EGI_Backend.Application.Interfaces
 
         // Remaining coverage per claim type for a member or dependent
         Task<CoverageSummaryDto> GetCoverageSummaryAsync(Guid memberId, Guid? dependentId);
+        Task<List<ClaimResponseDto>> GetClaimsReviewedByOfficerAsync(Guid officerId);
+        Task TakeClaimAsync(Guid officerId, Guid claimId);
+        Task ReleaseClaimAsync(Guid claimId);
     }
 }

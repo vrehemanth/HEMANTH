@@ -1,0 +1,1118 @@
+<div class="space-y-6 animate-in fade-in zoom-in duration-300">
+
+    <!-- HEADER -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h2 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Admin Control Center</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                {{ activeTab() === 'dashboard' ? 'Overview of system analytics and general metrics.' :
+                activeTab() === 'plans' ? 'Create, read, update, or delete enterprise insurance plans.' :
+                activeTab() === 'clients' ? 'Onboard, review, and manage your corporate partners.' :
+                activeTab() === 'staff' ? 'Manage credentials and access for your agents and claims officers.' :
+                activeTab() === 'policies' ? 'Track policy assignments, invoices, and fin ancial performance.' :
+                activeTab() === 'claims' ? 'Review and audit all system claims.' :
+                'Investigate system activity and security audit logs.' }}
+            </p>
+        </div>
+
+        <div class="flex items-center gap-3">
+            @if (isLoading()) {
+            <div
+                class="flex items-center gap-2 px-3 py-1 bg-primary-50 dark:bg-primary-900/20 text-primary-600 rounded-full text-xs font-bold animate-pulse">
+                <svg class="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="3">
+                    <path d="M21 12a9 9 0 11-6.219-8.56"></path>
+                </svg>
+                Syncing...
+            </div>
+            }
+
+            <div class="flex gap-3">
+
+                @if (activeTab() === 'plans') {
+                <button (click)="toggleNewPlanForm()"
+                    class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium shadow-sm transition-colors">
+                    {{ showNewPlanForm() ? 'Cancel' : 'Register New Plan' }}
+                </button>
+                }
+                @if (activeTab() === 'staff') {
+                <button (click)="toggleNewStaffForm()"
+                    class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium shadow-sm transition-colors">
+                    {{ showNewStaffForm() ? 'Cancel' : 'Register New Staff' }}
+                </button>
+                }
+                @if (['claims', 'logs', 'policies', 'clients'].includes(activeTab())) {
+                <button (click)="exportData()"
+                    class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium shadow-sm transition-colors flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" x2="12" y1="15" y2="3" />
+                    </svg>
+                    Export CSV
+                </button>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== DASHBOARD TAB ==================== -->
+    @if (activeTab() === 'dashboard') {
+    <!-- Overview Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+
+        <div
+            class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+            <div
+                class="absolute right-0 top-0 w-24 h-24 bg-blue-500/10 dark:bg-blue-500/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110">
+            </div>
+            <div class="flex justify-between items-start z-10 relative">
+                <div>
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total System Revenue</p>
+                    <h3 class="text-3xl font-bold text-gray-900 dark:text-white mt-2">₹{{ summary()?.totalRevenue |
+                        number:'1.0-0' }}</h3>
+                </div>
+                <div class="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M6 3h12" />
+                        <path d="M6 8h12" />
+                        <path d="m6 13 8.5 8" />
+                        <path d="M6 13h3" />
+                        <path d="M9 13c6.667 0 6.667-10 0-10" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div
+            class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+            <div
+                class="absolute right-0 top-0 w-24 h-24 bg-emerald-500/10 dark:bg-emerald-500/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110">
+            </div>
+            <div class="flex justify-between items-start z-10 relative">
+                <div>
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Corporate Clients</p>
+                    <h3 class="text-3xl font-bold text-gray-900 dark:text-white mt-2">{{ summary()?.customerCount || 0
+                        }}</h3>
+                </div>
+                <div class="p-2 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg text-emerald-600 dark:text-emerald-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect width="16" height="20" x="4" y="2" rx="2" ry="2" />
+                        <path d="M9 22v-4h6v4" />
+                        <path d="M8 6h.01" />
+                        <path d="M16 6h.01" />
+                        <path d="M12 6h.01" />
+                        <path d="M12 10h.01" />
+                        <path d="M12 14h.01" />
+                        <path d="M16 10h.01" />
+                        <path d="M16 14h.01" />
+                        <path d="M8 10h.01" />
+                        <path d="M8 14h.01" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div
+            class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+            <div
+                class="absolute right-0 top-0 w-24 h-24 bg-amber-500/10 dark:bg-amber-500/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110">
+            </div>
+            <div class="flex justify-between items-start z-10 relative">
+                <div>
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Claims in Queue</p>
+                    <h3 class="text-3xl font-bold text-gray-900 dark:text-white mt-2">{{ summary()?.pendingClaimsCount
+                        || 0 }}</h3>
+                </div>
+                <div class="p-2 bg-amber-50 dark:bg-amber-900/30 rounded-lg text-amber-600 dark:text-amber-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div
+            class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+            <div
+                class="absolute right-0 top-0 w-24 h-24 bg-purple-500/10 dark:bg-purple-500/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110">
+            </div>
+            <div class="flex justify-between items-start z-10 relative">
+                <div>
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Claim Payouts</p>
+                    <h3 class="text-3xl font-bold text-gray-900 dark:text-white mt-2">₹{{ summary()?.totalPayouts |
+                        number:'1.0-0' }}</h3>
+                </div>
+                <div class="p-2 bg-purple-50 dark:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M6 3h12" />
+                        <path d="M6 8h12" />
+                        <path d="m6 13 8.5 8" />
+                        <path d="M6 13h3" />
+                        <path d="M9 13c6.667 0 6.667-10 0-10" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
+        <!-- System Vitality Radar -->
+        <div
+            class="lg:col-span-8 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm p-8">
+            <div class="flex items-center justify-between mb-8">
+                <div>
+                    <h4 class="text-lg font-bold text-gray-900 dark:text-white">System Vitality Radar</h4>
+                    <p class="text-xs text-gray-500 mt-1">Real-time performance metrics and adjudication health.</p>
+                </div>
+                <div class="flex items-center gap-2 p-1.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                    <span class="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
+                    <span class="text-[10px] font-black text-emerald-600 uppercase tracking-tighter">Live
+                        Analysis</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="space-y-3">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Claim Approval Rate</p>
+                    <div class="flex items-end gap-2">
+                        <span class="text-4xl font-black text-gray-900 dark:text-white">{{ summary()?.claimApprovalRate
+                            }}%</span>
+                    </div>
+                    <div class="w-full h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                        <div class="h-full bg-emerald-500 transition-all duration-1000"
+                            [style.width.%]="summary()?.claimApprovalRate"></div>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Avg Claim Ticket</p>
+                    <div class="flex items-end gap-2">
+                        <span class="text-4xl font-black text-gray-900 dark:text-white">₹{{
+                            summary()?.averageClaimAmount | number:'1.0-0' }}</span>
+                    </div>
+                    <p class="text-[10px] text-gray-500">Floating average per adjudicated claim</p>
+                </div>
+
+                <div class="space-y-3">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">24h System Velocity</p>
+                    <div class="flex items-end gap-2 text-primary-600">
+                        <span class="text-4xl font-black">{{ summary()?.recentActivitiesCount }}</span>
+                        <span class="text-xs font-bold mb-1.5 uppercase">Events</span>
+                    </div>
+                    <p class="text-[10px] text-gray-500 italic">Atomic operations recorded in last 24h</p>
+                </div>
+            </div>
+
+            <div class="mt-8 pt-8 border-t border-gray-50 dark:border-gray-700 flex flex-wrap gap-8">
+                <div class="flex items-center gap-3">
+                    <div
+                        class="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path
+                                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.407 2.67 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.407-2.67-1M12 16c-1.11 0-2.08-.407-2.67-1">
+                            </path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-bold text-gray-400">NET RETAINED PROFIT</p>
+                        <p class="text-sm font-black text-gray-900 dark:text-white">₹{{ summary()?.netProfit |
+                            number:'1.0-0' }}</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div
+                        class="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center text-purple-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path
+                                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z">
+                            </path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-bold text-gray-400">SYSTEM CAPACITY</p>
+                        <p class="text-sm font-black text-gray-900 dark:text-white">{{ summary()?.agentCount }} Agents |
+                            {{ summary()?.claimsOfficerCount }} Officers</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Activity Stream -->
+        <div
+            class="lg:col-span-4 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm p-6 flex flex-col">
+            <div class="flex items-center justify-between mb-6">
+                <h4 class="text-md font-bold text-gray-900 dark:text-white">Live Event Stream</h4>
+                <button (click)="activeTab.set('logs')"
+                    class="text-[10px] font-bold text-primary-600 hover:underline">Full Feed</button>
+            </div>
+
+            <div class="space-y-4 flex-1 overflow-hidden relative">
+                <!-- Fade Effect Top -->
+                <div
+                    class="absolute top-0 inset-x-0 h-4 bg-gradient-to-b from-white dark:from-gray-800 to-transparent z-10">
+                </div>
+
+                <div class="space-y-3">
+                    @for (log of summary()?.topRecentLogs; track log.timestamp) {
+                    <div class="flex gap-3 animate-in slide-in-from-right duration-500">
+                        <div class="w-1.5 h-1.5 rounded-full mt-2 shrink-0" [ngClass]="{
+                                'bg-emerald-500': log.action.includes('Added'),
+                                'bg-blue-500': log.action.includes('Modified'),
+                                'bg-red-500': log.action.includes('Deleted'),
+                                'bg-gray-400': !log.action.includes('Added') && !log.action.includes('Modified') && !log.action.includes('Deleted')
+                            }"></div>
+                        <div class="min-w-0">
+                            <p class="text-xs font-bold text-gray-900 dark:text-gray-100 truncate">{{ log.action }} {{
+                                log.entity }}</p>
+                            <p class="text-[10px] text-gray-500">{{ log.timestamp | date:'shortTime' }} • Validated</p>
+                        </div>
+                    </div>
+                    } @empty {
+                    <p class="text-xs text-gray-500 italic text-center py-10">No recent system pulse detected.</p>
+                    }
+                </div>
+
+                <!-- Fade Effect Bottom -->
+                <div
+                    class="absolute bottom-0 inset-x-0 h-4 bg-gradient-to-t from-white dark:from-gray-800 to-transparent z-10">
+                </div>
+            </div>
+
+            <div
+                class="mt-6 p-4 rounded-2xl bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-[10px] font-bold text-gray-400">DATABASE HEALTH</span>
+                    <span class="text-[10px] font-bold text-emerald-500">STABLE</span>
+                </div>
+                <div class="flex gap-1">
+                    <div class="h-1 flex-1 bg-emerald-500 rounded-full opacity-30"></div>
+                    <div class="h-1 flex-1 bg-emerald-500 rounded-full opacity-50"></div>
+                    <div class="h-1 flex-1 bg-emerald-500 rounded-full opacity-40"></div>
+                    <div class="h-1 flex-1 bg-emerald-500 rounded-full animate-pulse"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Elite Agent Performance -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
+        <div
+            class="lg:col-span-12 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm p-8">
+            <div class="flex items-center justify-between mb-8">
+                <div>
+                    <h4 class="text-lg font-bold text-gray-900 dark:text-white">Elite Agent Performance</h4>
+                    <p class="text-xs text-gray-500 mt-1">Ranking of top performing agents by commission earned and
+                        policy volume.</p>
+                </div>
+                <div class="p-2 bg-amber-50 dark:bg-amber-900/20 rounded-xl text-amber-600">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                        <path
+                            d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                    </svg>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                @for (agent of summary()?.topAgents; track agent.agentId; let i = $index) {
+                <div
+                    class="p-5 rounded-2xl border dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30 relative overflow-hidden group hover:border-amber-200 dark:hover:border-amber-900/50 transition-all">
+                    <!-- Rank Badge -->
+                    <div class="absolute top-0 right-0 p-3">
+                        <span
+                            class="text-2xl font-black text-gray-200 dark:text-gray-700 group-hover:text-amber-100 dark:group-hover:text-amber-900/30 transition-colors">#{{
+                            i + 1 }}</span>
+                    </div>
+
+                    <div class="relative z-10">
+                        <div
+                            class="w-12 h-12 rounded-full bg-white dark:bg-gray-700 shadow-sm flex items-center justify-center text-primary-600 font-bold mb-4 border border-gray-100 dark:border-gray-600">
+                            {{ agent.name.charAt(0) }}
+                        </div>
+                        <h5 class="font-bold text-gray-900 dark:text-white truncate">{{ agent.name }}</h5>
+                        <p class="text-[10px] text-gray-500 uppercase font-black mt-1">{{ agent.policyCount }} Policies
+                            Active</p>
+
+                        <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                            <p class="text-[10px] font-bold text-gray-400 capitalize">Commission Earned</p>
+                            <p class="text-lg font-black text-emerald-600">₹{{ agent.totalCommission | number:'1.0-0' }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                } @empty {
+                <div class="col-span-5 py-10 text-center text-gray-500 italic">No agent performance data available yet.
+                </div>
+                }
+            </div>
+        </div>
+    </div>
+    }
+
+    <!-- ==================== PLANS TAB ==================== -->
+    @if (activeTab() === 'plans') {
+    @if (showNewPlanForm()) {
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm mb-6">
+        <h3 class="font-semibold text-gray-900 dark:text-white mb-4">
+            {{ isEditingPlan() ? 'Edit Insurance Plan' : 'Create New Insurance Plan' }}
+        </h3>
+        <div class="grid grid-cols-2 gap-4">
+            <input [(ngModel)]="newPlan.planCode" placeholder="Plan Code (e.g., EGI-X)" [disabled]="isEditingPlan()"
+                class="px-4 py-2 border dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white w-full disabled:bg-gray-50 dark:disabled:bg-gray-800">
+            <input [(ngModel)]="newPlan.planName" placeholder="Plan Name"
+                class="px-4 py-2 border dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white w-full">
+            <input [(ngModel)]="newPlan.basePremium" type="number" placeholder="Base Premium per Month"
+                class="px-4 py-2 border dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white w-full">
+            <div
+                class="flex items-center gap-2 px-4 py-2 border dark:border-gray-600 rounded bg-white dark:bg-gray-700">
+                <span class="text-sm text-gray-500">Plan Status:</span>
+                <button (click)="newPlan.status = !newPlan.status"
+                    [ngClass]="newPlan.status ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50'"
+                    class="text-xs px-2 py-1 rounded border border-current transition-colors">
+                    {{ newPlan.status ? 'Active' : 'Inactive' }}
+                </button>
+            </div>
+            <textarea [(ngModel)]="newPlan.description" placeholder="Description" rows="2"
+                class="col-span-2 px-4 py-2 border dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white w-full"></textarea>
+            <div class="col-span-2 text-right space-x-3">
+                <button (click)="savePlan()"
+                    class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition">
+                    {{ isEditingPlan() ? 'Update Package' : 'Save Package' }}
+                </button>
+            </div>
+        </div>
+    </div>
+    }
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        @for (p of plans(); track p.id) {
+        <div
+            class="group bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col">
+            <!-- Card Header -->
+            <div class="p-6 pb-4">
+                <div class="flex justify-between items-start mb-4">
+                    <span
+                        class="px-3 py-1 bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 text-[10px] font-bold uppercase tracking-widest rounded-full border border-primary-100 dark:border-primary-800">
+                        {{ p.planCode }}
+                    </span>
+                    <span class="text-xs px-2 py-1 rounded-full font-medium"
+                        [ngClass]="p.status ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400'">
+                        {{ p.status ? 'Active' : 'Inactive' }}
+                    </span>
+                </div>
+                <h3
+                    class="text-lg font-bold text-gray-900 dark:text-white group-hover:text-primary-600 transition-colors">
+                    {{ p.planName }}
+                </h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-2 line-clamp-2 h-10">
+                    {{ p.description }}
+                </p>
+            </div>
+
+            <!-- Card Body: Premium Comparison -->
+            <div
+                class="px-6 py-4 bg-gray-50/50 dark:bg-gray-900/20 border-t border-b border-gray-100 dark:border-gray-700 flex flex-col gap-2">
+                <div class="flex justify-between items-center">
+                    <div class="text-[10px] font-bold uppercase tracking-wider text-primary-600">Annual Premium</div>
+                    <div class="text-lg font-black text-gray-900 dark:text-white">
+                        ₹{{ p.basePremium | number:'1.0-0' }}<span
+                            class="text-[10px] font-medium text-gray-400 ml-1">/yr</span>
+                    </div>
+                </div>
+                <div class="flex justify-between items-center opacity-70">
+                    <div class="text-[10px] font-bold tracking-wider text-gray-400 uppercase">Estimated Monthly</div>
+                    <div class="text-sm font-bold text-gray-600 dark:text-gray-300">
+                        ₹{{ (p.basePremium / 12) | number:'1.0-0' }}<span
+                            class="text-[10px] font-medium ml-1">/mo</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card Actions -->
+            <div class="p-4 mt-auto flex items-center justify-between gap-2">
+                <button (click)="editPlan(p)"
+                    class="flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-xl transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                        <path d="m15 5 4 4" />
+                    </svg>
+                    Edit
+                </button>
+                <div class="flex gap-1">
+                    <button (click)="deactivatePlan(p.id)" title="Deactivate Plan"
+                        class="p-2 text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-xl transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
+                            <line x1="12" x2="12" y1="2" y2="12" />
+                        </svg>
+                    </button>
+                    <button (click)="hardDeletePlan(p.id)" title="Permanent Delete"
+                        class="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 6h18" />
+                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                            <line x1="10" x2="10" y1="11" y2="17" />
+                            <line x1="14" x2="14" y1="11" y2="17" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+        } @empty {
+        <div
+            class="col-span-full p-20 bg-white dark:bg-gray-800 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700 text-center">
+            <div
+                class="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    class="text-gray-400">
+                    <path d="M12 2v20" />
+                    <path d="m5 9 7-7 7 7" />
+                    <path d="m19 15-7 7-7-7" />
+                </svg>
+            </div>
+            <h3 class="text-lg font-bold text-gray-900 dark:text-white">No plans registered</h3>
+            <p class="text-gray-500 dark:text-gray-400 mt-2 max-w-xs mx-auto">Create your first insurance package to
+                start onboarding clients.</p>
+        </div>
+        }
+    </div>
+    }
+
+    <!-- ==================== CLIENTS TAB ==================== -->
+    @if (activeTab() === 'clients') {
+    <div class="grid grid-cols-1 gap-6">
+
+        <div
+            class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden overflow-x-auto">
+            <div
+                class="px-6 py-5 border-b border-gray-100 dark:border-gray-700 font-semibold text-gray-900 dark:text-white bg-amber-50 dark:bg-amber-900/10 min-w-[600px]">
+                Pending Corporate Applications (Needs Approval)
+            </div>
+            <table class="w-full text-left min-w-[600px]">
+                <thead class="bg-gray-50/50 dark:bg-gray-800/50 text-xs text-gray-500 dark:text-gray-400 uppercase">
+                    <tr>
+                        <th class="px-6 py-4">Company Profile</th>
+                        <th class="px-6 py-4">Submitted Documents</th>
+                        <th class="px-6 py-4 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    @for (client of pendingClients(); track client.id) {
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-3">
+                                <div
+                                    class="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/40 font-bold text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                                    {{ client.companyName?.charAt(0) || 'C' }}</div>
+                                <div>
+                                    <p class="font-medium text-gray-900 dark:text-gray-100">{{ client.companyName }}
+                                    </p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ client.address }} | Ref:
+                                        {{
+                                        client.id | slice:0:8 }}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            @if (client.documents && client.documents.length > 0) {
+                            <div class="flex flex-wrap gap-2">
+                                @for (doc of client.documents; track doc.fileName) {
+                                <a [href]="'https://localhost:7146' + doc.fileUrl" target="_blank"
+                                    class="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-100 dark:border-blue-800 hover:bg-blue-100 transition-colors"
+                                    [title]="doc.documentType + ' — ' + doc.fileName">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                        <polyline points="14 2 14 8 20 8" />
+                                    </svg>
+                                    {{ doc.documentType }}
+                                </a>
+                                }
+                            </div>
+                            } @else {
+                            <span class="text-xs text-gray-400 italic">No documents uploaded</span>
+                            }
+                        </td>
+
+                        <td class="px-6 py-4">
+                            <div class="flex items-center justify-end gap-3">
+                                <!-- Category Select -->
+                                <div class="flex flex-col gap-1 items-start">
+                                    <label
+                                        class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Tier</label>
+                                    <select [(ngModel)]="approvalCategory[client.id]"
+                                        class="text-xs bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-lg px-2 py-2 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium text-gray-700 dark:text-gray-300">
+                                        <option value="Small">Small (8%)</option>
+                                        <option value="Medium">Medium (6%)</option>
+                                        <option value="Large">Large (4%)</option>
+                                        <option value="Enterprise">Enterprise (2%)</option>
+                                    </select>
+                                </div>
+
+                                <div class="flex items-center gap-2 mt-4">
+                                    <button (click)="reviewClient(client.id, true)"
+                                        class="flex items-center gap-1.5 text-xs font-semibold bg-emerald-100 text-emerald-700 px-3 py-2 rounded-lg hover:bg-emerald-200 transition-all">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+                                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                                            stroke-linecap="round" stroke-linejoin="round">
+                                            <polyline points="20 6 9 17 4 12" />
+                                        </svg>
+                                        Approve
+                                    </button>
+                                    <button (click)="reviewClient(client.id, false)"
+                                        class="flex items-center gap-1.5 text-xs font-semibold bg-red-100 text-red-700 px-3 py-2 rounded-lg hover:bg-red-200 transition-all">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+                                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                                            stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M18 6 6 18" />
+                                            <path d="m6 6 12 12" />
+                                        </svg>
+                                        Reject
+                                    </button>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    } @empty {
+                    <tr>
+                        <td colspan="3" class="px-6 py-8 text-center text-gray-500 text-sm">No pending client
+                            approvals
+                            at the moment.</td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div
+            class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden overflow-x-auto">
+            <div
+                class="px-6 py-5 border-b border-gray-100 dark:border-gray-700 font-semibold text-gray-900 dark:text-white min-w-[600px]">
+                Approved Client Roster
+            </div>
+            <table class="w-full text-left min-w-[600px]">
+                <thead class="bg-gray-50/50 dark:bg-gray-800/50 text-xs text-gray-500 dark:text-gray-400 uppercase">
+                    <tr>
+                        <th class="px-6 py-4">Company Name</th>
+                        <th class="px-6 py-4">Registration Address</th>
+                        <th class="px-6 py-4">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    @for (c of allClients(); track c.id) {
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                        <td class="px-6 py-4 font-medium dark:text-gray-200">{{ c.companyName }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{ c.address }}</td>
+                        <td class="px-6 py-4">
+                            <span class="text-xs px-2 py-1 rounded shadow-sm font-medium" [ngClass]="{
+                        'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800': c.status === 'Approved',
+                        'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-100 dark:border-red-800': c.status === 'Rejected',
+                        'bg-amber-50 text-amber-700 dark:bg-amber-900/10 dark:text-amber-400 border border-amber-100 dark:border-amber-800': c.status !== 'Approved' && c.status !== 'Rejected'
+                      }">
+                                {{ c.status }}
+                            </span>
+                        </td>
+                    </tr>
+                    } @empty {
+                    <tr>
+                        <td colspan="3" class="px-6 py-8 text-center text-gray-500 text-sm">No clients have been
+                            onboarded yet.</td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    }
+
+    <!-- ==================== STAFF TAB ==================== -->
+    @if (activeTab() === 'staff') {
+    @if (showNewStaffForm()) {
+    <div
+        class="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm mb-6 animate-in slide-in-from-top duration-300">
+        <h3 class="font-semibold text-gray-900 dark:text-white mb-4">Onboard New Team Member</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Full Name</label>
+                <input [(ngModel)]="newStaff.name" placeholder="Staff Name"
+                    class="px-4 py-2 border dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white w-full shadow-sm focus:ring-1 focus:ring-primary-500">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Email Address</label>
+                <input [(ngModel)]="newStaff.email" placeholder="staff@example.com"
+                    class="px-4 py-2 border dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white w-full shadow-sm focus:ring-1 focus:ring-primary-500">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Role Type</label>
+                <select [(ngModel)]="newStaff.role"
+                    class="px-4 py-2 border dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white w-full shadow-sm focus:ring-1 focus:ring-primary-500">
+                    <option value="Agent">Broker Agent</option>
+                    <option value="ClaimsOfficer">Claims Officer</option>
+                </select>
+            </div>
+            <div class="md:col-span-3 text-right">
+                <button (click)="createStaff()" [disabled]="isStaffLoading()"
+                    class="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-2.5 rounded-xl font-medium shadow-lg shadow-primary-500/20 transition-all flex items-center gap-2 ml-auto">
+                    @if (isStaffLoading()) {
+                    <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none"
+                        viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                        </circle>
+                        <path class="opacity-75" fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                        </path>
+                    </svg>
+                    Onboarding...
+                    } @else {
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <line x1="19" x2="19" y1="8" y2="14" />
+                        <line x1="22" x2="16" y1="11" y2="11" />
+                    </svg>
+                    Onboard & Send Credentials
+                    }
+                </button>
+            </div>
+        </div>
+        <p class="text-[10px] text-gray-400 mt-3 italic">* A temporary password will be generated and emailed to the
+            user. They will be prompted to reset it upon their first login.</p>
+    </div>
+    }
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div
+            class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+            <div
+                class="px-6 py-5 border-b border-gray-100 dark:border-gray-700 font-semibold text-gray-900 dark:text-white">
+                Broker Agents (B2B)</div>
+            <table class="w-full text-left text-sm min-w-[600px]">
+                <thead class="bg-gray-50/50 dark:bg-gray-800/50 text-xs text-gray-500 dark:text-gray-400 uppercase">
+                    <tr>
+                        <th class="px-4 py-3">Account</th>
+                        <th class="px-4 py-3">Sales / Commissions</th>
+                        <th class="px-4 py-3 text-right">System Access</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    @for (a of agents(); track a.id) {
+                    <tr>
+                        <td class="px-4 py-3 font-medium dark:text-white">{{a.email}}<br><span
+                                class="text-xs text-gray-500">{{a.name}}</span></td>
+                        <td class="px-4 py-3 dark:text-gray-300">₹{{a.commissionEarned || 0}}</td>
+                        <td class="px-4 py-3">
+                            <div class="flex justify-end">
+                                <button (click)="toggleStaffStatus(a.id)"
+                                    class="text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm border transition-all"
+                                    [ngClass]="a.status==='Active' ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100' : 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'">
+                                    {{a.status}}
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    } @empty { <tr>
+                        <td colspan="3" class="px-4 py-6 text-center text-gray-500">No agents registered.</td>
+                    </tr> }
+                </tbody>
+            </table>
+        </div>
+
+        <div
+            class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+            <div
+                class="px-6 py-5 border-b border-gray-100 dark:border-gray-700 font-semibold text-gray-900 dark:text-white">
+                Claims Adjudication Officers</div>
+            <table class="w-full text-left text-sm min-w-[600px]">
+                <thead class="bg-gray-50/50 dark:bg-gray-800/50 text-xs text-gray-500 dark:text-gray-400 uppercase">
+                    <tr>
+                        <th class="px-4 py-3">Account</th>
+                        <th class="px-4 py-3 text-right">System Access</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    @for (o of claimsOfficers(); track o.id) {
+                    <tr>
+                        <td class="px-4 py-3 font-medium dark:text-white">{{o.email}}<br><span
+                                class="text-xs text-gray-500">{{o.name}}</span></td>
+                        <td class="px-4 py-3">
+                            <div class="flex justify-end">
+                                <button (click)="toggleStaffStatus(o.id)"
+                                    class="text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm border transition-all"
+                                    [ngClass]="o.status==='Active' ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100' : 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'">
+                                    {{o.status}}
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    } @empty { <tr>
+                        <td colspan="2" class="px-4 py-6 text-center text-gray-500">No claims officers registered.
+                        </td>
+                    </tr> }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    }
+
+    <!-- ==================== POLICIES TAB ==================== -->
+    @if (activeTab() === 'policies') {
+    <div
+        class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden overflow-x-auto">
+        <div
+            class="px-6 py-5 border-b border-gray-100 dark:border-gray-700 font-semibold text-gray-900 dark:text-white flex justify-between items-center min-w-[700px]">
+            <span>Active Policy Assignments</span>
+            <span class="text-xs font-normal text-gray-500">Click a policy to view Financial/Endorsement
+                history</span>
+        </div>
+        <table class="w-full text-left min-w-[700px]">
+            <thead class="bg-gray-50/50 dark:bg-gray-800/50 text-xs text-gray-500 dark:text-gray-400 uppercase">
+                <tr>
+                    <th class="px-6 py-4">Policy No</th>
+                    <th class="px-6 py-4">Client</th>
+                    <th class="px-6 py-4">Plan</th>
+                    <th class="px-6 py-4">Status</th>
+                    <th class="px-6 py-4 text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                @for (p of allPolicyAssignments(); track p.id) {
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer" (click)="viewPolicyDetails(p)">
+                    <td class="px-6 py-4 font-mono text-sm text-primary-600 dark:text-primary-400 font-semibold">{{
+                        p.policyNo }}</td>
+                    <td class="px-6 py-4 py-4 text-sm dark:text-gray-300">{{ p.companyName }}</td>
+                    <td class="px-6 py-4 text-sm dark:text-gray-300">{{ p.planName }}</td>
+                    <td class="px-6 py-4">
+                        <span
+                            class="text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">{{
+                            p.status }}</span>
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                        <button class="text-primary-600 hover:text-primary-700 text-xs font-semibold">View History
+                            &rarr;</button>
+                    </td>
+                </tr>
+                } @empty {
+                <tr>
+                    <td colspan="5" class="px-6 py-8 text-center text-gray-500 text-sm">No policy assignments found.
+                    </td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    }
+
+    <!-- ==================== CLAIMS TAB ==================== -->
+    @if (activeTab() === 'claims') {
+    <div
+        class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden overflow-x-auto">
+        <div
+            class="px-6 py-5 border-b border-gray-100 dark:border-gray-700 font-semibold text-gray-900 dark:text-white min-w-[800px]">
+            Global Claim Registry
+        </div>
+        <table class="w-full text-left min-w-[800px]">
+            <thead class="bg-gray-50/50 dark:bg-gray-800/50 text-xs text-gray-500 dark:text-gray-400 uppercase">
+                <tr>
+                    <th class="px-6 py-4">Claim ID</th>
+                    <th class="px-6 py-4">Member</th>
+                    <th class="px-6 py-4">Amount</th>
+                    <th class="px-6 py-4">Status</th>
+                    <th class="px-6 py-4">Reviewer</th>
+                    <th class="px-6 py-4 text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                @for (c of allClaimsRegistry(); track c.id) {
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                    <td class="px-6 py-4 font-mono text-xs dark:text-gray-400">#{{ c.claimNumber }}</td>
+                    <td class="px-6 py-4 text-sm">
+                        <p class="font-medium dark:text-white">{{ c.memberName }}</p>
+                        <p class="text-[10px] text-gray-500">{{ c.claimType }}</p>
+                    </td>
+                    <td class="px-6 py-4 font-semibold dark:text-white">₹{{ c.claimAmount }}</td>
+                    <td class="px-6 py-4">
+                        <span class="text-xs px-2 py-1 rounded" [ngClass]="{
+                        'bg-emerald-50 text-emerald-700 border border-emerald-200': c.status === 'Approved',
+                        'bg-red-50 text-red-700 border border-red-200': c.status === 'Rejected',
+                        'bg-amber-50 text-amber-700 border border-amber-200': c.status === 'Pending'
+                      }">{{ c.status }}</span>
+                    </td>
+                    <td class="px-6 py-4 text-xs text-gray-500">{{ c.reviewedByName || 'Not Reviewed' }}</td>
+                    <td class="px-6 py-4 text-right">
+                        <button (click)="viewClaimDetails(c.id)"
+                            class="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-xs font-medium transition-colors">Details</button>
+                    </td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    }
+
+    <!-- ==================== LOGS TAB ==================== -->
+    @if (activeTab() === 'logs') {
+    <div
+        class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden overflow-x-auto">
+        <div
+            class="px-6 py-5 border-b border-gray-100 dark:border-gray-700 font-semibold text-gray-900 dark:text-white min-w-[900px]">
+            System Audit Logs</div>
+        <table class="w-full text-left whitespace-nowrap min-w-[900px]">
+            <thead class="bg-gray-50/50 dark:bg-gray-800/50 text-xs text-gray-500 dark:text-gray-400">
+                <tr>
+                    <th class="px-6 py-4">Timestamp</th>
+                    <th class="px-6 py-4">User</th>
+                    <th class="px-6 py-4">Action</th>
+                    <th class="px-6 py-4">Entity</th>
+                    <th class="px-6 py-4">Original</th>
+                    <th class="px-6 py-4">Revised</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-700 text-xs">
+                @for (log of auditLogs(); track log.id) {
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                    <td class="px-6 py-4 text-gray-400 font-mono text-[10px]">{{ log.timestamp | date:'short' }}
+                    </td>
+                    <td class="px-6 py-4">
+                        <p class="font-medium dark:text-gray-300 text-sm">{{ log.userName || 'System' }}</p>
+                        <p class="text-[9px] text-gray-500 font-mono">{{ log.userId }}</p>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-0.5 rounded border text-[10px] font-bold uppercase transition-all"
+                            [ngClass]="getActionClass(log.action)">
+                            {{ log.action }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">{{ log.entityName
+                            }}</span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="max-w-[200px] text-[10px] text-gray-400 italic break-words line-clamp-2"
+                            [title]="log.oldValues">
+                            {{ formatJson(log.oldValues) }}
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="max-w-[200px] text-[10px] text-emerald-600 font-medium break-words line-clamp-2"
+                            [title]="log.newValues">
+                            {{ formatJson(log.newValues) }}
+                        </div>
+                    </td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    }
+
+    <!-- ==================== MODALS ==================== -->
+
+    @if (selectedPolicyHistory()) {
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-6">
+        <div
+            class="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-5xl h-[80vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            <div
+                class="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
+                <div>
+                    <h3 class="text-xl font-bold dark:text-white">Policy History & Financials</h3>
+                    <p class="text-sm text-gray-500">{{ selectedPolicyHistory()?.policyNo }} | {{
+                        selectedPolicyHistory()?.companyName }}</p>
+                </div>
+                <button (click)="selectedPolicyHistory.set(null)"
+                    class="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 6 6 18" />
+                        <path d="m6 6 12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-6 space-y-8">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- INVOICES -->
+                    <div>
+                        <h4 class="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                                <polyline points="14 2 14 8 20 8" />
+                            </svg>
+                            Invoices & Billing
+                        </h4>
+                        <div class="space-y-3">
+                            @for (inv of policyInvoices(); track inv.id) {
+                            <div
+                                class="p-4 rounded-2xl border dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30 flex justify-between items-center">
+                                <div>
+                                    <p class="font-mono text-xs text-gray-500">#{{ inv.invoiceNo }}</p>
+                                    <p class="font-bold dark:text-white">₹{{ inv.amount }}</p>
+                                    <p class="text-[10px] text-gray-500">Period: {{ inv.billingPeriodFrom | date }}
+                                        - {{
+                                        inv.billingPeriodTo | date }}</p>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-[10px] px-2 py-0.5 rounded-full border mb-1 inline-block"
+                                        [ngClass]="inv.status === 'Paid' ? 'text-emerald-600 border-emerald-200' : 'text-amber-600 border-amber-200'">{{
+                                        inv.status }}</span>
+                                    <button (click)="viewInvoicePayments(inv.id)"
+                                        class="block text-xs text-primary-600 hover:underline">View
+                                        Payments</button>
+                                </div>
+                            </div>
+                            } @empty { <p class="text-gray-400 text-sm italic">No invoices generated for this policy
+                                yet.</p> }
+                        </div>
+                    </div>
+
+                    <!-- ENDORSEMENTS -->
+                    <div>
+                        <h4 class="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4Z" />
+                            </svg>
+                            Plan Endorsements
+                        </h4>
+                        <div class="space-y-3">
+                            @for (end of policyEndorsements(); track end.id) {
+                            <div class="p-4 rounded-2xl border dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
+                                <div class="flex justify-between">
+                                    <span class="text-xs font-semibold px-2 py-0.5 bg-blue-50 text-blue-700 rounded">{{
+                                        end.type }}</span>
+                                    <span class="text-[10px] text-gray-400">{{ end.createdAt | date:'short'
+                                        }}</span>
+                                </div>
+                                <p class="text-xs mt-2 dark:text-gray-300">{{ end.description }}</p>
+                                <div class="mt-2 flex justify-between items-center">
+                                    <span class="text-[10px]">{{ end.status }}</span>
+                                    @if (end.reviewedBy) { <span class="text-[10px] text-gray-500">By Admin</span> }
+                                </div>
+                            </div>
+                            } @empty { <p class="text-gray-400 text-sm italic">No endorsements requested for this
+                                policy.</p> }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    }
+
+    @if (selectedClaimDetail()) {
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+        <div
+            class="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div class="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+                <h3 class="text-xl font-bold dark:text-white">Claim Audit Detail</h3>
+                <button (click)="selectedClaimDetail.set(null)" class="text-gray-400 hover:text-gray-600"><svg
+                        xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 6 6 18" />
+                        <path d="m6 6 12 12" />
+                    </svg></button>
+            </div>
+            <div class="p-8 grid grid-cols-2 gap-8">
+                <div>
+                    <label class="text-[10px] font-bold text-gray-400 uppercase">Policy Context</label>
+                    <p class="font-mono text-sm text-primary-600">{{ selectedClaimDetail().policyNo }}</p>
+                    <div class="mt-4">
+                        <label class="text-[10px] font-bold text-gray-400 uppercase">Amount Claimed</label>
+                        <p class="text-3xl font-black dark:text-white">₹{{ selectedClaimDetail().claimAmount }}</p>
+                    </div>
+                    <div class="mt-4">
+                        <label class="text-[10px] font-bold text-gray-400 uppercase">Reason</label>
+                        <p class="text-sm dark:text-gray-300 italic">"{{ selectedClaimDetail().claimReason }}"</p>
+                    </div>
+                </div>
+                <div class="space-y-4">
+                    <div class="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800">
+                        <label class="text-[10px] font-bold text-gray-400 uppercase">Adjudication Result</label>
+                        <p class="font-bold mt-1"
+                            [ngClass]="selectedClaimDetail().status === 'Approved' ? 'text-emerald-600' : 'text-red-600'">
+                            {{ selectedClaimDetail().status }}</p>
+                        @if (selectedClaimDetail().reviewedByName) {
+                        <p class="text-[10px] text-gray-500 mt-1">Reviewed by {{
+                            selectedClaimDetail().reviewedByName }}
+                            on {{ selectedClaimDetail().reviewedAt | date }}</p>
+                        }
+                    </div>
+                    @if (selectedClaimDetail().rejectionReason) {
+                    <div class="p-4 rounded-2xl bg-red-50 text-red-700 text-xs shadow-inner">
+                        <label class="font-bold uppercase block mb-1">Rejection Remark</label>
+                        {{ selectedClaimDetail().rejectionReason }}
+                    </div>
+                    }
+                </div>
+                <div class="col-span-2">
+                    <label class="text-[10px] font-bold text-gray-400 uppercase block mb-2">Supporting Evidence
+                        (Admin
+                        View)</label>
+                    <div class="flex gap-3 overflow-x-auto pb-2">
+                        @for (doc of selectedClaimDetail().documents; track doc.fileName) {
+                        <a [href]="'https://localhost:7146' + doc.fileUrl" target="_blank"
+                            class="p-3 border rounded-xl flex items-center gap-3 hover:bg-gray-50 transition-colors shrink-0">
+                            <div class="p-2 bg-blue-100 text-blue-600 rounded-lg"><svg
+                                    xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                    <polyline points="14 2 14 8 20 8" />
+                                </svg></div>
+                            <span class="text-xs font-medium">{{ doc.documentType }}</span>
+                        </a>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    }
+
+    @if (showRejectionModal()) {
+    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div
+            class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                <h3 class="font-bold text-gray-900 dark:text-white">Reason for Rejection</h3>
+                <button (click)="cancelRejection()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 6 6 18" />
+                        <path d="m6 6 12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6">
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Please provide a valid justification for
+                    declining this corporate application. This will be visible in the system logs.</p>
+                <textarea [(ngModel)]="rejectionForm.reason" rows="4" placeholder="Enter rejection reason here..."
+                    class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all outline-none resize-none"></textarea>
+                <div class="flex gap-3 mt-6">
+                    <button (click)="cancelRejection()"
+                        class="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">Cancel</button>
+                    <button (click)="submitRejection()"
+                        class="flex-1 px-4 py-2.5 rounded-xl bg-red-600 text-white font-medium hover:bg-red-700 shadow-lg shadow-red-200 dark:shadow-none transition-all">Submit
+                        Rejection</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    }
+
+</div>

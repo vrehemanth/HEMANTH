@@ -16,6 +16,7 @@ namespace EGI_Backend.Application.Interfaces
         Task UpdateAsync(User user);
         Task<List<User>> GetActiveAgentsAsync();
         Task<List<User>> GetAllByRoleAsync(UserRole role);
+        Task<List<User>> GetByIdsAsync(IEnumerable<Guid> ids);
         Task<int> CountByRoleAsync(UserRole role);
     }
 }

@@ -8,10 +8,10 @@ namespace EGI_Backend.Domain.Enums
 {
     public enum DocumentType
     {
-        GSTIN=1,
-        PAN=2,
-        CIN=3,
-        AddressProof=4,
-        Other=5
+        GSTIN = 1,
+        PAN = 2,
+        CIN = 3,
+        AddressProof = 4,
+        Other = 5
     }
 }

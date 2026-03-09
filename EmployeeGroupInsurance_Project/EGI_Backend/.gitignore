@@ -71,3 +71,8 @@ Thumbs.db
 *.log
 logs/
 temp/
+
+# User Uploads (Ignore files but keep directory structure)
+EGI_Backend.WebAPI/Uploads/*
+!EGI_Backend.WebAPI/Uploads/.gitkeep
+

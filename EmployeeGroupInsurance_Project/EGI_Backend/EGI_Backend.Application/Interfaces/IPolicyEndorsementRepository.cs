@@ -13,5 +13,6 @@ namespace EGI_Backend.Application.Interfaces
         Task UpdateAsync(PolicyEndorsement endorsement);
         Task<List<PolicyEndorsement>> GetByPolicyIdAsync(Guid policyAssignmentId);
         Task<List<PolicyEndorsement>> GetPendingAsync();
+        Task<List<PolicyEndorsement>> GetByClientIdAsync(Guid clientId);
     }
 }

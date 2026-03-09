@@ -9,7 +9,7 @@ namespace EGI_Backend.Domain.Entities
         public Guid Id { get; set; }
 
         public string? UserId { get; set; } // Storing as string to handle "System" or Guid strings
-        
+
         [Required]
         public string Action { get; set; } = string.Empty; // Added, Modified, Deleted
 

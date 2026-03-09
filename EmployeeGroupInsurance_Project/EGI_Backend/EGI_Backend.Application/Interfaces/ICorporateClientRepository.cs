@@ -15,6 +15,7 @@ namespace EGI_Backend.Application.Interfaces
         Task<List<CorporateClient>> GetPendingAsync();
         Task<int> CountPendingAsync();
         Task<List<CorporateClient>> GetAllAsync();
+        Task<int> GetTotalLiveMembersCountAsync(Guid clientId);
         Task SaveChangesAsync();
     }
 }

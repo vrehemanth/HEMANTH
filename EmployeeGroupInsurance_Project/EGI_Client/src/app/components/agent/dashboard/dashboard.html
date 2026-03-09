@@ -1,0 +1,528 @@
+<div class="space-y-6 animate-in fade-in duration-300">
+    <div class="flex items-center justify-between">
+        <div>
+            <h2 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white"> {{ pageTitle() }}</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1"> Manage your corporate clients, policy
+                implementations, and review adjustments.</p>
+        </div>
+
+        @if (isLoading()) {
+        <div
+            class="flex items-center gap-2 px-3 py-1 bg-primary-50 dark:bg-primary-900/20 text-primary-600 rounded-full text-xs font-bold animate-pulse">
+            <svg class="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <path d="M21 12a9 9 0 11-6.219-8.56"> </path>
+            </svg>
+            Syncing...
+        </div>
+        }
+    </div>
+
+    <!--OVERVIEW TAB-->
+    @if (activeTab() === 'overview') {
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div
+            class="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden group">
+            <div
+                class="absolute -right-4 -bottom-4 w-24 h-24 bg-primary-50 dark:bg-primary-900/10 rounded-full group-hover:scale-110 transition-transform duration-500">
+            </div>
+            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest relative z-10">Total Customers</p>
+            <h3 class="text-3xl font-black mt-2 dark:text-white relative z-10">{{ summary()?.totalCustomers || 0 }}</h3>
+            <p class="text-[10px] text-gray-500 mt-4 relative z-10">Managed Portfolio</p>
+        </div>
+
+        <div
+            class="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden group">
+            <div
+                class="absolute -right-4 -bottom-4 w-24 h-24 bg-blue-50 dark:bg-blue-900/10 rounded-full group-hover:scale-110 transition-transform duration-500">
+            </div>
+            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest relative z-10">Active Policies</p>
+            <h3 class="text-3xl font-black mt-2 dark:text-white relative z-10">{{ summary()?.activePolicies || 0 }}</h3>
+            <p class="text-[10px] text-gray-500 mt-4 relative z-10">In-force implementations</p>
+        </div>
+
+        <div
+            class="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden group">
+            <div
+                class="absolute -right-4 -bottom-4 w-24 h-24 bg-emerald-50 dark:bg-emerald-900/10 rounded-full group-hover:scale-110 transition-transform duration-500">
+            </div>
+            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest relative z-10">Sales (This Month)</p>
+            <h3 class="text-3xl font-black mt-2 text-emerald-600 dark:text-emerald-400 relative z-10">{{
+                summary()?.policiesSoldThisMonth || 0 }}</h3>
+            <p class="text-[10px] text-gray-500 mt-4 relative z-10">New policies issued</p>
+        </div>
+
+        <div
+            class="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm border-l-4 border-l-emerald-500">
+            <p class="text-xs font-bold text-emerald-500 uppercase tracking-widest">Commission Received</p>
+            <h3 class="text-3xl font-black mt-2 text-gray-900 dark:text-white">₹{{ summary()?.totalCommissionEarned |
+                number:'1.0-0' }}</h3>
+            <div class="flex items-center gap-1.5 mt-4 text-[10px] text-emerald-600 font-bold">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                Verified Earnings
+            </div>
+        </div>
+    </div>
+
+    <!-- Dynamic Business Oversight -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- DETAILED PENDING PREMIUM -->
+        <div
+            class="lg:col-span-5 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm p-8 flex flex-col">
+            <div class="flex items-center justify-between mb-8">
+                <div>
+                    <h4 class="text-lg font-bold text-gray-900 dark:text-white">Pending Premiums</h4>
+                    <p class="text-xs text-gray-500 mt-1">Outstanding balances requiring follow-up.</p>
+                </div>
+                <div class="p-2 bg-red-50 dark:bg-red-900/20 rounded-xl text-red-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="space-y-4 flex-1">
+                @for (item of summary()?.customerPendingPremiums; track item.companyName) {
+                <div
+                    class="flex items-center justify-between p-4 rounded-2xl bg-gray-50 dark:bg-gray-700/30 border border-gray-100 dark:border-gray-600 group hover:border-red-200 transition-colors">
+                    <div class="min-w-0">
+                        <p class="text-xs font-black text-gray-900 dark:text-white truncate uppercase tracking-tighter">
+                            {{ item.companyName }}</p>
+                        <p class="text-[9px] text-gray-400 font-bold uppercase mt-1">Due Balance</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm font-black text-red-600">₹{{ item.amount | number:'1.0-0' }}</p>
+                    </div>
+                </div>
+                } @empty {
+                <div class="flex-1 flex flex-col items-center justify-center opacity-30 py-10">
+                    <svg class="w-12 h-12 mb-3 text-emerald-500" fill="none" stroke="currentColor" stroke-width="1.5"
+                        viewBox="0 0 24 24">
+                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <p class="text-xs font-bold text-emerald-600">All premiums collected!</p>
+                </div>
+                }
+            </div>
+
+            <div class="mt-8 pt-6 border-t border-gray-100 dark:border-gray-700">
+                <div class="flex justify-between items-end">
+                    <div>
+                        <p class="text-[10px] text-gray-400 font-bold uppercase">Total Outstanding</p>
+                        <p class="text-2xl font-black text-gray-900 dark:text-white">₹{{
+                            summary()?.pendingPremium | number:'1.0-0' }}</p>
+                    </div>
+                    <button (click)="exportReport()"
+                        class="px-4 py-2 bg-primary-600 text-white text-[10px] font-black uppercase rounded-xl hover:bg-primary-700 transition-all">Export
+                        Report</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- CUSTOMER CLAIM MONITOR -->
+        <div
+            class="lg:col-span-7 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm p-8 flex flex-col">
+            <div class="flex items-center justify-between mb-8">
+                <div>
+                    <h4 class="text-lg font-bold text-gray-900 dark:text-white">Claim Status Monitor</h4>
+                    <p class="text-xs text-gray-500 mt-1">Live adjudication and document access.</p>
+                </div>
+                <div class="flex items-center gap-2 p-1.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                    <span class="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
+                    <span class="text-[10px] font-black text-emerald-600 uppercase">Live Pulse</span>
+                </div>
+            </div>
+
+            <div class="space-y-4 flex-1">
+                @for (claim of summary()?.recentClaims; track claim.id) {
+                <div
+                    class="p-4 rounded-2xl bg-white dark:bg-gray-700/20 border border-gray-100 dark:border-gray-700 group">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="min-w-0">
+                            <p
+                                class="text-xs font-black text-gray-900 dark:text-white truncate uppercase tracking-tighter">
+                                {{ claim.memberName }}</p>
+                            <p class="text-[10px] text-gray-500">{{ claim.date | date:'mediumDate' }} • ₹{{
+                                claim.amount | number:'1.0-0' }}</p>
+                        </div>
+                        <span class="text-[9px] font-black px-2 py-0.5 rounded-full uppercase" [ngClass]="{
+                            'bg-emerald-100 text-emerald-700': claim.status === 'Approved',
+                            'bg-red-100 text-red-700': claim.status === 'Rejected',
+                            'bg-amber-100 text-amber-700': claim.status !== 'Approved' && claim.status !== 'Rejected'
+                        }">{{ claim.status }}</span>
+                    </div>
+
+                    <div class="flex items-center gap-3 pt-4 border-t border-gray-50 dark:border-gray-700/50">
+                        <p class="text-[10px] text-gray-400 font-bold uppercase">Files:</p>
+                        @if (claim.status === 'Approved') {
+                        <div class="flex flex-wrap gap-2">
+                            @for (doc of claim.documents; track doc.id) {
+                            <a [href]="'https://localhost:7146' + doc.fileUrl" target="_blank"
+                                class="flex items-center gap-1 text-[10px] font-bold text-primary-600 hover:text-primary-700 bg-primary-50 dark:bg-primary-900/20 px-2 py-1 rounded-lg transition-colors">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5"
+                                    viewBox="0 0 24 24">
+                                    <path
+                                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                    </path>
+                                </svg>
+                                {{ doc.fileName | slice:0:15 }}...
+                            </a>
+                            } @empty {
+                            <span class="text-[9px] text-gray-400 italic">No files attached</span>
+                            }
+
+                        </div>
+                        } @else {
+                        <span class="text-[9px] text-gray-400 italic">Available upon approval</span>
+                        }
+                    </div>
+                </div>
+                } @empty {
+                <div class="flex-1 flex flex-col items-center justify-center py-20 opacity-30 italic text-xs">
+                    No recent claim activity detected.
+                </div>
+                }
+            </div>
+        </div>
+    </div>
+    }
+
+    <!--CUSTOMERS TAB-->
+    @if (activeTab() === 'customers') {
+    <div
+        class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden overflow-x-auto">
+        <div class="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center min-w-[600px]">
+            <h3 class="font-semibold dark:text-white"> My Corporate Customers </h3>
+            <button (click)="showCustomerForm.set(!showCustomerForm())"
+                class="text-sm bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition">
+                {{ showCustomerForm() ? 'Cancel' : 'Onboard Customer' }}
+            </button>
+        </div>
+
+        <div class="min-w-[600px]">
+            @if (showCustomerForm()) {
+            <div class="p-6 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700">
+                <form [formGroup]="customerForm" (ngSubmit)="createCustomer()" class="grid grid-cols-2 gap-4">
+                    <div class="col-span-2 md:col-span-1">
+                        <label class="block text-xs font-medium text-gray-500 mb-1"> Company Name </label>
+                        <input formControlName="companyName" placeholder="e.g. Acme Corp"
+                            class="px-4 py-2 border dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white w-full focus:ring-2 focus:ring-primary-500 outline-none transition">
+                    </div>
+                    <div class="col-span-2 md:col-span-1">
+                        <label class="block text-xs font-medium text-gray-500 mb-1"> Contact Person Name
+                        </label>
+                        <input formControlName="name" placeholder="Full Name"
+                            class="px-4 py-2 border dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white w-full focus:ring-2 focus:ring-primary-500 outline-none transition">
+                    </div>
+                    <div class="col-span-2 md:col-span-1">
+                        <label class="block text-xs font-medium text-gray-500 mb-1"> Work Email </label>
+                        <input formControlName="email" type="email" placeholder="email@company.com"
+                            class="px-4 py-2 border dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white w-full focus:ring-2 focus:ring-primary-500 outline-none transition">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-xs font-medium text-gray-500 mb-1"> Business Address </label>
+                        <textarea formControlName="address" placeholder="Full Registered Address" rows="2"
+                            class="px-4 py-2 border dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white w-full focus:ring-2 focus:ring-primary-500 outline-none transition"> </textarea>
+                    </div>
+
+                    <div class="col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Corporate
+                            Registration / PAN Document </label>
+                        <div
+                            class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-gray-600 border-dashed rounded-lg hover:border-primary-500 transition-colors cursor-pointer relative">
+                            <div class="space-y-1 text-center">
+                                <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none"
+                                    viewBox="0 0 48 48" aria-hidden="true">
+                                    <path
+                                        d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                                <div class="flex text-sm text-gray-600 dark:text-gray-400">
+                                    <label for="file-upload"
+                                        class="relative cursor-pointer bg-transparent rounded-md font-medium text-primary-600 hover:text-primary-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500">
+                                        <span>Upload a file </span>
+                                        <input id="file-upload" type="file" (change)="onFileSelect($event)"
+                                            class="sr-only">
+                                    </label>
+                                    <p class="pl-1"> or drag and drop </p>
+                                </div>
+                                <p class="text-xs text-gray-500 dark:text-gray-400"> PNG, JPG, PDF up to 10MB
+                                </p>
+                                @if (selectedFile) {
+                                <p class="text-xs font-semibold text-emerald-600 mt-2"> Selected: {{
+                                    selectedFile.name
+                                    }} </p>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-span-2 flex justify-end gap-3 mt-2">
+                        <button type="button" (click)="showCustomerForm.set(false)"
+                            class="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition font-medium">
+                            Cancel </button>
+                        <button type="submit" [disabled]="customerForm.invalid || !selectedFile"
+                            class="px-8 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:grayscale font-semibold shadow-md shadow-primary-500/20 transition-all transform active:scale-95">
+                            Start Onboarding </button>
+                    </div>
+                </form>
+            </div>
+            }
+
+            <table class="w-full text-left">
+                <thead class="bg-gray-50 dark:bg-gray-800/50 text-xs text-gray-500 dark:text-gray-400 uppercase">
+                    <tr>
+                        <th class="px-6 py-3"> Company </th>
+                        <th class="px-6 py-3"> Category / Address </th>
+                        <th class="px-6 py-3"> Status </th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    @for (c of customers(); track c.id) {
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                        <td class="px-6 py-4 font-medium dark:text-white">
+                            {{ c.companyName }}
+                            <br><span class="text-xs text-gray-500"> {{ c.email }}</span>
+                        </td>
+                        <td class="px-6 py-4 text-sm dark:text-gray-300">
+                            <span class="font-medium"> {{ c.businessCategory }}</span>
+                            <br> <span class="text-xs text-gray-400"> {{ c.address }}</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs rounded-full font-medium" [ngClass]="{
+    'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400': c.status === 'Approved',
+    'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400': c.status === 'Rejected',
+      'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400': c.status !== 'Approved' && c.status !== 'Rejected'
+                        }">
+                                {{ c.status }}
+                            </span>
+                        </td>
+                    </tr>
+                    } @empty {
+                    <tr>
+                        <td colspan="3" class="px-6 py-8 text-center text-gray-500 text-sm"> No
+                            customers found.
+                        </td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    }
+
+    <!--POLICIES TAB-->
+    @if (activeTab() === 'policies') {
+    <div
+        class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden overflow-x-auto">
+        <div
+            class="px-6 py-5 border-b border-gray-100 dark:border-gray-700 font-semibold text-gray-900 dark:text-white min-w-[800px]">
+            My Policies
+        </div>
+        <table class="w-full text-left text-sm min-w-[800px]">
+            <thead class="bg-gray-50 dark:bg-gray-800/50 text-xs text-gray-500 dark:text-gray-400 uppercase">
+                <tr>
+                    <th class="px-6 py-3"> Policy No </th>
+                    <th class="px-6 py-3"> Company </th>
+                    <th class="px-6 py-3"> Plan </th>
+                    <th class="px-6 py-3"> Period </th>
+                    <th class="px-6 py-3"> Annual Premium </th>
+                    <th class="px-6 py-3"> Commission </th>
+                    <th class="px-6 py-3"> Status </th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                @for (p of policies(); track p.id) {
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                    <td class="px-6 py-4 font-mono font-medium dark:text-white"> {{ p.policyNo }} </td>
+                    <td class="px-6 py-4 dark:text-gray-300"> {{ p.companyName }} </td>
+                    <td class="px-6 py-4 dark:text-gray-300"> {{ p.planName }}</td>
+                    <td class="px-6 py-4 text-xs dark:text-gray-400"> {{ p.startDate | date:
+                        'mediumDate' }} →
+                        {{
+                        p.endDate | date: 'mediumDate' }} </td>
+                    <td class="px-6 py-4 font-semibold dark:text-white">₹{{ p.annualPremium | number:
+                        '1.0-0' }}
+                    </td>
+                    <td class="px-6 py-4 text-emerald-600 dark:text-emerald-400 font-medium">₹{{
+                        p.commissionAmount |
+                        number: '1.0-0' }} </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs rounded-full"
+                            [ngClass]="p.status === 'Active' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'">
+                            {{ p.status }}
+                        </span>
+                    </td>
+                </tr>
+                } @empty {
+                <tr>
+                    <td colspan="7" class="px-6 py-8 text-center text-gray-500 text-sm"> No policies
+                        assigned to
+                        you
+                        yet.</td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    }
+
+    <!--ENDORSEMENTS TAB-->
+    @if (activeTab() === 'endorsements') {
+    <div
+        class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden overflow-x-auto">
+        <div class="p-6 border-b border-gray-100 dark:border-gray-700 min-w-[800px]">
+            <h3 class="font-semibold dark:text-white"> Pending Endorsements Review </h3>
+        </div>
+        <table class="w-full text-left min-w-[800px]">
+            <thead class="bg-gray-50 dark:bg-gray-800/50 text-xs text-gray-500 dark:text-gray-400 uppercase">
+                <tr>
+                    <th class="px-6 py-3"> Type </th>
+                    <th class="px-6 py-3"> Policy </th>
+                    <th class="px-6 py-3"> Description </th>
+                    <th class="px-6 py-3"> Est.Adjustment </th>
+                    <th class="px-6 py-3"> Action </th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                @for (e of pendingEndorsements(); track e.id) {
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                    <td class="px-6 py-4 text-sm font-medium dark:text-white"
+                        [ngClass]="{'text-red-600 dark:text-red-400': e.type?.toString().toLowerCase().includes('remove') || e.type?.toString().toLowerCase().includes('delete')}">
+                        {{ e.type }}
+                    </td>
+                    <td class="px-6 py-4 text-xs dark:text-gray-400 font-mono"> {{ e.policyAssignmentId
+                        | slice:
+                        0: 8
+                        }}...</td>
+                    <td class="px-6 py-4 text-sm dark:text-gray-300"> {{ e.description }}</td>
+                    <td class="px-6 py-4 text-sm font-semibold"
+                        [ngClass]="e.premiumAdjustment >= 0 ? 'text-emerald-600' : 'text-red-600'">
+                        {{ e.premiumAdjustment >= 0 ? '+' : '' }}₹{{ e.premiumAdjustment | number:
+                        '1.2-2' }}
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex gap-2">
+                            <button (click)="reviewEndorsement(e.id, true)"
+                                class="flex items-center gap-1 text-xs bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg hover:bg-emerald-200 font-semibold transition-all">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                                Approve
+                            </button>
+                            <button (click)="reviewEndorsement(e.id, false)"
+                                class="flex items-center gap-1 text-xs bg-red-100 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-200 font-semibold transition-all">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <path d="M18 6 6 18" />
+                                    <path d="m6 6 12 12" />
+                                </svg>
+                                Reject
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                } @empty {
+                <tr>
+                    <td colspan="5" class="px-6 py-8 text-center text-gray-500 text-sm"> No pending
+                        endorsements.</td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    }
+    <!--COMMISSIONS TAB-->
+    @if (activeTab() === 'commissions') {
+    <div
+        class="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden flex flex-col min-h-[600px]">
+        <div
+            class="p-8 border-b border-gray-100 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-900/40 flex justify-between items-center">
+            <div>
+                <h3 class="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Commission
+                    Calculation Trail</h3>
+                <p class="text-xs text-gray-500 mt-1">High-transparency financial audit of all automated commission
+                    payouts.</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <span
+                    class="px-3 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-black rounded-full uppercase">Real-time
+                    Ledger</span>
+            </div>
+        </div>
+
+        <div class="flex-1 overflow-x-auto">
+            <table class="w-full text-left table-fixed min-w-[900px]">
+                <thead class="bg-gray-50 dark:bg-gray-700/50 uppercase text-[10px] font-black text-gray-400">
+                    <tr>
+                        <th class="px-8 py-4 w-48">Timestamp</th>
+                        <th class="px-8 py-4 w-48">Event ID</th>
+                        <th class="px-8 py-4 w-auto">Calculation Detail & Context</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    @for (log of commissionLogs(); track log.id) {
+                    <tr class="hover:bg-primary-50/30 dark:hover:bg-primary-900/10 transition-colors group">
+                        <td class="px-8 py-6">
+                            <div class="flex flex-col">
+                                <span class="text-xs font-black text-gray-900 dark:text-white">{{ log.timestamp |
+                                    date:'MMM dd, yyyy' }}</span>
+                                <span class="text-[10px] text-gray-400 font-bold">{{ log.timestamp | date:'HH:mm:ss'
+                                    }}</span>
+                            </div>
+                        </td>
+                        <td class="px-8 py-6 font-mono text-[10px] text-primary-600 font-black">
+                            #{{ log.id.slice(0, 8) }}
+                        </td>
+                        <td class="px-8 py-6">
+                            <div class="flex items-start gap-4">
+                                <div class="p-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 rounded-xl">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5"
+                                        viewBox="0 0 24 24">
+                                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="text-xs font-bold text-gray-700 dark:text-gray-300 leading-relaxed">{{
+                                        log.newValues }}</p>
+                                    <div class="flex items-center gap-3 mt-2">
+                                        <span
+                                            class="text-[9px] font-black uppercase text-gray-400 tracking-widest bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">Reference:
+                                            Invoice</span>
+                                        <span class="text-[9px] font-bold text-emerald-500 italic">Calculation Verified
+                                            Auto</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    } @empty {
+                    <tr>
+                        <td colspan="3" class="px-8 py-20 text-center">
+                            <div class="flex flex-col items-center gap-4 opacity-20">
+                                <svg class="w-16 h-16" fill="none" stroke="currentColor" stroke-width="1.5"
+                                    viewBox="0 0 24 24">
+                                    <path
+                                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span class="text-sm font-black uppercase tracking-[0.2em]">No Commission Records
+                                    Detected</span>
+                            </div>
+                        </td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="p-6 bg-gray-50/50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-700">
+            <p class="text-[10px] text-gray-400 text-center font-bold tracking-widest uppercase italic">The above trail
+                is a tamper-proof mirror of the system's financial core.</p>
+        </div>
+    </div>
+    }
+</div>

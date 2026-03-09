@@ -12,9 +12,11 @@ namespace EGI_Backend.Infrastructure.Persistence
         public AuditEntry(EntityEntry entry)
         {
             Entry = entry;
+            Action = entry.State.ToString();
         }
 
         public EntityEntry Entry { get; }
+        public string? Action { get; set; }
         public string? UserId { get; set; }
         public string? EntityName { get; set; }
         public string? EntityId { get; set; }
@@ -28,7 +30,7 @@ namespace EGI_Backend.Infrastructure.Persistence
             {
                 Id = Guid.NewGuid(),
                 UserId = UserId,
-                Action = Entry.State.ToString(),
+                Action = Action,
                 EntityName = EntityName ?? Entry.Entity.GetType().Name,
                 EntityId = EntityId,
                 Timestamp = DateTime.UtcNow,

@@ -26,8 +26,10 @@ namespace EGI_Backend.Infrastructure.Repositories
         public async Task<PolicyAssignment?> GetByIdWithDetailsAsync(Guid id)
         {
             return await _context.PolicyAssignments
+                .Include(pa => pa.CorporateClient)
                 .Include(pa => pa.InsurancePlan)
                     .ThenInclude(ip => ip.Coverages)
+                .Include(pa => pa.Agent)
                 .Include(pa => pa.Members)
                     .ThenInclude(m => m.Dependents)
                 .FirstOrDefaultAsync(pa => pa.Id == id);
@@ -45,7 +47,8 @@ namespace EGI_Backend.Infrastructure.Repositories
                 .Include(pa => pa.CorporateClient)
                 .Include(pa => pa.InsurancePlan)
                 .Include(pa => pa.Agent)
-                .OrderByDescending(pa => pa.Id) // Better to sort by date if it exists
+                .Include(pa => pa.Members)
+                .OrderByDescending(pa => pa.Id)
                 .ToListAsync();
         }
 
@@ -78,6 +81,15 @@ namespace EGI_Backend.Infrastructure.Repositories
                 .SumAsync(pa => pa.CommissionAmount);
         }
 
+        public async Task<Dictionary<Guid, decimal>> GetTotalCommissionsForAgentsAsync(List<Guid> agentIds)
+        {
+            return await _context.PolicyAssignments
+                .Where(pa => agentIds.Contains(pa.AgentId) && pa.Status == PolicyStatus.Active)
+                .GroupBy(pa => pa.AgentId)
+                .Select(g => new { AgentId = g.Key, Total = g.Sum(pa => pa.CommissionAmount) })
+                .ToDictionaryAsync(x => x.AgentId, x => x.Total);
+        }
+
         public async Task<decimal> GetTotalCommissionAsync()
         {
             return await _context.PolicyAssignments
@@ -105,6 +117,15 @@ namespace EGI_Backend.Infrastructure.Repositories
         {
             return await _context.PolicyAssignments
                 .CountAsync(pa => pa.CorporateClientId == clientId && pa.Status == PolicyStatus.Active);
+        }
+
+        public async Task<Dictionary<Guid, int>> GetPolicyCountsForAgentsAsync(List<Guid> agentIds)
+        {
+            return await _context.PolicyAssignments
+                .Where(pa => agentIds.Contains(pa.AgentId))
+                .GroupBy(pa => pa.AgentId)
+                .Select(g => new { AgentId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.AgentId, x => x.Count);
         }
     }
 }

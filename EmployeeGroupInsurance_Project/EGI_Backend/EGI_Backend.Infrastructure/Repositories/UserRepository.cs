@@ -46,6 +46,13 @@ namespace EGI_Backend.Infrastructure.Repositories
                 .ToListAsync();
         }
 
+        public async Task<List<User>> GetByIdsAsync(IEnumerable<Guid> ids)
+        {
+            return await _context.Users
+                .Where(u => ids.Contains(u.Id))
+                .ToListAsync();
+        }
+
         public async Task<int> CountByRoleAsync(UserRole role)
         {
             return await _context.Users.CountAsync(u => u.Role == role);

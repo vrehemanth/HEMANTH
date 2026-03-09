@@ -1,4 +1,3 @@
-using AutoMapper;
 using EGI_Backend.Application.DTOs;
 using EGI_Backend.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -12,9 +11,9 @@ using System.Threading.Tasks;
 namespace EGI_Backend.WebAPI.Controllers
 {
     [Authorize(Roles = "Admin")]
-    [ApiController]
+    [Authorize(Roles = "Admin")]
     [Route("api/admin/dashboard")]
-    public class AdminDashboardController : ControllerBase
+    public class AdminDashboardController : BaseApiController
     {
         private readonly IAdminDashboardService _dashboardService;
         private readonly IInsurancePlanService _planService;
@@ -22,24 +21,21 @@ namespace EGI_Backend.WebAPI.Controllers
         private readonly IClaimService _claimService;
         private readonly IInvoiceService _invoiceService;
         private readonly IPolicyEndorsementService _endorsementService;
-        private readonly IMapper _mapper;
 
         public AdminDashboardController(
-            IAdminDashboardService dashboardService, 
+            IAdminDashboardService dashboardService,
             IInsurancePlanService planService,
             ICorporateClientService corporateService,
             IClaimService claimService,
             IInvoiceService invoiceService,
-            IPolicyEndorsementService endorsementService,
-            IMapper mapper)
+            IPolicyEndorsementService endorsementService)
         {
-            _dashboardService = dashboardService;
-            _planService = planService;
-            _corporateService = corporateService;
-            _claimService = claimService;
-            _invoiceService = invoiceService;
+            _dashboardService  = dashboardService;
+            _planService       = planService;
+            _corporateService  = corporateService;
+            _claimService      = claimService;
+            _invoiceService    = invoiceService;
             _endorsementService = endorsementService;
-            _mapper = mapper;
         }
 
         [HttpGet("claims/{claimId}/detail")]
@@ -146,13 +142,7 @@ namespace EGI_Backend.WebAPI.Controllers
         [HttpPost("approve-client/{id}")]
         public async Task<IActionResult> ApproveClient(Guid id, [FromBody] ReviewCorporateClientDto dto)
         {
-            var adminIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(adminIdStr) || !Guid.TryParse(adminIdStr, out var adminId))
-            {
-                return Unauthorized();
-            }
-
-            var result = await _dashboardService.ReviewClientAsync(id, adminId, dto);
+            var result = await _dashboardService.ReviewClientAsync(id, CurrentUserId, dto);
             if (!result) return NotFound("Client not found.");
 
             return Ok(new { message = dto.IsApproved ? "Client approved successfully." : "Client rejected successfully." });
@@ -201,11 +191,5 @@ namespace EGI_Backend.WebAPI.Controllers
             return Ok(clients);
         }
 
-        [HttpPost("recalculate-commissions")]
-        public async Task<IActionResult> RecalculateCommissions()
-        {
-            int updatedCount = await _dashboardService.RecalculateAllCommissionsAsync();
-            return Ok(new { message = $"Recalculated commissions for {updatedCount} policies.", updatedCount });
-        }
     }
 }
