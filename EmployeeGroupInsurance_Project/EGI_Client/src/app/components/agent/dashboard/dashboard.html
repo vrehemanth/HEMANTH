@@ -1,18 +1,16 @@
 <div class="space-y-6 animate-in fade-in duration-300">
     <div class="flex items-center justify-between">
         <div>
-            <h2 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white"> {{ pageTitle() }}</h2>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1"> Manage your corporate clients, policy
-                implementations, and review adjustments.</p>
+            <h2 class="text-3xl font-black tracking-tight text-premium"> {{ pageTitle() }}</h2>
+            <p class="text-sm text-gray-400 dark:text-gray-500 mt-1 font-medium"> Ecosystem oversight for corporate
+                portfolio and commission trails.</p>
         </div>
 
         @if (isLoading()) {
         <div
-            class="flex items-center gap-2 px-3 py-1 bg-primary-50 dark:bg-primary-900/20 text-primary-600 rounded-full text-xs font-bold animate-pulse">
-            <svg class="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                <path d="M21 12a9 9 0 11-6.219-8.56"> </path>
-            </svg>
-            Syncing...
+            class="flex items-center gap-2 px-4 py-1.5 glass rounded-full text-[10px] font-black uppercase tracking-widest text-primary-600 animate-pulse">
+            <span class="w-2 h-2 bg-primary-500 rounded-full"></span>
+            Synchronizing Engine...
         </div>
         }
     </div>
@@ -20,8 +18,18 @@
     <!--OVERVIEW TAB-->
     @if (activeTab() === 'overview') {
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        @if (isLoading() && !summary()) {
+        @for (i of [1,2,3,4]; track i) {
         <div
-            class="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden group">
+            class="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden">
+            <div class="absolute inset-0 animate-shimmer"></div>
+            <div class="h-3 w-20 bg-gray-100 dark:bg-gray-700 rounded mb-4"></div>
+            <div class="h-8 w-24 bg-gray-200 dark:bg-gray-600 rounded"></div>
+        </div>
+        }
+        } @else {
+        <div
+            class="premium-hover bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden group">
             <div
                 class="absolute -right-4 -bottom-4 w-24 h-24 bg-primary-50 dark:bg-primary-900/10 rounded-full group-hover:scale-110 transition-transform duration-500">
             </div>
@@ -31,7 +39,7 @@
         </div>
 
         <div
-            class="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden group">
+            class="premium-hover bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden group">
             <div
                 class="absolute -right-4 -bottom-4 w-24 h-24 bg-blue-50 dark:bg-blue-900/10 rounded-full group-hover:scale-110 transition-transform duration-500">
             </div>
@@ -41,7 +49,7 @@
         </div>
 
         <div
-            class="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden group">
+            class="premium-hover bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden group">
             <div
                 class="absolute -right-4 -bottom-4 w-24 h-24 bg-emerald-50 dark:bg-emerald-900/10 rounded-full group-hover:scale-110 transition-transform duration-500">
             </div>
@@ -52,7 +60,7 @@
         </div>
 
         <div
-            class="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm border-l-4 border-l-emerald-500">
+            class="premium-hover bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm border-l-4 border-l-emerald-500">
             <p class="text-xs font-bold text-emerald-500 uppercase tracking-widest">Commission Received</p>
             <h3 class="text-3xl font-black mt-2 text-gray-900 dark:text-white">₹{{ summary()?.totalCommissionEarned |
                 number:'1.0-0' }}</h3>
@@ -63,13 +71,77 @@
                 Verified Earnings
             </div>
         </div>
+        }
+    </div>
+
+    <!-- Intelligence & Global Insights -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Commission Engine (Donut) -->
+        <div
+            class="premium-hover group bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm transition-all">
+            <div class="flex items-center justify-between mb-6">
+                <h4 class="text-xs font-black uppercase tracking-widest text-gray-400">Commission Growth</h4>
+                <div
+                    class="px-2 py-0.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-full text-[10px] font-bold text-emerald-600">
+                    Performance: Positive</div>
+            </div>
+            <div class="relative h-48 flex items-center justify-center">
+                <canvas #commissionChart></canvas>
+                <div
+                    class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none group-hover:opacity-0 transition-opacity duration-300">
+                    <span class="text-xl font-black dark:text-white">₹{{ (summary()?.totalCommissionEarned +
+                        summary()?.projectedCommission) | number:'1.0-0' }}</span>
+                    <span class="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">Total Portfolio</span>
+                </div>
+            </div>
+            <div class="mt-6 grid grid-cols-2 gap-4 border-t border-gray-50 dark:border-gray-700/50 pt-4">
+                <div class="flex flex-col items-center border-r border-gray-50 dark:border-gray-700/50">
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-[#10b981]"></span>
+                        <span class="text-[9px] font-bold text-gray-400 uppercase">Earned</span>
+                    </div>
+                    <span class="text-sm font-bold dark:text-gray-200">₹{{ summary()?.totalCommissionEarned |
+                        number:'1.0-0' }}</span>
+                </div>
+                <div class="flex flex-col items-center">
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-[#6366f1]"></span>
+                        <span class="text-[9px] font-bold text-gray-400 uppercase">Projected</span>
+                    </div>
+                    <span class="text-sm font-bold dark:text-gray-200">₹{{ summary()?.projectedCommission |
+                        number:'1.0-0' }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div
+            class="premium-hover bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm transition-all">
+            <div class="flex items-center justify-between mb-4">
+                <h4 class="text-xs font-black uppercase tracking-widest text-gray-400">Outstanding pipeline</h4>
+                <span class="text-[10px] text-red-500 font-bold uppercase">Urgent Follow-up</span>
+            </div>
+            <div class="h-64">
+                <canvas #outstandingChart></canvas>
+            </div>
+        </div>
+
+        <div
+            class="premium-hover bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm transition-all">
+            <div class="flex items-center justify-between mb-4">
+                <h4 class="text-xs font-black uppercase tracking-widest text-gray-400">Portfolio Sales Mix</h4>
+                <span class="text-[10px] text-blue-500 font-bold uppercase">Product Focus</span>
+            </div>
+            <div class="h-64">
+                <canvas #salesMixChart></canvas>
+            </div>
+        </div>
     </div>
 
     <!-- Dynamic Business Oversight -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <!-- DETAILED PENDING PREMIUM -->
         <div
-            class="lg:col-span-5 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm p-8 flex flex-col">
+            class="premium-hover lg:col-span-5 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm p-8 flex flex-col">
             <div class="flex items-center justify-between mb-8">
                 <div>
                     <h4 class="text-lg font-bold text-gray-900 dark:text-white">Pending Premiums</h4>
@@ -122,7 +194,7 @@
 
         <!-- CUSTOMER CLAIM MONITOR -->
         <div
-            class="lg:col-span-7 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm p-8 flex flex-col">
+            class="premium-hover lg:col-span-7 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm p-8 flex flex-col">
             <div class="flex items-center justify-between mb-8">
                 <div>
                     <h4 class="text-lg font-bold text-gray-900 dark:text-white">Claim Status Monitor</h4>
@@ -192,18 +264,44 @@
     @if (activeTab() === 'customers') {
     <div
         class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden overflow-x-auto">
-        <div class="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center min-w-[600px]">
-            <h3 class="font-semibold dark:text-white"> My Corporate Customers </h3>
-            <button (click)="showCustomerForm.set(!showCustomerForm())"
-                class="text-sm bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition">
-                {{ showCustomerForm() ? 'Cancel' : 'Onboard Customer' }}
-            </button>
+        <div
+            class="p-6 border-b border-gray-100 dark:border-gray-700 flex flex-col md:flex-row justify-between items-center gap-4 min-w-[600px]">
+            <h3 class="font-semibold dark:text-white shrink-0"> My Corporate Customers </h3>
+            <div class="flex items-center gap-2 w-full md:w-auto">
+                <div class="relative w-full md:w-64">
+                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none"
+                        stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                    <input type="text" [value]="customerSearchTerm()"
+                        (input)="customerSearchTerm.set($any($event.target).value)" placeholder="Search customers..."
+                        class="w-full pl-10 pr-4 py-2 text-xs border dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary-500 transition-all outline-none">
+                </div>
+                <select [value]="customerStatusFilter()" (change)="customerStatusFilter.set($any($event.target).value)"
+                    class="px-3 py-2 text-xs border dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary-500 transition-all outline-none">
+                    <option value="All">All</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Rejected">Rejected</option>
+                </select>
+                <button (click)="showCustomerForm.set(!showCustomerForm())"
+                    class="text-xs bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-all active:scale-95 shadow-md shadow-primary-500/20 whitespace-nowrap">
+                    {{ showCustomerForm() ? 'Cancel' : 'Onboard Customer' }}
+                </button>
+            </div>
         </div>
 
         <div class="min-w-[600px]">
             @if (showCustomerForm()) {
-            <div class="p-6 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700">
-                <form [formGroup]="customerForm" (ngSubmit)="createCustomer()" class="grid grid-cols-2 gap-4">
+            <div class="p-8 glass m-4 rounded-3xl border dark:border-gray-700/50 animate-in zoom-in-95 duration-300">
+                <div class="mb-6">
+                    <h4 class="text-xl font-black text-premium uppercase tracking-tight">Enterprise Onboarding</h4>
+                    <p class="text-xs text-gray-500 mt-1 font-medium">Initiate the corporate ecosystem registration
+                        process.
+                    </p>
+                </div>
+                <form [formGroup]="customerForm" (ngSubmit)="createCustomer()" class="grid grid-cols-2 gap-6">
                     <div class="col-span-2 md:col-span-1">
                         <label class="block text-xs font-medium text-gray-500 mb-1"> Company Name </label>
                         <input formControlName="companyName" placeholder="e.g. Acme Corp"
@@ -274,13 +372,43 @@
             <table class="w-full text-left">
                 <thead class="bg-gray-50 dark:bg-gray-800/50 text-xs text-gray-500 dark:text-gray-400 uppercase">
                     <tr>
-                        <th class="px-6 py-3"> Company </th>
-                        <th class="px-6 py-3"> Category / Address </th>
-                        <th class="px-6 py-3"> Status </th>
+                        <th class="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                            (click)="sortCustomers('company')">
+                            <div class="flex items-center gap-1">Company @if(customerSortConfig().column === 'company')
+                                {<svg class="w-3 h-3 text-primary-500"
+                                    [ngClass]="{'rotate-180': customerSortConfig().direction === 'desc'}" fill="none"
+                                    stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M5 15l7-7 7 7">
+                                    </path>
+                                </svg>}</div>
+                        </th>
+                        <th class="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                            (click)="sortCustomers('category')">
+                            <div class="flex items-center gap-1">Category / Address @if(customerSortConfig().column ===
+                                'category') {<svg class="w-3 h-3 text-primary-500"
+                                    [ngClass]="{'rotate-180': customerSortConfig().direction === 'desc'}" fill="none"
+                                    stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M5 15l7-7 7 7">
+                                    </path>
+                                </svg>}</div>
+                        </th>
+                        <th class="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                            (click)="sortCustomers('status')">
+                            <div class="flex items-center gap-1">Status @if(customerSortConfig().column === 'status')
+                                {<svg class="w-3 h-3 text-primary-500"
+                                    [ngClass]="{'rotate-180': customerSortConfig().direction === 'desc'}" fill="none"
+                                    stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M5 15l7-7 7 7">
+                                    </path>
+                                </svg>}</div>
+                        </th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-                    @for (c of customers(); track c.id) {
+                    @for (c of filteredCustomers(); track c.id) {
                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                         <td class="px-6 py-4 font-medium dark:text-white">
                             {{ c.companyName }}
@@ -318,23 +446,96 @@
     <div
         class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden overflow-x-auto">
         <div
-            class="px-6 py-5 border-b border-gray-100 dark:border-gray-700 font-semibold text-gray-900 dark:text-white min-w-[800px]">
-            My Policies
+            class="px-6 py-5 border-b border-gray-100 dark:border-gray-700 font-semibold text-gray-900 dark:text-white min-w-[800px] flex justify-between items-center gap-4">
+            <span>My Policies</span>
+            <div class="relative w-full md:w-64 font-normal">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none"
+                    stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                <input type="text" [value]="policySearchTerm()"
+                    (input)="policySearchTerm.set($any($event.target).value)" placeholder="Search policies..."
+                    class="w-full pl-10 pr-4 py-2 text-xs border dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary-500 transition-all outline-none">
+            </div>
         </div>
         <table class="w-full text-left text-sm min-w-[800px]">
             <thead class="bg-gray-50 dark:bg-gray-800/50 text-xs text-gray-500 dark:text-gray-400 uppercase">
                 <tr>
-                    <th class="px-6 py-3"> Policy No </th>
-                    <th class="px-6 py-3"> Company </th>
-                    <th class="px-6 py-3"> Plan </th>
-                    <th class="px-6 py-3"> Period </th>
-                    <th class="px-6 py-3"> Annual Premium </th>
-                    <th class="px-6 py-3"> Commission </th>
-                    <th class="px-6 py-3"> Status </th>
+                    <th class="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                        (click)="sortPolicies('policyNo')">
+                        <div class="flex items-center gap-1">Policy No @if(policySortConfig().column === 'policyNo')
+                            {<svg class="w-3 h-3 text-primary-500"
+                                [ngClass]="{'rotate-180': policySortConfig().direction === 'desc'}" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7">
+                                </path>
+                            </svg>}</div>
+                    </th>
+                    <th class="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                        (click)="sortPolicies('company')">
+                        <div class="flex items-center gap-1">Company @if(policySortConfig().column === 'company') {<svg
+                                class="w-3 h-3 text-primary-500"
+                                [ngClass]="{'rotate-180': policySortConfig().direction === 'desc'}" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7">
+                                </path>
+                            </svg>}</div>
+                    </th>
+                    <th class="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                        (click)="sortPolicies('plan')">
+                        <div class="flex items-center gap-1">Plan @if(policySortConfig().column === 'plan') {<svg
+                                class="w-3 h-3 text-primary-500"
+                                [ngClass]="{'rotate-180': policySortConfig().direction === 'desc'}" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7">
+                                </path>
+                            </svg>}</div>
+                    </th>
+                    <th class="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                        (click)="sortPolicies('period')">
+                        <div class="flex items-center gap-1">Period @if(policySortConfig().column === 'period') {<svg
+                                class="w-3 h-3 text-primary-500"
+                                [ngClass]="{'rotate-180': policySortConfig().direction === 'desc'}" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7">
+                                </path>
+                            </svg>}</div>
+                    </th>
+                    <th class="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                        (click)="sortPolicies('premium')">
+                        <div class="flex items-center gap-1">Annual Premium @if(policySortConfig().column === 'premium')
+                            {<svg class="w-3 h-3 text-primary-500"
+                                [ngClass]="{'rotate-180': policySortConfig().direction === 'desc'}" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7">
+                                </path>
+                            </svg>}</div>
+                    </th>
+                    <th class="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                        (click)="sortPolicies('commission')">
+                        <div class="flex items-center gap-1">Commission @if(policySortConfig().column === 'commission')
+                            {<svg class="w-3 h-3 text-primary-500"
+                                [ngClass]="{'rotate-180': policySortConfig().direction === 'desc'}" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7">
+                                </path>
+                            </svg>}</div>
+                    </th>
+                    <th class="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                        (click)="sortPolicies('status')">
+                        <div class="flex items-center gap-1">Status @if(policySortConfig().column === 'status') {<svg
+                                class="w-3 h-3 text-primary-500"
+                                [ngClass]="{'rotate-180': policySortConfig().direction === 'desc'}" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7">
+                                </path>
+                            </svg>}</div>
+                    </th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-                @for (p of policies(); track p.id) {
+                @for (p of filteredPolicies(); track p.id) {
                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                     <td class="px-6 py-4 font-mono font-medium dark:text-white"> {{ p.policyNo }} </td>
                     <td class="px-6 py-4 dark:text-gray-300"> {{ p.companyName }} </td>
@@ -379,15 +580,51 @@
         <table class="w-full text-left min-w-[800px]">
             <thead class="bg-gray-50 dark:bg-gray-800/50 text-xs text-gray-500 dark:text-gray-400 uppercase">
                 <tr>
-                    <th class="px-6 py-3"> Type </th>
-                    <th class="px-6 py-3"> Policy </th>
-                    <th class="px-6 py-3"> Description </th>
-                    <th class="px-6 py-3"> Est.Adjustment </th>
-                    <th class="px-6 py-3"> Action </th>
+                    <th class="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                        (click)="sortEndorsements('type')">
+                        <div class="flex items-center gap-1">Type @if(endorsementSortConfig().column === 'type') {<svg
+                                class="w-3 h-3 text-primary-500"
+                                [ngClass]="{'rotate-180': endorsementSortConfig().direction === 'desc'}" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7">
+                                </path>
+                            </svg>}</div>
+                    </th>
+                    <th class="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                        (click)="sortEndorsements('policy')">
+                        <div class="flex items-center gap-1">Policy @if(endorsementSortConfig().column === 'policy')
+                            {<svg class="w-3 h-3 text-primary-500"
+                                [ngClass]="{'rotate-180': endorsementSortConfig().direction === 'desc'}" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7">
+                                </path>
+                            </svg>}</div>
+                    </th>
+                    <th class="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                        (click)="sortEndorsements('description')">
+                        <div class="flex items-center gap-1">Description @if(endorsementSortConfig().column ===
+                            'description') {<svg class="w-3 h-3 text-primary-500"
+                                [ngClass]="{'rotate-180': endorsementSortConfig().direction === 'desc'}" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7">
+                                </path>
+                            </svg>}</div>
+                    </th>
+                    <th class="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                        (click)="sortEndorsements('adjustment')">
+                        <div class="flex items-center gap-1">Est.Adjustment @if(endorsementSortConfig().column ===
+                            'adjustment') {<svg class="w-3 h-3 text-primary-500"
+                                [ngClass]="{'rotate-180': endorsementSortConfig().direction === 'desc'}" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7">
+                                </path>
+                            </svg>}</div>
+                    </th>
+                    <th class="px-6 py-3 text-right">Action</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-                @for (e of pendingEndorsements(); track e.id) {
+                @for (e of filteredEndorsements(); track e.id) {
                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                     <td class="px-6 py-4 text-sm font-medium dark:text-white"
                         [ngClass]="{'text-red-600 dark:text-red-400': e.type?.toString().toLowerCase().includes('remove') || e.type?.toString().toLowerCase().includes('delete')}">
@@ -460,13 +697,43 @@
             <table class="w-full text-left table-fixed min-w-[900px]">
                 <thead class="bg-gray-50 dark:bg-gray-700/50 uppercase text-[10px] font-black text-gray-400">
                     <tr>
-                        <th class="px-8 py-4 w-48">Timestamp</th>
-                        <th class="px-8 py-4 w-48">Event ID</th>
-                        <th class="px-8 py-4 w-auto">Calculation Detail & Context</th>
+                        <th class="px-8 py-4 w-48 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                            (click)="sortCommissions('timestamp')">
+                            <div class="flex items-center gap-1">Timestamp @if(commissionSortConfig().column ===
+                                'timestamp') {<svg class="w-3 h-3 text-primary-500"
+                                    [ngClass]="{'rotate-180': commissionSortConfig().direction === 'desc'}" fill="none"
+                                    stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M5 15l7-7 7 7">
+                                    </path>
+                                </svg>}</div>
+                        </th>
+                        <th class="px-8 py-4 w-48 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                            (click)="sortCommissions('event')">
+                            <div class="flex items-center gap-1">Event ID @if(commissionSortConfig().column === 'event')
+                                {<svg class="w-3 h-3 text-primary-500"
+                                    [ngClass]="{'rotate-180': commissionSortConfig().direction === 'desc'}" fill="none"
+                                    stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M5 15l7-7 7 7">
+                                    </path>
+                                </svg>}</div>
+                        </th>
+                        <th class="px-8 py-4 w-auto cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                            (click)="sortCommissions('detail')">
+                            <div class="flex items-center gap-1">Calculation Detail & Context
+                                @if(commissionSortConfig().column === 'detail') {<svg class="w-3 h-3 text-primary-500"
+                                    [ngClass]="{'rotate-180': commissionSortConfig().direction === 'desc'}" fill="none"
+                                    stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M5 15l7-7 7 7">
+                                    </path>
+                                </svg>}</div>
+                        </th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-                    @for (log of commissionLogs(); track log.id) {
+                    @for (log of filteredCommissions(); track log.id) {
                     <tr class="hover:bg-primary-50/30 dark:hover:bg-primary-900/10 transition-colors group">
                         <td class="px-8 py-6">
                             <div class="flex flex-col">

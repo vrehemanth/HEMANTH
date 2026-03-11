@@ -20,6 +20,7 @@ namespace EGI_Backend.Application.Interfaces
         // Called by background job daily
         Task GenerateDueInvoicesAsync();
         Task MarkOverdueInvoicesAsync();
+        Task MarkOverdueInvoicesForClientAsync(Guid clientId);
 
         // Customer pays an invoice
         Task<PaymentResponseDto> PayInvoiceAsync(Guid invoiceId, Guid customerUserId, PayInvoiceDto dto);

@@ -4,6 +4,7 @@ using EGI_Backend.WebAPI.Mapping;
 using EGI_Backend.Infrastructure.Repositories;
 using EGI_Backend.Infrastructure.Services;
 using EGI_Backend.Infrastructure.BackgroundJobs;
+using EGI_Backend.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -23,41 +24,11 @@ namespace EGI_Backend.WebAPI
                 // Add services to the container.
                 builder.Services.AddMemoryCache();
                 builder.Services.AddHttpContextAccessor();
-                builder.Services.AddDbContext<EGIDbContext>(options=>
-                    options.UseSqlServer(builder.Configuration.GetConnectionString("EGIConnection")));
-                builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+                
+                builder.Services.AddInfrastructure(builder.Configuration);
+                builder.Services.AddApplication();
 
-                builder.Services.AddScoped<ICorporateClientRepository, CorporateClientRepository>();
-                builder.Services.AddScoped<IAgentCustomerRepository, AgentCustomerRepository>();
-                builder.Services.AddScoped<IPolicyAssignmentRepository, PolicyAssignmentRepository>();
-                builder.Services.AddScoped<IAgentCustomerService, AgentCustomerService>();
-                builder.Services.AddScoped<IPolicyAssignmentService, PolicyAssignmentService>();
-                builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();  
-                builder.Services.AddScoped<ICorporateDocumentRepository, CorporateDocumentRepository>();
-                builder.Services.AddScoped<IDocumentStorageService, LocalFileStorageService>();
-                builder.Services.AddScoped<ICorporateClientService, CorporateClientService>();
-                builder.Services.AddScoped<IEmailService, EmailService>();
-                builder.Services.AddScoped<INotificationService, NotificationService>();
-                builder.Services.AddScoped<IInsurancePlanRepository, InsurancePlanRepository>();
-                builder.Services.AddScoped<IInsurancePlanService, InsurancePlanService>();
-                builder.Services.AddScoped<IClaimRepository, ClaimRepository>();
-                builder.Services.AddScoped<IClaimService, ClaimService>();
-                builder.Services.AddScoped<IMemberRepository, MemberRepository>();
-                builder.Services.AddScoped<IDependentRepository, DependentRepository>();
-                builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
-                builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
-                builder.Services.AddScoped<IPolicyEndorsementRepository, PolicyEndorsementRepository>();
-                builder.Services.AddScoped<IPolicyEndorsementService, PolicyEndorsementService>();
-                builder.Services.AddScoped<IInvoiceService, InvoiceService>();
-                builder.Services.AddHostedService<EGI_Backend.Infrastructure.BackgroundServices.InsuranceAutomationWorker>();
-                builder.Services.AddScoped<IAuthService, AuthService>();
-                builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
-                builder.Services.AddScoped<IAdminDashboardService, AdminDashboardService>();
-                builder.Services.AddScoped<IAgentDashboardService, AgentDashboardService>();
-                builder.Services.AddScoped<IClaimsOfficerDashboardService, ClaimsOfficerDashboardService>();
-                builder.Services.AddScoped<ICustomerDashboardService, CustomerDashboardService>();
                 builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
-                builder.Services.AddScoped<IUserRepository, UserRepository>();
                 builder.Services.AddAuthentication(options =>
                 {
                     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -90,6 +61,11 @@ namespace EGI_Backend.WebAPI
             }).AddJsonOptions(options =>
             {
                 options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+            });
+
+            builder.Services.Configure<Microsoft.AspNetCore.Mvc.ApiBehaviorOptions>(options =>
+            {
+                options.SuppressModelStateInvalidFilter = true;
             });
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
@@ -132,7 +108,7 @@ namespace EGI_Backend.WebAPI
             {
                 options.AddPolicy("AllowAll",
                     builder => builder
-                        .AllowAnyOrigin()
+                        .WithOrigins("http://localhost:4200") // Angular default port
                         .AllowAnyMethod()
                         .AllowAnyHeader());
             });

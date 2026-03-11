@@ -41,7 +41,8 @@ namespace EGI_Backend.WebAPI.Mapping
             // Invoice mappings
             CreateMap<Invoice, InvoiceResponseDto>()
                 .ForMember(dest => dest.PolicyNo, opt => opt.MapFrom(src => src.PolicyAssignment != null ? src.PolicyAssignment.PolicyNo : string.Empty))
-                .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()));
+                .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()))
+                .ForMember(dest => dest.IsPaymentBlocked, opt => opt.MapFrom(src => !src.InvoiceNo.EndsWith("-ADJ") && (DateTime.UtcNow.Date - src.DueDate.Date).Days >= 7));
 
             CreateMap<Payment, PaymentResponseDto>()
                 .ForMember(dest => dest.InvoiceNo, opt => opt.MapFrom(src => src.Invoice != null ? src.Invoice.InvoiceNo : string.Empty))

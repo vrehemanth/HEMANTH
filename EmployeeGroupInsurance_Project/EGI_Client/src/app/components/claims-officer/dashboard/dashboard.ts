@@ -1,10 +1,12 @@
-import { Component, inject, signal, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, signal, OnInit, OnDestroy, computed, viewChild, ElementRef, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, NavigationEnd } from '@angular/router';
 import { ClaimsOfficerService } from '../../../data-access/api.services';
 import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 import { ToastService } from '../../../core/services/toast.service';
+import { Chart, registerables } from 'chart.js';
+Chart.register(...registerables);
 
 @Component({
   selector: 'app-claims-officer-dashboard',
@@ -18,6 +20,30 @@ export class ClaimsOfficerDashboardComponent implements OnInit, OnDestroy {
   toastService = inject(ToastService);
   private routerSub?: Subscription;
 
+  // --- Chart Canvases ---
+  decisionCanvas = viewChild<ElementRef<HTMLCanvasElement>>('decisionChart');
+  adjudicationCanvas = viewChild<ElementRef<HTMLCanvasElement>>('adjudicationChart');
+  typeCanvas = viewChild<ElementRef<HTMLCanvasElement>>('typeChart');
+
+  private decisionChart?: Chart;
+  private adjudicationChart?: Chart;
+  private typeChart?: Chart;
+
+  private chartEffect = effect(() => {
+    const dCanvas = this.decisionCanvas();
+    const aCanvas = this.adjudicationCanvas();
+    const tCanvas = this.typeCanvas();
+
+    // Dependencies
+    this.summary();
+    this.claimHistory();
+
+    if (dCanvas && aCanvas && tCanvas && this.activeTab() === 'overview') {
+      this.destroyCharts();
+      setTimeout(() => this.initCharts(), 300);
+    }
+  });
+
   activeTab = signal<'overview' | 'queue' | 'history'>('overview');
   pageTitle = signal('Claims Adjudication Dashboard');
   isLoading = signal(false);
@@ -25,6 +51,81 @@ export class ClaimsOfficerDashboardComponent implements OnInit, OnDestroy {
   summary = signal<any>(null);
   pendingClaims = signal<any[]>([]);
   claimHistory = signal<any[]>([]);
+
+  // Filtering signals
+  pendingSearchTerm = signal('');
+  pendingSortConfig = signal<{ column: string, direction: 'asc' | 'desc' }>({ column: 'date', direction: 'desc' });
+
+  historySearchTerm = signal('');
+  historyStatusFilter = signal('All');
+  historySortConfig = signal<{ column: string, direction: 'asc' | 'desc' }>({ column: 'date', direction: 'desc' });
+
+  // Computed filtered lists
+  filteredPendingClaims = computed(() => {
+    let result = this.pendingClaims();
+    const search = this.pendingSearchTerm().toLowerCase().trim();
+    if (search) {
+      result = result.filter(c =>
+        (c.id && c.id.toLowerCase().includes(search)) ||
+        (c.memberName && c.memberName.toLowerCase().includes(search)) ||
+        (c.claimType && c.claimType.toLowerCase().includes(search))
+      );
+    }
+    const sort = this.pendingSortConfig();
+    return [...result].sort((a, b) => {
+      let comparison = 0;
+      switch (sort.column) {
+        case 'id': comparison = (a.id || '').localeCompare(b.id || ''); break;
+        case 'member': comparison = (a.memberName || '').localeCompare(b.memberName || ''); break;
+        case 'type': comparison = (a.claimType || '').localeCompare(b.claimType || ''); break;
+        case 'amount': comparison = (a.claimAmount || 0) - (b.claimAmount || 0); break;
+        case 'date': comparison = new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime(); break;
+      }
+      return sort.direction === 'asc' ? comparison : -comparison;
+    });
+  });
+
+  filteredClaimHistory = computed(() => {
+    let result = this.claimHistory();
+    const statusIdx = this.historyStatusFilter();
+    if (statusIdx !== 'All') {
+      result = result.filter(c => c.status === statusIdx);
+    }
+    const search = this.historySearchTerm().toLowerCase().trim();
+    if (search) {
+      result = result.filter(c =>
+        (c.id && c.id.toLowerCase().includes(search)) ||
+        (c.memberName && c.memberName.toLowerCase().includes(search)) ||
+        (c.claimType && c.claimType.toLowerCase().includes(search)) ||
+        (c.rejectionReason && c.rejectionReason.toLowerCase().includes(search))
+      );
+    }
+    const sort = this.historySortConfig();
+    return [...result].sort((a, b) => {
+      let comparison = 0;
+      switch (sort.column) {
+        case 'date': comparison = new Date(a.reviewedAt || 0).getTime() - new Date(b.reviewedAt || 0).getTime(); break;
+        case 'member': comparison = (a.memberName || '').localeCompare(b.memberName || ''); break;
+        case 'type': comparison = (a.claimType || '').localeCompare(b.claimType || ''); break;
+        case 'amount': comparison = (a.claimAmount || 0) - (b.claimAmount || 0); break;
+        case 'status': comparison = (a.status || '').localeCompare(b.status || ''); break;
+        case 'reason': comparison = (a.rejectionReason || '').localeCompare(b.rejectionReason || ''); break;
+      }
+      return sort.direction === 'asc' ? comparison : -comparison;
+    });
+  });
+
+  updateSort(configSignal: any, column: string) {
+    const current = configSignal();
+    if (current.column === column) {
+      configSignal.set({ column, direction: current.direction === 'asc' ? 'desc' : 'asc' });
+    } else {
+      configSignal.set({ column, direction: 'asc' });
+    }
+  }
+
+  sortPending(column: string) { this.updateSort(this.pendingSortConfig, column); }
+  sortHistory(column: string) { this.updateSort(this.historySortConfig, column); }
 
   selectedClaim = signal<any>(null);
   coverageSummary = signal<any>(null);
@@ -80,7 +181,12 @@ export class ClaimsOfficerDashboardComponent implements OnInit, OnDestroy {
     if (tab === 'overview' && !this.summary() && !this.pendingReqs.has('overview')) {
       this.pendingReqs.add('overview');
       this.officerService.getSummary().subscribe({
-        next: res => { this.summary.set(res?.data || res); this.pendingReqs.delete('overview'); },
+        next: res => {
+          this.summary.set(res?.data || res);
+          this.pendingReqs.delete('overview');
+          // Load history for analytics
+          this.lazyLoadTab('history');
+        },
         error: () => this.pendingReqs.delete('overview')
       });
     } else if (tab === 'queue' && this.pendingClaims().length === 0) {
@@ -221,5 +327,145 @@ export class ClaimsOfficerDashboardComponent implements OnInit, OnDestroy {
       link.click();
       document.body.removeChild(link);
     }
+  }
+
+  private destroyCharts() {
+    this.decisionChart?.destroy();
+    this.adjudicationChart?.destroy();
+    this.typeChart?.destroy();
+  }
+
+  private initCharts() {
+    const dCtx = this.decisionCanvas()?.nativeElement;
+    const aCtx = this.adjudicationCanvas()?.nativeElement;
+    const tCtx = this.typeCanvas()?.nativeElement;
+
+    if (!dCtx || !aCtx || !tCtx) return;
+
+    this.initDecisionChart(dCtx);
+    this.initAdjudicationChart(aCtx);
+    this.initTypeChart(tCtx);
+  }
+
+  private initDecisionChart(ctx: HTMLCanvasElement) {
+    const s = this.summary();
+    const approved = s?.approvedClaimsCount || 0;
+    const rejected = s?.rejectedClaimsCount || 0;
+    const pending = s?.pendingClaimsCount || 0;
+
+    this.decisionChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Approved', 'Rejected', 'Pending'],
+        datasets: [{
+          data: [approved, rejected, pending],
+          backgroundColor: ['#10b981', '#ef4444', '#f59e0b'],
+          borderWidth: 0,
+          borderRadius: 10,
+          hoverOffset: 12
+        }]
+      },
+      options: {
+        cutout: '75%',
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            padding: 14,
+            usePointStyle: true,
+            callbacks: { label: (i: any) => ` ${i.label}: ${i.raw} Claims` }
+          }
+        }
+      }
+    });
+  }
+
+  private initAdjudicationChart(ctx: HTMLCanvasElement) {
+    const history = this.claimHistory();
+    const last7Days = [];
+    const counts = new Array(7).fill(0);
+
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      last7Days.push(d.toLocaleDateString('en-US', { weekday: 'short' }));
+    }
+
+    history.forEach(c => {
+      const d = new Date(c.reviewedAt);
+      const diff = Math.floor((new Date().getTime() - d.getTime()) / (1000 * 3600 * 24));
+      if (diff >= 0 && diff < 7) {
+        counts[6 - diff]++;
+      }
+    });
+
+    const grad = ctx.getContext('2d')?.createLinearGradient(0, 0, 0, 400);
+    grad?.addColorStop(0, 'rgba(99, 102, 241, 0.4)');
+    grad?.addColorStop(1, 'rgba(99, 102, 241, 0)');
+
+    this.adjudicationChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: last7Days,
+        datasets: [{
+          label: 'Reviewed Claims',
+          data: counts,
+          borderColor: '#6366f1',
+          backgroundColor: grad,
+          fill: true,
+          tension: 0.4,
+          pointRadius: 4,
+          borderWidth: 3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 10, weight: 600 } } },
+          y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { stepSize: 1, font: { size: 10 } } }
+        }
+      }
+    });
+  }
+
+  private initTypeChart(ctx: HTMLCanvasElement) {
+    const history = this.claimHistory();
+    const types: { [key: string]: number } = {};
+    history.slice(0, 50).forEach(c => { // Sample last 50
+      types[c.claimType] = (types[c.claimType] || 0) + 1;
+    });
+
+    this.typeChart = new Chart(ctx, {
+      type: 'polarArea',
+      data: {
+        labels: Object.keys(types),
+        datasets: [{
+          data: Object.values(types),
+          backgroundColor: [
+            'rgba(59, 130, 246, 0.6)',
+            'rgba(16, 185, 129, 0.6)',
+            'rgba(245, 158, 11, 0.6)',
+            'rgba(139, 92, 246, 0.6)',
+            'rgba(236, 72, 153, 0.6)'
+          ]
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { boxWidth: 8, font: { size: 9 }, usePointStyle: true }
+          }
+        },
+        scales: {
+          r: { ticks: { display: false }, grid: { color: 'rgba(0,0,0,0.05)' } }
+        }
+      }
+    });
   }
 }

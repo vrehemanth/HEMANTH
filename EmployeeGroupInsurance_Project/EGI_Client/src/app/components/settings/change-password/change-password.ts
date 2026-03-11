@@ -16,6 +16,8 @@ export class ChangePasswordComponent {
     private toastService = inject(ToastService);
 
     isLoading = signal(false);
+    showPassword = signal(false);
+    showConfirmPassword = signal(false);
 
     onPasswordPaste(event: ClipboardEvent) {
         event.preventDefault();

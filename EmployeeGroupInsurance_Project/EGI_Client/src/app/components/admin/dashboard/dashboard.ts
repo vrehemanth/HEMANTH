@@ -1,10 +1,12 @@
-﻿import { Component, inject, signal, OnInit, OnDestroy } from '@angular/core';
+﻿import { Component, inject, signal, OnInit, OnDestroy, computed, viewChild, ElementRef, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AdminService } from '../../../data-access/api.services';
 import { FormsModule } from '@angular/forms';
 import { Router, NavigationEnd } from '@angular/router';
-import { filter, Subscription, forkJoin } from 'rxjs';
+import { filter, Subscription, forkJoin, of, catchError } from 'rxjs';
 import { ToastService } from '../../../core/services/toast.service';
+import { Chart, registerables } from 'chart.js';
+Chart.register(...registerables);
 
 @Component({
   selector: 'app-admin-dashboard',
@@ -21,12 +23,231 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   routerSub: Subscription | undefined;
   isLoading = signal(false);
 
+  // --- Chart Canvases ---
+  financialCanvas = viewChild<ElementRef<HTMLCanvasElement>>('financialChart');
+  claimTrendCanvas = viewChild<ElementRef<HTMLCanvasElement>>('claimTrendChart');
+  planMixCanvas = viewChild<ElementRef<HTMLCanvasElement>>('planMixChart');
+
+  private financialChart?: Chart;
+  private claimTrendChart?: Chart;
+  private planMixChart?: Chart;
+
+  // --- Chart Lifecycle Effect ---
+  private chartEffect = effect(() => {
+    const fCanvas = this.financialCanvas();
+    const cCanvas = this.claimTrendCanvas();
+    const pCanvas = this.planMixCanvas();
+
+    // Track signals for reactivity
+    this.summary();
+    this.allClaimsRegistry();
+    this.allPolicyAssignments();
+
+    if (fCanvas && cCanvas && pCanvas && this.activeTab() === 'dashboard') {
+      this.destroyCharts();
+      setTimeout(() => this.initCharts(), 300);
+    }
+  });
+
   summary = signal<any>(null);
   pendingClients = signal<any[]>([]);
   allClients = signal<any[]>([]);
   allPolicyAssignments = signal<any[]>([]);
   allClaimsRegistry = signal<any[]>([]);
   auditLogs = signal<any[]>([]);
+
+  // --- Filtering & Sorting Signals ---
+  claimSearchTerm = signal('');
+  claimStatusFilter = signal('All');
+  claimSortConfig = signal<{ column: string, direction: 'asc' | 'desc' }>({ column: 'date', direction: 'desc' });
+
+  clientSearchTerm = signal('');
+  clientSortConfig = signal<{ column: string, direction: 'asc' | 'desc' }>({ column: 'companyName', direction: 'asc' });
+
+  policySearchTerm = signal('');
+  policySortConfig = signal<{ column: string, direction: 'asc' | 'desc' }>({ column: 'policyNo', direction: 'asc' });
+
+  logSearchTerm = signal('');
+  logDateFilter = signal('All');
+  logSortConfig = signal<{ column: string, direction: 'asc' | 'desc' }>({ column: 'timestamp', direction: 'desc' });
+
+  planSortConfig = signal<{ column: string, direction: 'asc' | 'desc' }>({ column: 'planCode', direction: 'asc' });
+  agentSortConfig = signal<{ column: string, direction: 'asc' | 'desc' }>({ column: 'name', direction: 'asc' });
+  officerSortConfig = signal<{ column: string, direction: 'asc' | 'desc' }>({ column: 'name', direction: 'asc' });
+
+  // --- Filtered Computeds ---
+  filteredClaims = computed(() => {
+    let result = this.allClaimsRegistry();
+    const statusIdx = this.claimStatusFilter();
+    if (statusIdx !== 'All') {
+      result = result.filter(c => c.status === statusIdx);
+    }
+    const search = this.claimSearchTerm().toLowerCase().trim();
+    if (search) {
+      result = result.filter(c =>
+        (c.claimNumber && c.claimNumber.toLowerCase().includes(search)) ||
+        (c.memberName && c.memberName.toLowerCase().includes(search)) ||
+        (c.claimType && c.claimType.toLowerCase().includes(search))
+      );
+    }
+    const sort = this.claimSortConfig();
+    return [...result].sort((a, b) => {
+      let comparison = 0;
+      switch (sort.column) {
+        case 'id': comparison = (a.claimNumber || '').localeCompare(b.claimNumber || ''); break;
+        case 'date': comparison = new Date(a.claimDate || 0).getTime() - new Date(b.claimDate || 0).getTime(); break;
+        case 'amount': comparison = a.claimAmount - b.claimAmount; break;
+        case 'member': comparison = (a.memberName || '').localeCompare(b.memberName || ''); break;
+        case 'status': comparison = (a.status || '').localeCompare(b.status || ''); break;
+        case 'reviewer': comparison = (a.reviewerName || '').localeCompare(b.reviewerName || ''); break;
+      }
+      return sort.direction === 'asc' ? comparison : -comparison;
+    });
+  });
+
+  filteredClients = computed(() => {
+    let result = this.allClients();
+    const search = this.clientSearchTerm().toLowerCase().trim();
+    if (search) {
+      result = result.filter(c =>
+        (c.companyName && c.companyName.toLowerCase().includes(search)) ||
+        (c.address && c.address.toLowerCase().includes(search))
+      );
+    }
+    const sort = this.clientSortConfig();
+    return [...result].sort((a, b) => {
+      let comparison = 0;
+      switch (sort.column) {
+        case 'companyName': comparison = (a.companyName || '').localeCompare(b.companyName || ''); break;
+        case 'address': comparison = (a.address || '').localeCompare(b.address || ''); break;
+        case 'status': comparison = (a.status || '').localeCompare(b.status || ''); break;
+      }
+      return sort.direction === 'asc' ? comparison : -comparison;
+    });
+  });
+
+  filteredPolicies = computed(() => {
+    let result = this.allPolicyAssignments();
+    const search = this.policySearchTerm().toLowerCase().trim();
+    if (search) {
+      result = result.filter(p =>
+        (p.policyNo && p.policyNo.toLowerCase().includes(search)) ||
+        (p.companyName && p.companyName.toLowerCase().includes(search)) ||
+        (p.planName && p.planName.toLowerCase().includes(search))
+      );
+    }
+    const sort = this.policySortConfig();
+    return [...result].sort((a, b) => {
+      let comparison = 0;
+      switch (sort.column) {
+        case 'policyNo': comparison = (a.policyNo || '').localeCompare(b.policyNo || ''); break;
+        case 'company': comparison = (a.companyName || '').localeCompare(b.companyName || ''); break;
+        case 'plan': comparison = (a.planName || '').localeCompare(b.planName || ''); break;
+        case 'period': comparison = new Date(a.startDate || 0).getTime() - new Date(b.startDate || 0).getTime(); break;
+        case 'premium': comparison = (a.annualPremium || 0) - (b.annualPremium || 0); break;
+        case 'status': comparison = (a.status || '').localeCompare(b.status || ''); break;
+      }
+      return sort.direction === 'asc' ? comparison : -comparison;
+    });
+  });
+
+  filteredLogs = computed(() => {
+    let result = this.auditLogs();
+    const search = this.logSearchTerm().toLowerCase().trim();
+    const dateFilter = this.logDateFilter();
+
+    if (dateFilter !== 'All') {
+      const today = new Date();
+      result = result.filter(log => {
+        const logDate = new Date(log.timestamp);
+        if (dateFilter === 'Today') {
+          return logDate.toDateString() === today.toDateString();
+        } else if (dateFilter === 'Past 7 Days') {
+          const sevenDaysAgo = new Date(today.getTime() - (7 * 24 * 60 * 60 * 1000));
+          return logDate >= sevenDaysAgo;
+        }
+        return true;
+      });
+    }
+
+    if (search) {
+      result = result.filter(l =>
+        (l.action && l.action.toLowerCase().includes(search)) ||
+        (l.entityAffected && l.entityAffected.toLowerCase().includes(search)) ||
+        (l.ipAddress && l.ipAddress.toLowerCase().includes(search))
+      );
+    }
+
+    const sort = this.logSortConfig();
+    return [...result].sort((a, b) => {
+      let comparison = 0;
+      switch (sort.column) {
+        case 'timestamp': comparison = new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime(); break;
+        case 'action': comparison = (a.action || '').localeCompare(b.action || ''); break;
+        case 'entity': comparison = (a.entityAffected || '').localeCompare(b.entityAffected || ''); break;
+        case 'user': comparison = (a.userId || '').localeCompare(b.userId || ''); break;
+        case 'ip': comparison = (a.ipAddress || '').localeCompare(b.ipAddress || ''); break;
+      }
+      return sort.direction === 'asc' ? comparison : -comparison;
+    });
+  });
+
+  filteredPlans = computed(() => {
+    const sort = this.planSortConfig();
+    return [...this.plans()].sort((a, b) => {
+      let comparison = 0;
+      switch (sort.column) {
+        case 'planCode': comparison = (a.planCode || '').localeCompare(b.planCode || ''); break;
+        case 'planName': comparison = (a.planName || '').localeCompare(b.planName || ''); break;
+        case 'premium': comparison = (a.basePremium || 0) - (b.basePremium || 0); break;
+        case 'status': comparison = Number(b.status) - Number(a.status); break;
+      }
+      return sort.direction === 'asc' ? comparison : -comparison;
+    });
+  });
+
+  filteredAgents = computed(() => {
+    const sort = this.agentSortConfig();
+    return [...this.agents()].sort((a, b) => {
+      let comparison = 0;
+      switch (sort.column) {
+        case 'name': comparison = (a.name || '').localeCompare(b.name || ''); break;
+        case 'email': comparison = (a.email || '').localeCompare(b.email || ''); break;
+        case 'status': comparison = (a.status || '').localeCompare(b.status || ''); break;
+      }
+      return sort.direction === 'asc' ? comparison : -comparison;
+    });
+  });
+
+  filteredOfficers = computed(() => {
+    const sort = this.officerSortConfig();
+    return [...this.claimsOfficers()].sort((a, b) => {
+      let comparison = 0;
+      switch (sort.column) {
+        case 'name': comparison = (a.name || '').localeCompare(b.name || ''); break;
+        case 'email': comparison = (a.email || '').localeCompare(b.email || ''); break;
+        case 'status': comparison = (a.status || '').localeCompare(b.status || ''); break;
+      }
+      return sort.direction === 'asc' ? comparison : -comparison;
+    });
+  });
+
+  updateSort(configSignal: any, column: string) {
+    const current = configSignal();
+    if (current.column === column) {
+      configSignal.set({ column, direction: current.direction === 'asc' ? 'desc' : 'asc' });
+    } else {
+      configSignal.set({ column, direction: 'asc' });
+    }
+  }
+
+  sortClaims(column: string) { this.updateSort(this.claimSortConfig, column); }
+  sortClients(column: string) { this.updateSort(this.clientSortConfig, column); }
+  sortPolicies(column: string) { this.updateSort(this.policySortConfig, column); }
+  sortLogs(column: string) { this.updateSort(this.logSortConfig, column); }
+  sortPlans(column: string) { this.updateSort(this.planSortConfig, column); }
+  sortAgents(column: string) { this.updateSort(this.agentSortConfig, column); }
+  sortOfficers(column: string) { this.updateSort(this.officerSortConfig, column); }
 
   selectedPolicyHistory = signal<any>(null);
   policyInvoices = signal<any[]>([]);
@@ -112,9 +333,170 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.adminService.getSummary().subscribe({
       next: (res: any) => {
         this.summary.set(res?.data || res);
+
+        // Trigger registry loads for charts
+        this.loadClaimsRegistry();
+        this.loadPoliciesData();
+
         this.pendingReqs.delete('dashboard');
       },
       error: () => this.pendingReqs.delete('dashboard')
+    });
+  }
+
+  private destroyCharts() {
+    this.financialChart?.destroy();
+    this.claimTrendChart?.destroy();
+    this.planMixChart?.destroy();
+  }
+
+  private initCharts() {
+    const fEl = this.financialCanvas()?.nativeElement;
+    const cEl = this.claimTrendCanvas()?.nativeElement;
+    const pEl = this.planMixCanvas()?.nativeElement;
+
+    if (!fEl || !cEl || !pEl) return;
+
+    this.initFinancialChart(fEl);
+    this.initClaimTrendChart(cEl);
+    this.initPlanMixChart(pEl);
+  }
+
+  private initFinancialChart(ctx: HTMLCanvasElement) {
+    const s = this.summary();
+    const revenue = s?.totalRevenue || 0;
+    const payouts = s?.totalPayouts || 0;
+    const commissions = s?.totalCommissionPayouts || 0;
+    const profit = s?.netProfit || 0;
+
+    this.financialChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Net Profit', 'Claim Payouts', 'Agent Commissions'],
+        datasets: [{
+          data: [profit, payouts, commissions],
+          backgroundColor: ['#10b981', '#f59e0b', '#6366f1'],
+          borderWidth: 0,
+          borderRadius: 8,
+          hoverOffset: 15
+        }]
+      },
+      options: {
+        cutout: '75%',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            titleFont: { size: 13, weight: 'bold' },
+            bodyFont: { size: 12 },
+            padding: 14,
+            displayColors: true,
+            boxWidth: 10,
+            boxHeight: 10,
+            boxPadding: 6,
+            usePointStyle: true,
+            borderColor: 'rgba(255,255,255,0.1)',
+            borderWidth: 1,
+            callbacks: {
+              label: (i: any) => ` ${i.label}: ₹${i.raw.toLocaleString()}`
+            }
+          }
+        }
+      }
+    });
+  }
+
+  private initClaimTrendChart(ctx: HTMLCanvasElement) {
+    const claims = this.allClaimsRegistry();
+    if (claims.length === 0) return;
+
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      months.push(d.toLocaleString('default', { month: 'short' }));
+    }
+
+    const groupedTotal = new Array(6).fill(0);
+    const groupedApproved = new Array(6).fill(0);
+
+    claims.forEach(cl => {
+      const date = new Date(cl.claimDate);
+      const diffMonths = (new Date().getFullYear() - date.getFullYear()) * 12 + (new Date().getMonth() - date.getMonth());
+      if (diffMonths >= 0 && diffMonths < 6) {
+        const idx = 5 - diffMonths;
+        groupedTotal[idx] += 1;
+        if (cl.status === 'Approved') groupedApproved[idx] += 1;
+      }
+    });
+
+    const grad = ctx.getContext('2d')?.createLinearGradient(0, 0, 0, 400);
+    grad?.addColorStop(0, 'rgba(59, 130, 246, 0.4)');
+    grad?.addColorStop(1, 'rgba(59, 130, 246, 0)');
+
+    this.claimTrendChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: months,
+        datasets: [{
+          label: 'Total Claims',
+          data: groupedTotal,
+          borderColor: '#3b82f6',
+          backgroundColor: grad,
+          fill: true,
+          tension: 0.4,
+          pointRadius: 6,
+          pointBackgroundColor: '#3b82f6',
+          borderWidth: 3
+        }, {
+          label: 'Approved',
+          data: groupedApproved,
+          borderColor: '#10b981',
+          borderWidth: 2,
+          pointRadius: 0,
+          borderDash: [5, 5]
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 10, weight: 600 } } },
+          y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { stepSize: 1, font: { size: 10 } } }
+        }
+      }
+    });
+  }
+
+  private initPlanMixChart(ctx: HTMLCanvasElement) {
+    const policies = this.allPolicyAssignments();
+    const mix: { [key: string]: number } = {};
+    policies.forEach(p => { mix[p.planName] = (mix[p.planName] || 0) + 1; });
+
+    this.planMixChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(mix),
+        datasets: [{
+          label: 'Active Policies',
+          data: Object.values(mix),
+          backgroundColor: '#6366f1',
+          borderRadius: 8,
+          barThickness: 24
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 10, weight: 700 } } },
+          y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { stepSize: 1, font: { size: 10 } } }
+        }
+      }
     });
   }
 

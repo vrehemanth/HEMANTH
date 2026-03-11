@@ -26,6 +26,7 @@ export class LoginComponent implements OnInit {
   isLoading = signal(false);
   errorMessage = signal<string | null>(null);
   isAccountBlocked = signal(false);
+  showPassword = signal(false);
 
   onPasswordPaste(event: ClipboardEvent) {
     event.preventDefault();

@@ -48,6 +48,9 @@ namespace EGI_Backend.Application.Services
             var policy = await _policyRepo.GetByIdWithDetailsAsync(dto.PolicyAssignmentId);
             if (policy == null) throw new NotFoundException("Policy not found.");
 
+            if (policy.Status != PolicyStatus.Active)
+                throw new BadRequestException("Policy Endorsements can only be submitted for active policies.");
+
             // Flatten the EndorsementData to a string for DB storage
             string jsonData = JsonSerializer.Serialize(dto.EndorsementData);
             using var jsonDoc = JsonDocument.Parse(jsonData);
@@ -103,6 +106,9 @@ namespace EGI_Backend.Application.Services
 
             var policy = await _policyRepo.GetByIdWithDetailsAsync(endorsement.PolicyAssignmentId);
             if (policy == null) throw new NotFoundException("Associated policy not found.");
+
+            if (policy.Status != PolicyStatus.Active)
+                throw new BadRequestException("Policy Endorsements can only be reviewed for active policies.");
 
             endorsement.Status = dto.Status;
             endorsement.ReviewedByUserId = agentId;
@@ -243,10 +249,17 @@ namespace EGI_Backend.Application.Services
                         throw new BadRequestException("MemberId is required for RemoveMember endorsement.");
 
                     var mId = Guid.Parse(rmProp.GetString()!);
-                    var m   = await _memberRepo.GetByIdAsync(mId);
+                    var m   = await _memberRepo.GetByIdWithPolicyAsync(mId);
                     if (m == null) throw new NotFoundException($"Member with ID '{mId}' not found.");
 
                     m.Status = false; // Soft-delete
+                    
+                    // Recursive deactivation of dependents ensure consistency
+                    foreach (var d in m.Dependents)
+                    {
+                        d.IsActive = false;
+                    }
+                    
                     await _memberRepo.UpdateAsync(m);
                     break;
 
@@ -370,30 +383,19 @@ namespace EGI_Backend.Application.Services
                 try
                 {
                     using var doc = JsonDocument.Parse(jsonStr);
-                    if (doc.RootElement.TryGetProperty("Relationship", out var relProp))
+                    if (doc.RootElement.TryGetProperty("Relationship", out var relProp) && 
+                        (relProp.ValueKind == JsonValueKind.Number || 
+                        (relProp.ValueKind == JsonValueKind.String && int.TryParse(relProp.GetString(), out _))))
                     {
-                        string relStr = "";
+                        var relValue = (RelationshipType)ParseEnum<RelationshipType>(relProp);
                         
-                        if (relProp.ValueKind == JsonValueKind.String)
+                        return relValue switch
                         {
-                            var s = relProp.GetString() ?? "";
-                            if (int.TryParse(s, out int relInt))
-                            {
-                                relStr = ((RelationshipType)relInt).ToString().ToLower();
-                            }
-                            else
-                            {
-                                relStr = s.ToLower();
-                            }
-                        }
-                        else if (relProp.ValueKind == JsonValueKind.Number)
-                        {
-                            relStr = ((RelationshipType)relProp.GetInt32()).ToString().ToLower();
-                        }
-
-                        if (relStr == "spouse")                                                return 0.8m;
-                        if (relStr == "child")                                                 return 0.4m;
-                        if (relStr is "father" or "mother" || relStr.Contains("parent"))       return 1.2m;
+                            RelationshipType.Spouse => 0.8m,
+                            RelationshipType.Child  => 0.4m,
+                            RelationshipType.Father or RelationshipType.Mother => 1.2m,
+                            _ => 1.0m
+                        };
                     }
                 }
                 catch { /* malformed JSON — fall through to default */ }

@@ -4,6 +4,9 @@ using EGI_Backend.Application.Interfaces;
 using EGI_Backend.Application.Exceptions;
 using EGI_Backend.Domain.Entities;
 using EGI_Backend.Domain.Enums;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
 
 namespace EGI_Backend.Application.Services
 {
@@ -14,27 +17,33 @@ namespace EGI_Backend.Application.Services
         private readonly ICorporateClientRepository _clientRepo;
         private readonly IPolicyAssignmentRepository _policyRepo;
         private readonly IAuditLogRepository _auditLogRepo;
+        private readonly INotificationService _notificationService;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
-
-
-
+        private readonly IEmailService _emailService;
+        private readonly IUserRepository _userRepo;
         public InvoiceService(
             IInvoiceRepository invoiceRepo,
             IPaymentRepository paymentRepo,
             ICorporateClientRepository clientRepo,
             IPolicyAssignmentRepository policyRepo,
             IAuditLogRepository auditLogRepo,
+            INotificationService notificationService,
             IUnitOfWork unitOfWork,
-            IMapper mapper)
+            IMapper mapper,
+            IEmailService emailService,
+            IUserRepository userRepo)
         {
             _invoiceRepo = invoiceRepo;
             _paymentRepo = paymentRepo;
             _clientRepo = clientRepo;
             _policyRepo = policyRepo;
             _auditLogRepo = auditLogRepo;
+            _notificationService = notificationService;
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _emailService = emailService;
+            _userRepo = userRepo;
         }
 
         // ─── Helpers ─────────────────────────────────────────────
@@ -57,6 +66,135 @@ namespace EGI_Backend.Application.Services
                 ? date.AddMonths(1)
                 : date.AddYears(1);
         }
+
+        private async Task SendInvoiceEmailAsync(Invoice invoice, PolicyAssignment policy)
+        {
+            var corporateClient = await _clientRepo.GetByIdAsync(policy.CorporateClientId);
+            if (corporateClient != null)
+            {
+                var user = await _userRepo.GetByIdAsync(corporateClient.UserId);
+                if (user != null && !string.IsNullOrEmpty(user.Email)) // Or use user.Email directly
+                {
+                    var pdfBytes = GenerateInvoicePdf(invoice, corporateClient, policy, user.Email);
+                    string pdfFileName = $"Invoice_{invoice.InvoiceNo}.pdf";
+                    await _emailService.SendInvoiceGeneratedEmailAsync(user.Email, corporateClient.CompanyName, invoice.InvoiceNo, invoice.Amount, invoice.DueDate, pdfBytes, pdfFileName);
+                }
+            }
+        }
+
+        private byte[] GenerateInvoicePdf(Invoice invoice, CorporateClient client, PolicyAssignment policy, string userEmail)
+        {
+            QuestPDF.Settings.License = LicenseType.Community;
+
+            return Document.Create(container =>
+            {
+                container.Page(page =>
+                {
+                    page.Size(PageSizes.A4);
+                    page.Margin(2, Unit.Centimetre);
+                    page.PageColor(Colors.White);
+                    page.DefaultTextStyle(x => x.FontSize(10).FontFamily(Fonts.Arial).FontColor("#4B5563"));
+
+                    page.Header().Element(ComposeHeader);
+                    page.Content().Element(ComposeContent);
+
+                    void ComposeHeader(IContainer c)
+                    {
+                        c.Row(row =>
+                        {
+                            row.RelativeItem().Column(col =>
+                            {
+                                col.Item().Text("EGI").FontSize(32).Bold().FontColor("#1A56DB");
+                                col.Item().PaddingBottom(10).Text("EMPLOYEE GROUP INSURANCE").FontSize(9).Bold().FontColor("#6B7280").LetterSpacing(0.05f);
+
+                                col.Item().Text("Global Headquarters").FontSize(10).FontColor("#6B7280");
+                                col.Item().Text("Financial District, Tower B").FontSize(10).FontColor("#6B7280");
+                                col.Item().Text("billing@egi.insurance.com").FontSize(10).FontColor("#6B7280");
+                                col.Item().Text("+1 (800) 555-0199").FontSize(10).FontColor("#6B7280");
+                            });
+
+                            row.ConstantItem(250).AlignRight().Column(col =>
+                            {
+                                col.Item().AlignRight().Text("INVOICE").FontSize(36).FontColor("#E5E7EB").Light();
+                                col.Item().AlignRight().PaddingBottom(15).Text(invoice.InvoiceNo.StartsWith("#") ? invoice.InvoiceNo : $"#{invoice.InvoiceNo}").FontSize(12).Bold().FontColor("#374151");
+
+                                col.Item().Row(r =>
+                                {
+                                    r.RelativeItem().AlignRight().Text("DATE OF ISSUE:").FontSize(9).Bold().FontColor("#6B7280").LetterSpacing(0.05f);
+                                    r.ConstantItem(100).AlignRight().Text(invoice.InvoiceDate.ToString("dd MMMM yyyy")).FontSize(10).Bold().FontColor("#374151");
+                                });
+                                col.Item().PaddingTop(5).Row(r =>
+                                {
+                                    r.RelativeItem().AlignRight().Text("DUE DATE:").FontSize(9).Bold().FontColor("#6B7280").LetterSpacing(0.05f);
+                                    r.ConstantItem(100).AlignRight().Text(invoice.DueDate.ToString("dd MMMM yyyy")).FontSize(10).Bold().FontColor("#374151");
+                                });
+                            });
+                        });
+                    }
+
+                    void ComposeContent(IContainer c)
+                    {
+                        c.PaddingVertical(1, Unit.Centimetre).Column(col =>
+                        {
+                            col.Spacing(25);
+                            col.Item().LineHorizontal(1).LineColor("#F3F4F6");
+
+                            col.Item().Row(row =>
+                            {
+                                row.RelativeItem().Column(innerCol =>
+                                {
+                                    innerCol.Item().PaddingBottom(5).Text("BILLED TO").FontSize(10).Bold().FontColor("#9CA3AF").LetterSpacing(0.05f);
+                                    innerCol.Item().Text(client.CompanyName).FontSize(16).Bold().FontColor("#1F2937");
+                                    innerCol.Item().PaddingTop(5).Text(userEmail).FontSize(12).FontColor("#6B7280");
+                                    innerCol.Item().Text(client.Phone ?? "N/A").FontSize(11).FontColor("#6B7280");
+                                    innerCol.Item().Text(client.Address ?? "N/A").FontSize(11).FontColor("#6B7280");
+                                });
+
+                                row.ConstantItem(200).AlignRight().Background("#F9FAFB").Border(1).BorderColor("#F3F4F6").Padding(15).Column(innerCol =>
+                                {
+                                    innerCol.Item().AlignCenter().Text("TOTAL AMOUNT DUE").FontSize(9).Bold().FontColor("#9CA3AF").LetterSpacing(0.05f);
+                                    innerCol.Item().PaddingTop(5).PaddingBottom(10).AlignCenter().Text($"₹{invoice.Amount:N2}").FontSize(24).Bold().FontColor("#3B82F6");
+                                    
+                                    var isPaid = invoice.Status == InvoiceStatus.Paid;
+                                    var statusColor = isPaid ? "#10B981" : "#F59E0B";
+                                    var statusText = isPaid ? "PAID" : "PENDING";
+                                    var statusBg = isPaid ? "#D1FAE5" : "#FEF3C7";
+
+                                    innerCol.Item().AlignCenter().Background(statusBg).PaddingVertical(4).PaddingHorizontal(12).Row(cr =>
+                                    {
+                                        cr.AutoItem().PaddingRight(5).Text("●").FontSize(10).FontColor(statusColor);
+                                        cr.AutoItem().Text(statusText).FontSize(10).Bold().FontColor(statusColor);
+                                    });
+                                });
+                            });
+
+                            col.Item().Border(1).BorderColor("#E5E7EB").Column(innerCol =>
+                            {
+                                innerCol.Item().Background("#F9FAFB").PaddingHorizontal(15).PaddingVertical(10).Row(row =>
+                                {
+                                    row.RelativeItem().Text("DESCRIPTION").FontSize(9).Bold().FontColor("#6B7280").LetterSpacing(0.05f);
+                                    row.ConstantItem(100).AlignRight().Text("AMOUNT (INR)").FontSize(9).Bold().FontColor("#6B7280").LetterSpacing(0.05f);
+                                });
+                                
+                                innerCol.Item().LineHorizontal(1).LineColor("#E5E7EB");
+                                
+                                innerCol.Item().PaddingHorizontal(15).PaddingVertical(15).Row(row =>
+                                {
+                                    row.RelativeItem().Column(i =>
+                                    {
+                                        i.Item().Text("Policy Premium & Administration").FontSize(12).Bold().FontColor("#1F2937");
+                                        i.Item().PaddingTop(5).Text("Comprehensive Employee Group Insurance Coverage calculation mapped directly to active membership headcount.").FontSize(10).FontColor("#6B7280");
+                                    });
+                                    row.ConstantItem(100).AlignRight().Text($"₹{invoice.Amount:N2}").FontSize(11).FontColor("#374151");
+                                });
+                            });
+                        });
+                    }
+                });
+            }).GeneratePdf();
+        }
+
+
 
         // ─── Core Invoice Generation ──────────────────────────────
 
@@ -81,6 +219,9 @@ namespace EGI_Backend.Application.Services
 
             await _invoiceRepo.AddAsync(invoice);
             await _unitOfWork.SaveChangesAsync();
+
+            try { await SendInvoiceEmailAsync(invoice, policy); }
+            catch (Exception ex) { Console.WriteLine($"[EMAIL ERROR]: {ex.Message}"); }
         }
 
         public async Task ApplyCreditToNextInvoiceAsync(Guid policyAssignmentId, decimal creditAmount)
@@ -149,12 +290,17 @@ namespace EGI_Backend.Application.Services
 
             await _invoiceRepo.AddAsync(invoice);
             await _unitOfWork.SaveChangesAsync();
+
+            try { await SendInvoiceEmailAsync(invoice, policy); }
+            catch (Exception ex) { Console.WriteLine($"[EMAIL ERROR]: {ex.Message}"); }
         }
 
         public async Task GenerateDueInvoicesAsync()
         {
             int today = DateTime.UtcNow.Day;
             var policies = await _invoiceRepo.GetActivePoliciesDueForInvoiceAsync(today);
+
+            var newlyGeneratedInvoices = new List<(Invoice Inv, PolicyAssignment Pol)>();
 
             foreach (var policy in policies)
             {
@@ -197,18 +343,146 @@ namespace EGI_Backend.Application.Services
                 };
 
                 await _invoiceRepo.AddAsync(invoice);
+                newlyGeneratedInvoices.Add((invoice, policy));
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+
+            // Send Emails after saving
+            foreach (var item in newlyGeneratedInvoices)
+            {
+                try { await SendInvoiceEmailAsync(item.Inv, item.Pol); }
+                catch (Exception ex) { Console.WriteLine($"[EMAIL ERROR]: {ex.Message}"); }
+            }
+        }
+
+        public async Task MarkOverdueInvoicesAsync()
+        {
+            var overdueInvoices = await _invoiceRepo.GetOverduePendingInvoicesAsync();
+            var today = DateTime.UtcNow.Date;
+
+            foreach (var inv in overdueInvoices)
+            {
+                await ProcessInvoiceOverdueRulesInternalAsync(inv, today);
             }
 
             await _unitOfWork.SaveChangesAsync();
         }
 
-        public async Task MarkOverdueInvoicesAsync()
+        public async Task MarkOverdueInvoicesForClientAsync(Guid clientId)
         {
-            var overdueList = await _invoiceRepo.GetOverduePendingInvoicesAsync();
-            foreach (var inv in overdueList)
-                inv.Status = InvoiceStatus.Overdue;
+            // Optimize: Include PolicyAssignment and CorporateClient to avoid N+1 inside rules processor
+            var invoices = await _invoiceRepo.GetByClientIdAsync(clientId);
+            var today = DateTime.UtcNow.Date;
+
+            // Filter to standard invoices (not adjustments) that need checking
+            var pendingOrOverdue = invoices
+                .Where(i => i.Status != InvoiceStatus.Paid && !i.InvoiceNo.EndsWith("-ADJ"))
+                .ToList();
+
+            foreach (var inv in pendingOrOverdue)
+            {
+                // Note: inv.PolicyAssignment is already included by GetByClientIdAsync in InvoiceRepository
+                await ProcessInvoiceOverdueRulesInternalAsync(inv, today);
+            }
 
             await _unitOfWork.SaveChangesAsync();
+        }
+
+        private async Task ProcessInvoiceOverdueRulesInternalAsync(Invoice inv, DateTime today)
+        {
+            // First, ensure status is 'Overdue' if past DueDate
+            if (inv.DueDate.Date <= today && inv.Status == InvoiceStatus.Pending)
+            {
+                inv.Status = InvoiceStatus.Overdue;
+            }
+
+            if (inv.Status != InvoiceStatus.Overdue && inv.Status != InvoiceStatus.PartiallyPaid) return;
+
+            // Only process standard group invoices for mandatory 10% penalty & inactivation
+            if (!inv.InvoiceNo.EndsWith("-ADJ"))
+            {
+                var daysOverdue = (today - inv.DueDate.Date).Days;
+                
+                // Optimized: Use the already included PolicyAssignment if available
+                var policy = inv.PolicyAssignment ?? await _policyRepo.GetByIdWithDetailsAsync(inv.PolicyAssignmentId);
+                if (policy == null) return;
+
+                var customerUserId = policy.CorporateClient?.UserId;
+                if (customerUserId == null) return;
+
+                // 1. Initial Deadline Penalty (Applied on or after Day 7 from Invoice)
+                if (daysOverdue >= 0 && !inv.IsPenaltyApplied)
+                {
+                    var penaltyAmount = Math.Round(inv.Amount * 0.10m, 2);
+                    inv.Amount += penaltyAmount;
+                    inv.IsPenaltyApplied = true;
+
+                    await _auditLogRepo.AddAsync(new AuditLog
+                    {
+                        Id = Guid.NewGuid(),
+                        Action = "OverduePenaltyApplied",
+                        EntityName = "Invoice",
+                        EntityId = inv.Id.ToString(),
+                        NewValues = $"10% overdue penalty applied. Penalty: ₹{penaltyAmount}. New Amount: ₹{inv.Amount} (Applied on Day 7)",
+                        Timestamp = DateTime.UtcNow
+                    });
+
+                    await _notificationService.CreateNotificationAsync(
+                        customerUserId.Value,
+                        "Overdue Penalty Applied",
+                        $"Invoice #{inv.InvoiceNo} is past due. A 10% late penalty has been applied. New balance: ₹{inv.Amount - inv.TotalPaid}.",
+                        "Warning"
+                    );
+                }
+
+                // 2. Middle Warnings
+                if (daysOverdue == 3)
+                {
+                    await _notificationService.CreateNotificationAsync(
+                        customerUserId.Value,
+                        "Policy Suspension Warning",
+                        $"Your policy #{policy.PolicyNo} will be suspended in 4 days if the outstanding balance for Invoice #{inv.InvoiceNo} is not settled.",
+                        "Warning"
+                    );
+                }
+                else if (daysOverdue == 6)
+                {
+                    await _notificationService.CreateNotificationAsync(
+                        customerUserId.Value,
+                        "URGENT: Policy Suspension Tomorrow",
+                        $"Final Notice: Your coverage under policy #{policy.PolicyNo} will be suspended tomorrow due to non-payment of Invoice #{inv.InvoiceNo}.",
+                        "Error"
+                    );
+                }
+
+                // 3. Critical Enforcement (Day 14 from Invoice / Day 7 Overdue)
+                if (daysOverdue >= 7)
+                {
+                    if (policy.Status == PolicyStatus.Active)
+                    {
+                        policy.Status = PolicyStatus.Inactive;
+                        await _policyRepo.UpdateAsync(policy);
+
+                        await _auditLogRepo.AddAsync(new AuditLog
+                        {
+                            Id = Guid.NewGuid(),
+                            Action = "PolicySuspension",
+                            EntityName = "PolicyAssignment",
+                            EntityId = policy.Id.ToString(),
+                            NewValues = $"Policy suspended due to non-payment of Invoice #{inv.InvoiceNo} 7 days after penalty notification (14 days total since invoice date).",
+                            Timestamp = DateTime.UtcNow
+                        });
+
+                        await _notificationService.CreateNotificationAsync(
+                            customerUserId.Value,
+                            "Policy Suspended",
+                            $"Your policy #{policy.PolicyNo} has been inactivated due to non-payment. Contact Customer Care for more queries",
+                            "Error"
+                        );
+                    }
+                }
+            }
         }
 
         // ─── Payment ──────────────────────────────────────────────
@@ -222,12 +496,20 @@ namespace EGI_Backend.Application.Services
             if (invoice.Status == InvoiceStatus.Paid)
                 throw new BadRequestException("Invoice is already paid.");
 
+            // Rule: Block payment if 14+ days from InvoiceDate (7+ days from DueDate)
+            if (!invoice.InvoiceNo.EndsWith("-ADJ") && (DateTime.UtcNow.Date - invoice.DueDate.Date).Days >= 7)
+                throw new BadRequestException("Payment is blocked for this invoice because the 14-day grace period has expired. Your policy has been suspended. Please contact customer support for reinstatement.");
+
             decimal balanceBefore = invoice.Amount - invoice.TotalPaid;
             if (dto.PaidAmount <= 0)
                 throw new BadRequestException("Paid amount must be greater than zero.");
 
             if (dto.PaidAmount > balanceBefore)
                 throw new BadRequestException($"Paid amount (₹{dto.PaidAmount}) exceeds the remaining balance (₹{balanceBefore}).");
+
+            decimal minRequired = Math.Min(Math.Round(invoice.Amount / 2, 2), balanceBefore);
+            if (dto.PaidAmount < minRequired)
+                throw new BadRequestException($"Partial payments must be at least 50% of the total invoice amount (₹{Math.Round(invoice.Amount / 2, 2)}). Minimum payment required: ₹{minRequired}.");
 
             var payment = new Payment
             {

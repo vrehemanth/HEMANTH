@@ -19,6 +19,8 @@ namespace EGI_Backend.Application.DTOs
         public decimal CommissionEarned { get; set; }
         public DateTime DueDate { get; set; }
         public string Status { get; set; } = string.Empty;
+        public bool IsPenaltyApplied { get; set; }
+        public bool IsPaymentBlocked { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 

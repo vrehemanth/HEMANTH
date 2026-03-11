@@ -77,28 +77,49 @@ namespace EGI_Backend.Application.Services
 
             // 4A. Parse Members (Sheet 1)
             var memberSheet = memberWorkbook.Worksheet(1);
-            var memberRows = memberSheet.RowsUsed().Skip(1); // skip header
+            var memberRows = memberSheet.RowsUsed().Skip(1).ToList(); // skip header
+
+            int rowIdx = 2; // Starting from row 2 (row 1 is header)
             foreach (var row in memberRows)
             {
-                var empCode = row.Cell(1).GetString().Trim();
-                if (string.IsNullOrEmpty(empCode)) continue;
-
-                var member = new Member
+                try
                 {
-                    Id = Guid.NewGuid(),
-                    EmployeeCode = empCode,
-                    FullName = row.Cell(2).GetString().Trim(),
-                    Email = row.Cell(3).GetString().Trim(),
-                    PhoneNo = row.Cell(4).GetString().Trim(),
-                    DateOfBirth = row.Cell(5).GetDateTime(),
-                    Gender = Enum.TryParse<Gender>(row.Cell(6).GetString(), true, out var g) ? g : Gender.Male,
-                    SumInsured = employeeSumInsured,
-                    Status = true
-                };
+                    var empCode = row.Cell(1).GetString().Trim();
+                    if (string.IsNullOrEmpty(empCode)) continue;
 
-                membersMap.Add(empCode, member);
-                totalAnnualPremium += basePremium; // 1.0x multiplier
-                policyAssignment.Members.Add(member);
+                    var fullName = row.Cell(2).GetString().Trim();
+                    if (string.IsNullOrEmpty(fullName)) throw new BadRequestException($"Row {rowIdx}: Full Name is required.");
+
+                    DateTime dob;
+                    if (!row.Cell(5).TryGetValue(out dob))
+                    {
+                        // Fallback: try manual parse if Excel date format is weird
+                        if (!DateTime.TryParse(row.Cell(5).GetString(), out dob))
+                            throw new BadRequestException($"Row {rowIdx}: Invalid Date of Birth format.");
+                    }
+
+                    var member = new Member
+                    {
+                        Id = Guid.NewGuid(),
+                        EmployeeCode = empCode,
+                        FullName = fullName,
+                        Email = row.Cell(3).GetString().Trim(),
+                        PhoneNo = row.Cell(4).GetString().Trim(),
+                        DateOfBirth = dob,
+                        Gender = Enum.TryParse<Gender>(row.Cell(6).GetString(), true, out var g) ? g : Gender.Male,
+                        SumInsured = employeeSumInsured,
+                        Status = true
+                    };
+
+                    membersMap.Add(empCode, member);
+                    totalAnnualPremium += basePremium; // 1.0x multiplier
+                    policyAssignment.Members.Add(member);
+                }
+                catch (Exception ex) when (!(ex is BaseException))
+                {
+                    throw new BadRequestException($"Member Ingestion Failure at Row {rowIdx}: {ex.Message}");
+                }
+                rowIdx++;
             }
 
             // 4B. Parse Dependents
@@ -107,48 +128,66 @@ namespace EGI_Backend.Application.Services
                 using var dependentStream = dto.DependentsFile.OpenReadStream();
                 using var dependentWorkbook = new XLWorkbook(dependentStream);
                 var dependentSheet = dependentWorkbook.Worksheet(1);
-                var dependentRows = dependentSheet.RowsUsed().Skip(1);
+                var dependentRows = dependentSheet.RowsUsed().Skip(1).ToList();
+
+                int depRowIdx = 2;
                 foreach (var row in dependentRows)
                 {
-                    var empCode = row.Cell(1).GetString().Trim();
-                    if (string.IsNullOrEmpty(empCode) || !membersMap.ContainsKey(empCode)) continue;
-
-                    var relationshipStr = row.Cell(3).GetString().Replace(" ", "");
-                    if (!Enum.TryParse<RelationshipType>(relationshipStr, true, out var relationship))
-                        relationship = RelationshipType.Other;
-
-                    decimal dependentSumInsured = 0m;
-                    foreach (var coverage in plan.Coverages)
+                    try
                     {
-                        if (relationship == RelationshipType.Spouse || relationship == RelationshipType.Child)
+                        var empCode = row.Cell(1).GetString().Trim();
+                        if (string.IsNullOrEmpty(empCode)) continue;
+                        if (!membersMap.ContainsKey(empCode)) continue;
+
+                        var relationshipStr = row.Cell(3).GetString().Replace(" ", "");
+                        if (!Enum.TryParse<RelationshipType>(relationshipStr, true, out var relationship))
+                            relationship = RelationshipType.Other;
+
+                        decimal dependentSumInsured = 0m;
+                        foreach (var coverage in plan.Coverages)
                         {
-                            if (coverage.CoveredGroup == CoveredGroup.EmployeeAndFamily || coverage.CoveredGroup == CoveredGroup.EmployeeFamilyAndParents)
-                                dependentSumInsured += coverage.CoverageAmount;
+                            if (relationship == RelationshipType.Spouse || relationship == RelationshipType.Child)
+                            {
+                                if (coverage.CoveredGroup == CoveredGroup.EmployeeAndFamily || coverage.CoveredGroup == CoveredGroup.EmployeeFamilyAndParents)
+                                    dependentSumInsured += coverage.CoverageAmount;
+                            }
+                            else if (relationship == RelationshipType.Father || relationship == RelationshipType.Mother)
+                            {
+                                if (coverage.CoveredGroup == CoveredGroup.EmployeeFamilyAndParents)
+                                    dependentSumInsured += coverage.CoverageAmount;
+                            }
                         }
-                        else if (relationship == RelationshipType.Father || relationship == RelationshipType.Mother)
+
+                        DateTime depDob;
+                        if (!row.Cell(4).TryGetValue(out depDob))
                         {
-                            if (coverage.CoveredGroup == CoveredGroup.EmployeeFamilyAndParents)
-                                dependentSumInsured += coverage.CoverageAmount;
+                            if (!DateTime.TryParse(row.Cell(4).GetString(), out depDob))
+                                throw new BadRequestException($"Dependent Row {depRowIdx}: Invalid Date of Birth format.");
                         }
+
+                        var dependent = new Dependent
+                        {
+                            Id = Guid.NewGuid(),
+                            MemberId = membersMap[empCode].Id,
+                            FullName = row.Cell(2).GetString().Trim(),
+                            Relationship = relationship,
+                            DateOfBirth = depDob,
+                            Gender = Enum.TryParse<Gender>(row.Cell(5).GetString(), true, out var dg) ? dg : Gender.Male,
+                            SumInsured = dependentSumInsured
+                        };
+
+                        membersMap[empCode].Dependents.Add(dependent);
+
+                        // Multipliers
+                        if (relationship == RelationshipType.Spouse) totalAnnualPremium += basePremium * 0.8m;
+                        else if (relationship == RelationshipType.Father || relationship == RelationshipType.Mother) totalAnnualPremium += basePremium * 1.2m;
+                        else totalAnnualPremium += basePremium * 0.5m; // Children or others
                     }
-
-                    var dependent = new Dependent
+                    catch (Exception ex) when (!(ex is BaseException))
                     {
-                        Id = Guid.NewGuid(),
-                        MemberId = membersMap[empCode].Id,
-                        FullName = row.Cell(2).GetString().Trim(),
-                        Relationship = relationship,
-                        DateOfBirth = row.Cell(4).GetDateTime(),
-                        Gender = Enum.TryParse<Gender>(row.Cell(5).GetString(), true, out var dg) ? dg : Gender.Male,
-                        SumInsured = dependentSumInsured
-                    };
-
-                    membersMap[empCode].Dependents.Add(dependent);
-
-                    // Multipliers
-                    if (relationship == RelationshipType.Spouse) totalAnnualPremium += basePremium * 0.8m;
-                    else if (relationship == RelationshipType.Father || relationship == RelationshipType.Mother) totalAnnualPremium += basePremium * 1.2m;
-                    else totalAnnualPremium += basePremium * 0.5m; // Children or others
+                        throw new BadRequestException($"Dependent Ingestion Failure at Row {depRowIdx}: {ex.Message}");
+                    }
+                    depRowIdx++;
                 }
             }
 

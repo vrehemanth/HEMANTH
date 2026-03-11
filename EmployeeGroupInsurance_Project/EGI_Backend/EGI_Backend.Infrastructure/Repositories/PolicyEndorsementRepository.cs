@@ -58,6 +58,7 @@ namespace EGI_Backend.Infrastructure.Repositories
         public async Task<List<PolicyEndorsement>> GetByClientIdAsync(Guid clientId)
         {
             return await _context.PolicyEndorsements
+                .AsNoTracking()
                 .Include(pe => pe.PolicyAssignment)
                 .Where(pe => pe.PolicyAssignment.CorporateClientId == clientId)
                 .OrderByDescending(pe => pe.CreatedAt)

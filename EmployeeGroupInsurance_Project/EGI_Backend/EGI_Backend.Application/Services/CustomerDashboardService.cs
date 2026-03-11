@@ -9,39 +9,54 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using EGI_Backend.Domain.Entities;
+using EGI_Backend.Domain.Enums;
 
 namespace EGI_Backend.Application.Services
 {
     public class CustomerDashboardService : ICustomerDashboardService
     {
-        private readonly IServiceScopeFactory _scopeFactory;
+        private readonly ICorporateClientRepository _clientRepo;
+        private readonly IPolicyAssignmentRepository _policyRepo;
+        private readonly IMemberRepository _memberRepo;
+        private readonly IClaimRepository _claimRepo;
+        private readonly IInvoiceRepository _invoiceRepo;
+        private readonly IPolicyEndorsementRepository _endorsementRepo;
+        private readonly IInvoiceService _invoiceService;
         private readonly IMapper _mapper;
         private readonly IMemoryCache _cache;
 
         public CustomerDashboardService(
-            IServiceScopeFactory scopeFactory,
+            ICorporateClientRepository clientRepo,
+            IPolicyAssignmentRepository policyRepo,
+            IMemberRepository memberRepo,
+            IClaimRepository claimRepo,
+            IInvoiceRepository invoiceRepo,
+            IPolicyEndorsementRepository endorsementRepo,
+            IInvoiceService invoiceService,
             IMapper mapper,
             IMemoryCache cache)
         {
-            _scopeFactory = scopeFactory;
+            _clientRepo = clientRepo;
+            _policyRepo = policyRepo;
+            _memberRepo = memberRepo;
+            _claimRepo = claimRepo;
+            _invoiceRepo = invoiceRepo;
+            _endorsementRepo = endorsementRepo;
+            _invoiceService = invoiceService;
             _mapper = mapper;
             _cache = cache;
         }
 
         private async Task<Guid> GetClientIdAsync(Guid userId)
         {
-            using var scope = _scopeFactory.CreateScope();
-            var clientRepo = scope.ServiceProvider.GetRequiredService<ICorporateClientRepository>();
-            var client = await clientRepo.GetByUserIdAsync(userId);
+            var client = await _clientRepo.GetByUserIdAsync(userId);
             if (client == null) throw new NotFoundException("Corporate Client profile not found.");
             return client.Id;
         }
 
         public async Task<CorporateClientResponseDto> GetProfileAsync(Guid userId)
         {
-            using var scope = _scopeFactory.CreateScope();
-            var clientRepo = scope.ServiceProvider.GetRequiredService<ICorporateClientRepository>();
-            var client = await clientRepo.GetByUserIdAsync(userId);
+            var client = await _clientRepo.GetByUserIdAsync(userId);
             if (client == null) throw new NotFoundException("Profile not found.");
             return _mapper.Map<CorporateClientResponseDto>(client);
         }
@@ -56,41 +71,13 @@ namespace EGI_Backend.Application.Services
 
             var clientId = await GetClientIdAsync(userId);
 
-            // Parallel execution for dashboard metrics
-            var policyTask = Task.Run(async () => {
-                using var scope = _scopeFactory.CreateScope();
-                return await scope.ServiceProvider.GetRequiredService<IPolicyAssignmentRepository>().CountByClientIdAsync(clientId);
-            });
-
-            var memberTask = Task.Run(async () => {
-                using var scope = _scopeFactory.CreateScope();
-                return await scope.ServiceProvider.GetRequiredService<IMemberRepository>().CountByClientIdAsync(clientId);
-            });
-
-            var claimTask = Task.Run(async () => {
-                using var scope = _scopeFactory.CreateScope();
-                return await scope.ServiceProvider.GetRequiredService<IClaimRepository>().CountPendingForClientAsync(clientId);
-            });
-
-            var unpaidTask = Task.Run(async () => {
-                using var scope = _scopeFactory.CreateScope();
-                return await scope.ServiceProvider.GetRequiredService<IInvoiceRepository>().CountUnpaidByClientAsync(clientId);
-            });
-
-            var balanceTask = Task.Run(async () => {
-                using var scope = _scopeFactory.CreateScope();
-                return await scope.ServiceProvider.GetRequiredService<IInvoiceRepository>().GetTotalBalanceByClientAsync(clientId);
-            });
-
-            await Task.WhenAll(policyTask, memberTask, claimTask, unpaidTask, balanceTask);
-
             var summary = new CustomerDashboardSummaryDto
             {
-                TotalPolicies = policyTask.Result,
-                TotalMembers = memberTask.Result,
-                PendingClaims = claimTask.Result,
-                UnpaidInvoices = unpaidTask.Result,
-                TotalPremiumDue = balanceTask.Result
+                TotalPolicies = await _policyRepo.CountByClientIdAsync(clientId),
+                TotalMembers = await _memberRepo.CountByClientIdAsync(clientId),
+                PendingClaims = await _claimRepo.CountPendingForClientAsync(clientId),
+                UnpaidInvoices = await _invoiceRepo.CountUnpaidByClientAsync(clientId),
+                TotalPremiumDue = await _invoiceRepo.GetTotalBalanceByClientAsync(clientId)
             };
 
             _cache.Set(cacheKey, summary, TimeSpan.FromSeconds(5));
@@ -106,39 +93,27 @@ namespace EGI_Backend.Application.Services
             }
 
             var clientId = await GetClientIdAsync(userId);
+            var summary = await GetSummaryAsync(userId);
+            
+            // One-time check for overdue invoices - only if we have unpaid ones
+            if (summary.UnpaidInvoices > 0)
+            {
+                await _invoiceService.MarkOverdueInvoicesForClientAsync(clientId);
+            }
 
-            // True Parallelism for overview data
-            var summaryTask = GetSummaryAsync(userId);
-
-            var policiesTask = Task.Run(async () => {
-                using var scope = _scopeFactory.CreateScope();
-                return await scope.ServiceProvider.GetRequiredService<IPolicyAssignmentRepository>().GetByClientIdAsync(clientId);
-            });
-
-            var claimsTask = Task.Run(async () => {
-                using var scope = _scopeFactory.CreateScope();
-                return await scope.ServiceProvider.GetRequiredService<IClaimRepository>().GetByClientIdAsync(clientId);
-            });
-
-            var invoicesTask = Task.Run(async () => {
-                using var scope = _scopeFactory.CreateScope();
-                return await scope.ServiceProvider.GetRequiredService<IInvoiceRepository>().GetByClientIdAsync(clientId);
-            });
-
-            var endorsementTask = Task.Run(async () => {
-                using var scope = _scopeFactory.CreateScope();
-                return await scope.ServiceProvider.GetRequiredService<IPolicyEndorsementRepository>().GetByClientIdAsync(clientId);
-            });
-
-            await Task.WhenAll(summaryTask, policiesTask, claimsTask, invoicesTask, endorsementTask);
+            // Fetch only necessary data for dashboard sequentially because EF Core DbContext is not thread-safe
+            var policies = await _policyRepo.GetByClientIdAsync(clientId);
+            var claims = await _claimRepo.GetByClientIdAsync(clientId);
+            var invoices = await _invoiceRepo.GetByClientIdAsync(clientId);
+            var endorsements = await _endorsementRepo.GetByClientIdAsync(clientId);
 
             var overview = new CustomerDashboardOverviewDto
             {
-                Summary = summaryTask.Result,
-                RecentPolicies = _mapper.Map<List<PolicyAssignmentResponseDto>>(policiesTask.Result.Take(5)),
-                RecentClaims = _mapper.Map<List<ClaimResponseDto>>(claimsTask.Result.Take(5)),
-                RecentInvoices = _mapper.Map<List<InvoiceResponseDto>>(invoicesTask.Result.Take(5)),
-                RecentEndorsements = _mapper.Map<List<EndorsementResponseDto>>(endorsementTask.Result.Take(5))
+                Summary = summary,
+                RecentPolicies = _mapper.Map<List<PolicyAssignmentResponseDto>>(policies.OrderByDescending(p => p.StartDate).Take(5)),
+                RecentClaims = _mapper.Map<List<ClaimResponseDto>>(claims.OrderByDescending(c => c.ClaimDate).Take(5)),
+                RecentInvoices = _mapper.Map<List<InvoiceResponseDto>>(invoices.OrderByDescending(i => i.BillingPeriodFrom).Take(5)),
+                RecentEndorsements = _mapper.Map<List<EndorsementResponseDto>>(endorsements.OrderByDescending(e => e.CreatedAt).Take(5))
             };
 
             _cache.Set(cacheKey, overview, TimeSpan.FromSeconds(5));
@@ -148,45 +123,36 @@ namespace EGI_Backend.Application.Services
         public async Task<List<PolicyAssignmentResponseDto>> GetMyPoliciesAsync(Guid userId)
         {
             var clientId = await GetClientIdAsync(userId);
-            using var scope = _scopeFactory.CreateScope();
-            var repo = scope.ServiceProvider.GetRequiredService<IPolicyAssignmentRepository>();
-            var policies = await repo.GetByClientIdAsync(clientId);
+            await _invoiceService.MarkOverdueInvoicesForClientAsync(clientId);
+            var policies = await _policyRepo.GetByClientIdAsync(clientId);
             return _mapper.Map<List<PolicyAssignmentResponseDto>>(policies);
         }
 
         public async Task<List<MemberResponseDto>> GetMyMembersAsync(Guid userId)
         {
             var clientId = await GetClientIdAsync(userId);
-            using var scope = _scopeFactory.CreateScope();
-            var repo = scope.ServiceProvider.GetRequiredService<IMemberRepository>();
-            var members = await repo.GetByClientIdAsync(clientId);
+            var members = await _memberRepo.GetByClientIdAsync(clientId);
             return _mapper.Map<List<MemberResponseDto>>(members);
         }
 
         public async Task<List<ClaimResponseDto>> GetMyClaimsAsync(Guid userId)
         {
             var clientId = await GetClientIdAsync(userId);
-            using var scope = _scopeFactory.CreateScope();
-            var repo = scope.ServiceProvider.GetRequiredService<IClaimRepository>();
-            var claims = await repo.GetByClientIdAsync(clientId);
+            var claims = await _claimRepo.GetByClientIdAsync(clientId);
             return _mapper.Map<List<ClaimResponseDto>>(claims);
         }
 
         public async Task<List<InvoiceResponseDto>> GetMyInvoicesAsync(Guid userId)
         {
             var clientId = await GetClientIdAsync(userId);
-            using var scope = _scopeFactory.CreateScope();
-            var repo = scope.ServiceProvider.GetRequiredService<IInvoiceRepository>();
-            var invoices = await repo.GetByClientIdAsync(clientId);
+            var invoices = await _invoiceRepo.GetByClientIdAsync(clientId);
             return _mapper.Map<List<InvoiceResponseDto>>(invoices);
         }
 
         public async Task<List<EndorsementResponseDto>> GetMyEndorsementsAsync(Guid userId)
         {
             var clientId = await GetClientIdAsync(userId);
-            using var scope = _scopeFactory.CreateScope();
-            var repo = scope.ServiceProvider.GetRequiredService<IPolicyEndorsementRepository>();
-            var endorsements = await repo.GetByClientIdAsync(clientId);
+            var endorsements = await _endorsementRepo.GetByClientIdAsync(clientId);
             return _mapper.Map<List<EndorsementResponseDto>>(endorsements);
         }
     }

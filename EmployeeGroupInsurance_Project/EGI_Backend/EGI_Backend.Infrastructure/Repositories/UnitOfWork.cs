@@ -18,6 +18,15 @@ namespace EGI_Backend.Infrastructure.Repositories
         }
 
         public async Task SaveChangesAsync()
-            => await _context.SaveChangesAsync();
+        {
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+            {
+                throw new EGI_Backend.Application.Exceptions.ConflictException("The record has been modified by another process. Please refresh and try again.");
+            }
+        }
     }
 }

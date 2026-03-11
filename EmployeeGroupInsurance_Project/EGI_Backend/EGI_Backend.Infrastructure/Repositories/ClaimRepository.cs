@@ -153,6 +153,7 @@ namespace EGI_Backend.Infrastructure.Repositories
         public async Task<List<Claim>> GetByClientIdAsync(Guid clientId)
         {
             return await _context.Claims
+                .AsNoTracking()
                 .Include(c => c.Member)
                 .Include(c => c.Dependent)
                 .Include(c => c.PolicyAssignment)

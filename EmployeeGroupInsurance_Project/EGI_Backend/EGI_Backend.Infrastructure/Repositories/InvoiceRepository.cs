@@ -90,6 +90,7 @@ namespace EGI_Backend.Infrastructure.Repositories
         public async Task<List<Invoice>> GetByClientIdAsync(Guid clientId)
         {
             return await _context.Invoices
+                .AsNoTracking()
                 .Include(i => i.PolicyAssignment)
                 .Where(i => i.PolicyAssignment.CorporateClientId == clientId)
                 .OrderByDescending(i => i.BillingPeriodFrom)

@@ -12,5 +12,7 @@ namespace EGI_Backend.Application.Interfaces
         Task SendRejectionEmailAsync(string email, string reason);
         Task SendPasswordResetEmailAsync(string email, string token);
         Task SendBlockNotificationEmailAsync(string email);
+        Task SendClaimApprovedEmailAsync(string email, string memberName, string claimNumber, decimal amount, byte[] invoicePdf, string pdfFileName);
+        Task SendInvoiceGeneratedEmailAsync(string email, string companyName, string invoiceNo, decimal amount, DateTime dueDate, byte[] invoicePdf, string pdfFileName);
     }
 }

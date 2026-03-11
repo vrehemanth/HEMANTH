@@ -27,5 +27,8 @@ namespace EGI_Backend.Domain.Entities
 
         // Soft-delete flag — false means this dependent was removed via endorsement
         public bool IsActive { get; set; } = true;
+
+        [Timestamp]
+        public byte[] RowVersion { get; set; }
     }
 }

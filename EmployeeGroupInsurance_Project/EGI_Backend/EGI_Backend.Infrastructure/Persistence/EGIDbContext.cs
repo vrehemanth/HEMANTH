@@ -144,6 +144,61 @@ namespace EGI_Backend.Infrastructure.Persistence
             modelBuilder.Entity<PolicyAssignment>()
                 .HasIndex(pa => pa.Status);
 
+            modelBuilder.Entity<PolicyAssignment>()
+                .HasIndex(pa => pa.CorporateClientId);
+
+            modelBuilder.Entity<PolicyAssignment>()
+                .HasIndex(pa => pa.AgentId);
+
+            modelBuilder.Entity<Invoice>()
+                .HasIndex(i => i.Status);
+
+            modelBuilder.Entity<Invoice>()
+                .HasIndex(i => i.PolicyAssignmentId);
+
+            modelBuilder.Entity<Member>()
+                .HasIndex(m => m.PolicyAssignmentId);
+
+            modelBuilder.Entity<AgentCustomer>()
+                .HasIndex(ac => ac.AgentId);
+
+            modelBuilder.Entity<AgentCustomer>()
+                .HasIndex(ac => ac.CorporateClientId);
+
+            // Additional indexes for common query fields
+            modelBuilder.Entity<CorporateClient>()
+                .HasIndex(cc => cc.CompanyName);
+
+            modelBuilder.Entity<CorporateClient>()
+                .HasIndex(cc => cc.UserId);
+
+            // Removed invalid index on Member.CorporateClientId as it doesn't exist on the entity.
+            // PolicyAssignmentId is already indexed.
+
+            modelBuilder.Entity<Dependent>()
+                .HasIndex(d => d.MemberId);
+
+            modelBuilder.Entity<Claim>()
+                .HasIndex(c => c.MemberId);
+
+            modelBuilder.Entity<Claim>()
+                .HasIndex(c => c.DependentId);
+
+            modelBuilder.Entity<Invoice>()
+                .HasIndex(i => i.DueDate);
+
+            modelBuilder.Entity<Payment>()
+                .HasIndex(p => p.InvoiceId);
+
+            modelBuilder.Entity<Payment>()
+                .HasIndex(p => p.PaidBy);
+
+            modelBuilder.Entity<Notification>()
+                .HasIndex(n => n.UserId);
+
+            modelBuilder.Entity<Notification>()
+                .HasIndex(n => n.IsRead);
+
             modelBuilder.Entity<CorporateClient>(entity =>
             {
                 entity.HasKey(c => c.Id);

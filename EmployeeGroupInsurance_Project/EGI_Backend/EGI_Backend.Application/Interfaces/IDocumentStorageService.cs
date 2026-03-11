@@ -10,5 +10,6 @@ namespace EGI_Backend.Application.Interfaces
     public interface IDocumentStorageService
     {
         Task<string> UploadAsync(IFormFile file);
+        Task DeleteAsync(string filePath);
     }
 }

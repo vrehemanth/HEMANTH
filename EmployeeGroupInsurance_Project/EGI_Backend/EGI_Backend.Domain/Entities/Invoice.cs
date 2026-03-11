@@ -31,6 +31,7 @@ namespace EGI_Backend.Domain.Entities
         public DateTime DueDate { get; set; }
 
         public InvoiceStatus Status { get; set; } = InvoiceStatus.Pending;
+        public bool IsPenaltyApplied { get; set; } = false;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

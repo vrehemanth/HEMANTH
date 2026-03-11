@@ -60,6 +60,7 @@ namespace EGI_Backend.Infrastructure.Repositories
         public async Task<List<PolicyAssignment>> GetByAgentIdAsync(Guid agentId)
         {
             return await _context.PolicyAssignments
+                .AsNoTracking()
                 .Include(pa => pa.CorporateClient)
                 .Include(pa => pa.InsurancePlan)
                 .Where(pa => pa.AgentId == agentId)
@@ -106,6 +107,7 @@ namespace EGI_Backend.Infrastructure.Repositories
         public async Task<List<PolicyAssignment>> GetByClientIdAsync(Guid clientId)
         {
             return await _context.PolicyAssignments
+                .AsNoTracking()
                 .Include(pa => pa.InsurancePlan)
                 .Include(pa => pa.CorporateClient)
                 .Where(pa => pa.CorporateClientId == clientId)

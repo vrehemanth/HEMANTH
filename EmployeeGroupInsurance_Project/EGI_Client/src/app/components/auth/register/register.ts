@@ -24,6 +24,7 @@ export class RegisterComponent implements OnInit {
   }
 
   isLoading = signal(false);
+  showPassword = signal(false);
 
   onPasswordPaste(event: ClipboardEvent) {
     event.preventDefault();

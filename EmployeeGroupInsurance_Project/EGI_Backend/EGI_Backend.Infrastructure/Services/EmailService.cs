@@ -81,7 +81,49 @@ namespace EGI_Backend.Infrastructure.Services
             Console.WriteLine("---------------------------------------------");
         }
 
-        private async Task SendEmailAsync(string toEmail, string subject, string body)
+        public async Task SendClaimApprovedEmailAsync(string email, string memberName, string claimNumber, decimal amount, byte[] invoicePdf, string pdfFileName)
+        {
+            var subject = $"Claim Approved - {claimNumber}";
+            var body = $@"
+                <div style='font-family: Arial, sans-serif; color: #333;'>
+                    <h2 style='color: #27ae60;'>Claim Approved!</h2>
+                    <p>Dear <b>{memberName}</b>,</p>
+                    <p>We are pleased to inform you that your claim <b>{claimNumber}</b> has been approved.</p>
+                    <p><b>Approved Amount:</b> ₹{amount:N2}</p>
+                    <p>Please find attached the detailed settlement invoice for your records.</p>
+                    <br/>
+                    <p>Regards,<br/>EGI Claims Processing Team</p>
+                </div>";
+
+            await SendEmailAsync(email, subject, body, invoicePdf, pdfFileName);
+
+            Console.WriteLine($"[EMAIL SERVICE] Claim Approved Email sent to: {email} with attachment: {pdfFileName}");
+        }
+
+        public async Task SendInvoiceGeneratedEmailAsync(string email, string companyName, string invoiceNo, decimal amount, DateTime dueDate, byte[] invoicePdf, string pdfFileName)
+        {
+            var subject = $"New Invoice Generated - {invoiceNo}";
+            var body = $@"
+                <div style='font-family: Arial, sans-serif; color: #333;'>
+                    <h2 style='color: #2980b9;'>New Invoice Generated</h2>
+                    <p>Dear <b>{companyName}</b>,</p>
+                    <p>A new invoice <b>{invoiceNo}</b> has been generated for your Employee Group Insurance policy.</p>
+                    <ul>
+                        <li><b>Invoice Amount:</b> ₹{amount:N2}</li>
+                        <li><b>Due Date:</b> {dueDate.ToString("dd MMM yyyy")}</li>
+                    </ul>
+                    <p>Please find attached the detailed invoice for your records.</p>
+                    <p>Kindly arrange for payment before the due date to ensure uninterrupted coverage.</p>
+                    <br/>
+                    <p>Regards,<br/>EGI Billing Team</p>
+                </div>";
+
+            await SendEmailAsync(email, subject, body, invoicePdf, pdfFileName);
+
+            Console.WriteLine($"[EMAIL SERVICE] Invoice Email sent to: {email} with attachment: {pdfFileName}");
+        }
+
+        private async Task SendEmailAsync(string toEmail, string subject, string body, byte[]? attachmentBytes = null, string? attachmentName = null)
         {
             var smtpHost = _configuration["SmtpSettings:Server"];
             var smtpPort = int.Parse(_configuration["SmtpSettings:Port"] ?? "587");
@@ -108,6 +150,11 @@ namespace EGI_Backend.Infrastructure.Services
                 };
 
                 mailMessage.To.Add(toEmail);
+
+                if (attachmentBytes != null && !string.IsNullOrEmpty(attachmentName))
+                {
+                    mailMessage.Attachments.Add(new Attachment(new System.IO.MemoryStream(attachmentBytes), attachmentName, "application/pdf"));
+                }
 
                 await client.SendMailAsync(mailMessage);
             }

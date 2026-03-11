@@ -2,6 +2,8 @@ import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 
+import { AuthService } from '../../../core/services/auth.service';
+
 @Component({
     selector: 'app-account-blocked',
     standalone: true,
@@ -11,13 +13,13 @@ import { Router } from '@angular/router';
 })
 export class AccountBlockedComponent {
     private router = inject(Router);
+    private authService = inject(AuthService);
 
     supportEmail = 'security@egi-insurance.com';
-    supportContact = '+1 (800) EGI-PROT';
+    supportContact = '+91 9876543210';
 
     logout() {
-        localStorage.clear();
-        sessionStorage.clear();
+        this.authService.clearSession();
         this.router.navigate(['/auth/login']);
     }
 }

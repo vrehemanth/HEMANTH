@@ -108,15 +108,8 @@ namespace EGI_Backend.WebAPI.Controllers
         [HttpPost("upload-members")]
         public async Task<IActionResult> UploadMembersExcel([FromForm] UploadMembersDto dto)
         {
-            try
-            {
-                var resultMessage = await _policyService.ProcessMembersExcelAsync(dto);
-                return Ok(new { message = resultMessage });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var resultMessage = await _policyService.ProcessMembersExcelAsync(dto);
+            return Ok(new { message = resultMessage });
         }
 
         [HttpGet("summary")]

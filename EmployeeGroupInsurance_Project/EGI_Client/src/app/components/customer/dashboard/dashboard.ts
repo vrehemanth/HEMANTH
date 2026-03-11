@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit, OnDestroy, computed } from '@angular/core';
+import { Component, inject, signal, OnInit, OnDestroy, computed, viewChild, effect, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CustomerService } from '../../../data-access/api.services';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -8,6 +8,18 @@ import { filter, catchError } from 'rxjs/operators';
 import { ToastService } from '../../../core/services/toast.service';
 import * as htmlToImage from 'html-to-image';
 import { jsPDF } from 'jspdf';
+import { Chart, registerables } from 'chart.js';
+Chart.register(...registerables);
+
+import {
+  RelationshipType,
+  DocumentType,
+  ClaimDocumentType,
+  BillingFrequency,
+  EndorsementType,
+  PaymentMethod,
+  Gender
+} from '../../../core/models/models';
 
 @Component({
   selector: 'app-customer-dashboard',
@@ -22,6 +34,30 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
   toastService = inject(ToastService);
   private routerSub?: Subscription;
 
+  // --- Chart Canvases ---
+  premiumCanvas = viewChild<ElementRef<HTMLCanvasElement>>('premiumChart');
+  claimsCanvas = viewChild<ElementRef<HTMLCanvasElement>>('claimsChart');
+
+  private premiumChart?: Chart;
+  private claimsChart?: Chart;
+
+  // --- Analytics Initialization Effect (Fixed: Moved to class field for Injection Context) ---
+  private chartEffect = effect(() => {
+    const pCanvas = this.premiumCanvas();
+    const cCanvas = this.claimsCanvas();
+
+    // Track data changes to re-trigger charts
+    this.invoices();
+    this.claims();
+    this.policies();
+
+    if (pCanvas && cCanvas && this.activeTab() === 'overview') {
+      this.destroyCharts();
+      setTimeout(() => this.initCharts(), 300);
+    }
+  });
+
+
   activeTab = signal<'overview' | 'profile' | 'policies' | 'claims' | 'billing' | 'revisions'>('overview');
   pageTitle = signal('Strategic Portal');
   isLoading = signal(false);
@@ -35,7 +71,23 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
   endorsements = signal<any[]>([]);
   plans = signal<any[]>([]);
   profileData = signal<any>(null);
+
+  // --- Wizard/Stepper State ---
+  policyOnboardingStep = signal(1);
+  claimSubmissionStep = signal(1);
+  activeActionMenu = signal<string | null>(null);
   isProfileApproved = computed(() => this.profileData()?.status === 'Approved');
+
+  isPremiumDueSoon = computed(() => {
+    const today = new Date();
+    const threeDaysFromNow = new Date();
+    threeDaysFromNow.setDate(today.getDate() + 3);
+    return this.invoices().some(inv => {
+      if (inv.status === 'Paid') return false;
+      const dueDate = new Date(inv.dueDate);
+      return dueDate <= threeDaysFromNow && dueDate >= today;
+    });
+  });
 
   todayStr = signal(new Date().toISOString().split('T')[0]);
   maxStartDateStr = computed(() => {
@@ -43,6 +95,166 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
     d.setMonth(d.getMonth() + 1);
     return d.toISOString().split('T')[0];
   });
+
+  // --- Grid Filters & Sorting State ---
+  claimSearchTerm = signal('');
+  claimStatusFilter = signal('All');
+  claimSortConfig = signal<{ column: string, direction: 'asc' | 'desc' }>({ column: 'date', direction: 'desc' });
+
+  // --- Filtered and Sorted Computeds ---
+  filteredClaims = computed(() => {
+    let result = this.claims();
+
+    // 1. Filter by Status
+    const statusIdx = this.claimStatusFilter();
+    if (statusIdx !== 'All') {
+      result = result.filter(c => c.status === statusIdx);
+    }
+
+    // 2. Filter by Search Term (Faceted Search)
+    const search = this.claimSearchTerm().toLowerCase().trim();
+    if (search) {
+      result = result.filter(c =>
+        (c.memberName && c.memberName.toLowerCase().includes(search)) ||
+        (c.dependentName && c.dependentName.toLowerCase().includes(search)) ||
+        (c.claimType && c.claimType.toLowerCase().includes(search)) ||
+        (c.claimAmount && c.claimAmount.toString().includes(search))
+      );
+    }
+
+    // 3. Sorting
+    const sort = this.claimSortConfig();
+    return [...result].sort((a, b) => {
+      let comparison = 0;
+      switch (sort.column) {
+        case 'date':
+          comparison = new Date(a.claimDate).getTime() - new Date(b.claimDate).getTime();
+          break;
+        case 'amount':
+          comparison = a.claimAmount - b.claimAmount;
+          break;
+        case 'name':
+          comparison = (a.memberName || '').localeCompare(b.memberName || '');
+          break;
+        case 'type':
+          comparison = (a.claimType || '').localeCompare(b.claimType || '');
+          break;
+      }
+      return sort.direction === 'asc' ? comparison : -comparison;
+    });
+  });
+
+  // Method to update sorting
+  sortClaims(column: string) {
+    const current = this.claimSortConfig();
+    if (current.column === column) {
+      this.claimSortConfig.set({ column, direction: current.direction === 'asc' ? 'desc' : 'asc' });
+    } else {
+      this.claimSortConfig.set({ column, direction: 'asc' });
+    }
+  }
+
+  // --- Grid Filters & Sorting State for Members ---
+  memberSearchTerm = signal('');
+  memberStatusFilter = signal('All');
+  memberSortConfig = signal<{ column: string, direction: 'asc' | 'desc' }>({ column: 'name', direction: 'asc' });
+
+  // --- Filtered and Sorted Computeds for Members ---
+  filteredMembersList = computed(() => {
+    let result = this.members();
+
+    // 1. Filter by Status
+    const statusIdx = this.memberStatusFilter();
+    if (statusIdx !== 'All') {
+      const isActive = statusIdx === 'Active';
+      result = result.filter(m => m.status === isActive);
+    }
+
+    // 2. Filter by Search Term
+    const search = this.memberSearchTerm().toLowerCase().trim();
+    if (search) {
+      result = result.filter(m =>
+        (m.fullName && m.fullName.toLowerCase().includes(search)) ||
+        (m.relationship && m.relationship.toLowerCase().includes(search))
+      );
+    }
+
+    // 3. Sorting
+    const sort = this.memberSortConfig();
+    return [...result].sort((a, b) => {
+      let comparison = 0;
+      switch (sort.column) {
+        case 'name':
+          comparison = (a.fullName || '').localeCompare(b.fullName || '');
+          break;
+        case 'relationship':
+          comparison = (a.relationship || '').localeCompare(b.relationship || '');
+          break;
+      }
+      return sort.direction === 'asc' ? comparison : -comparison;
+    });
+  });
+
+  // Method to update member sorting
+  sortMembers(column: string) {
+    const current = this.memberSortConfig();
+    if (current.column === column) {
+      this.memberSortConfig.set({ column, direction: current.direction === 'asc' ? 'desc' : 'asc' });
+    } else {
+      this.memberSortConfig.set({ column, direction: 'asc' });
+    }
+  }
+
+  // --- Grid Filters & Sorting State for Invoices ---
+  invoiceSearchTerm = signal('');
+  invoiceStatusFilter = signal('All');
+  invoiceSortConfig = signal<{ column: string, direction: 'asc' | 'desc' }>({ column: 'date', direction: 'desc' });
+
+  // --- Filtered and Sorted Computeds for Invoices ---
+  filteredInvoiceList = computed(() => {
+    let result = this.invoices();
+
+    // 1. Filter by Status
+    const statusIdx = this.invoiceStatusFilter();
+    if (statusIdx !== 'All') {
+      result = result.filter(i => i.status === statusIdx);
+    }
+
+    // 2. Filter by Search Term
+    const search = this.invoiceSearchTerm().toLowerCase().trim();
+    if (search) {
+      result = result.filter(i =>
+        (i.invoiceNo && i.invoiceNo.toLowerCase().includes(search)) ||
+        (i.id && i.id.toLowerCase().includes(search)) ||
+        (i.amount && i.amount.toString().includes(search))
+      );
+    }
+
+    // 3. Sorting
+    const sort = this.invoiceSortConfig();
+    return [...result].sort((a, b) => {
+      let comparison = 0;
+      switch (sort.column) {
+        case 'date':
+          comparison = new Date(a.invoiceDate).getTime() - new Date(b.invoiceDate).getTime();
+          break;
+        case 'amount':
+          comparison = a.amount - b.amount;
+          break;
+      }
+      return sort.direction === 'asc' ? comparison : -comparison;
+    });
+  });
+
+  // Method to update invoice sorting
+  sortInvoices(column: string) {
+    const current = this.invoiceSortConfig();
+    if (current.column === column) {
+      this.invoiceSortConfig.set({ column, direction: current.direction === 'asc' ? 'desc' : 'asc' });
+    } else {
+      this.invoiceSortConfig.set({ column, direction: 'asc' });
+    }
+  }
 
   // Computed signals for Claim Form filtering
   filteredMembers = computed(() => {
@@ -56,6 +268,42 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
   selectedEndorsementMember = signal<any>(null);
   isInvalidEmployeeCode = signal(false);
 
+  // Helper methods to navigate steps
+  setPolicyStep(step: number) {
+    if (step < 1) return;
+    // Basic validation before moving forward
+    if (step === 2 && !this.selectedPlanForOnboarding()) {
+      this.toastService.warning('Please select a plan deployment blueprint first.');
+      return;
+    }
+    if (step === 3 && (this.policyForm.get('billingFrequency')?.invalid || this.policyForm.get('startDate')?.invalid)) {
+      this.toastService.warning('Please complete the billing and activation dates.');
+      return;
+    }
+    if (step === 4 && (!this.membersFile)) {
+      this.toastService.warning('Roster artifacts are required for deployment review.');
+      return;
+    }
+    this.policyOnboardingStep.set(step);
+  }
+
+  setClaimStep(step: number) {
+    if (step < 1) return;
+    if (step === 2 && !this.claimForm.get('policyAssignmentId')?.value) {
+      this.toastService.warning('Please select a target policy segment first.');
+      return;
+    }
+    if (step === 3 && !this.selectedClaimMember()) {
+      this.toastService.warning('Please verify a valid employee ID first.');
+      return;
+    }
+    if (step === 4 && (this.claimForm.get('claimType')?.invalid || this.claimForm.get('claimAmount')?.invalid)) {
+      this.toastService.warning('Please specify claim classification and value.');
+      return;
+    }
+    this.claimSubmissionStep.set(step);
+  }
+
   // Drilldown states
   selectedPolicy = signal<any>(null);
   policyInvoices = signal<any[]>([]);
@@ -67,6 +315,12 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
   invoicePayments = signal<any[]>([]);
 
   showClaimForm = signal(false);
+  toggleClaimForm() {
+    this.showClaimForm.set(!this.showClaimForm());
+    if (this.showClaimForm()) {
+      this.claimSubmissionStep.set(1);
+    }
+  }
   showPolicyForm = signal(false);
   showPaymentModal = signal(false);
   selectedInvoiceForPayment = signal<any>(null);
@@ -79,13 +333,22 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
 
   // Document Types from Backend Enum
   docTypes = [
-    { id: '1', name: 'Medical Bill' },
-    { id: '2', name: 'Hospital Discharge' },
-    { id: '3', name: 'Prescription' },
-    { id: '4', name: 'FIR (Accident)' },
-    { id: '8', name: 'Diagnosis Report' },
-    { id: '10', name: 'Other' }
+    { id: ClaimDocumentType.MedicalBill.toString(), name: 'Medical Bill' },
+    { id: ClaimDocumentType.HospitalDischargeReport.toString(), name: 'Hospital Discharge' },
+    { id: ClaimDocumentType.DoctorPrescription.toString(), name: 'Prescription' },
+    { id: ClaimDocumentType.FIR.toString(), name: 'FIR (Accident)' },
+    { id: ClaimDocumentType.DiagnosisReport.toString(), name: 'Diagnosis Report' },
+    { id: ClaimDocumentType.Other.toString(), name: 'Other' }
   ];
+
+  // Making Enums available to the template
+  EnumRelationship = RelationshipType;
+  EnumEndorsement = EndorsementType;
+  EnumBilling = BillingFrequency;
+  EnumPayment = PaymentMethod;
+  EnumGender = Gender;
+  EnumDocType = DocumentType;
+  EnumClaimDocType = ClaimDocumentType;
   membersFile: File | null = null;
   dependentsFile: File | null = null;
 
@@ -107,20 +370,20 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
 
   policyForm = this.fb.group({
     insurancePlanId: ['', Validators.required],
-    billingFrequency: [2, Validators.required],
+    billingFrequency: [BillingFrequency.Monthly, Validators.required],
     startDate: [new Date().toISOString().split('T')[0], Validators.required],
     durationInYears: [1, [Validators.required, Validators.min(1), Validators.max(10)]]
   });
 
   paymentForm = this.fb.group({
     amount: [0, [Validators.required, Validators.min(1)]],
-    paymentMethod: [1, Validators.required],
+    paymentMethod: [PaymentMethod.Card, Validators.required],
     transactionId: ['']
   });
 
   endorsementForm = this.fb.group({
     policyAssignmentId: ['', Validators.required],
-    type: ['0', Validators.required],
+    type: [EndorsementType.AddMember.toString(), Validators.required],
     description: ['', Validators.required],
     firstName: [''],
     lastName: [''],
@@ -128,10 +391,10 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
     email: [''],
     phoneNo: [''],
     dateOfBirth: [''],
-    gender: ['0'],
+    gender: [Gender.Male.toString()],
     memberId: [''],
     fullName: [''],
-    relationship: ['1']
+    relationship: [RelationshipType.Spouse.toString()]
   });
 
   private extractArray(payload: any): any[] {
@@ -160,6 +423,151 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+
+  private destroyCharts() {
+    this.premiumChart?.destroy();
+    this.claimsChart?.destroy();
+  }
+
+  private initCharts() {
+    const pEl = this.premiumCanvas()?.nativeElement;
+    const cEl = this.claimsCanvas()?.nativeElement;
+
+    if (!pEl || !cEl) return;
+
+    this.initPremiumChart(pEl);
+    this.initClaimsChart(cEl);
+  }
+
+  private initPremiumChart(ctx: HTMLCanvasElement) {
+    const totalDue = this.summary()?.totalPremiumDue || 0;
+    // Calculate paid amount from total invoices where status is Paid
+    const totalPaid = this.invoices()
+      .filter(inv => inv.status === 'Paid')
+      .reduce((sum, current) => sum + (current.amount || 0), 0);
+
+    const data = {
+      labels: ['Settled', 'Outstanding'],
+      datasets: [{
+        data: [totalPaid, totalDue],
+        backgroundColor: ['#10b981', '#ef4444'],
+        borderWidth: 0,
+        hoverOffset: 10,
+        borderRadius: 5
+      }]
+    };
+
+    this.premiumChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: data,
+      options: {
+        cutout: '80%',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            padding: 12,
+            titleFont: { size: 14, weight: 'bold' },
+            bodyFont: { size: 12 },
+            callbacks: {
+              label: (item: any) => ` ₹${item.raw.toLocaleString()}`
+            }
+          }
+        }
+      }
+    });
+  }
+
+  private initClaimsChart(ctx: HTMLCanvasElement) {
+    const claims = this.claims();
+    if (claims.length === 0) return;
+
+    // Last 6 months labels
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      months.push(d.toLocaleString('default', { month: 'short' }));
+    }
+
+    // Grouping
+    const groupedTotal = new Array(6).fill(0);
+    const groupedApproved = new Array(6).fill(0);
+
+    claims.forEach(cl => {
+      const date = new Date(cl.claimDate);
+      const diffMonths = (new Date().getFullYear() - date.getFullYear()) * 12 + (new Date().getMonth() - date.getMonth());
+      if (diffMonths >= 0 && diffMonths < 6) {
+        const idx = 5 - diffMonths;
+        groupedTotal[idx] += 1;
+        if (cl.status === 'Approved') {
+          groupedApproved[idx] += 1;
+        }
+      }
+    });
+
+    const gradientApproved = ctx.getContext('2d')?.createLinearGradient(0, 0, 0, 400);
+    gradientApproved?.addColorStop(0, 'rgba(16, 185, 129, 0.4)');
+    gradientApproved?.addColorStop(1, 'rgba(16, 185, 129, 0)');
+
+    const gradientTotal = ctx.getContext('2d')?.createLinearGradient(0, 0, 0, 400);
+    gradientTotal?.addColorStop(0, 'rgba(59, 130, 246, 0.4)');
+    gradientTotal?.addColorStop(1, 'rgba(59, 130, 246, 0)');
+
+    this.claimsChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: months,
+        datasets: [
+          {
+            label: 'Approved',
+            data: groupedApproved,
+            borderColor: '#10b981',
+            backgroundColor: gradientApproved,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 4,
+            pointBackgroundColor: '#10b981',
+            borderWidth: 3
+          },
+          {
+            label: 'Total Transmission',
+            data: groupedTotal,
+            borderColor: '#3b82f6',
+            backgroundColor: gradientTotal,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 0,
+            borderWidth: 2,
+            borderDash: [5, 5]
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            mode: 'index',
+            intersect: false,
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            padding: 12
+          }
+        },
+        scales: {
+          x: { display: true, grid: { display: false }, ticks: { font: { size: 10, weight: 600 } } },
+          y: { display: true, grid: { color: 'rgba(0,0,0,0.05)' }, border: { dash: [5, 5] }, ticks: { stepSize: 1, font: { size: 10 } } }
+        }
+      }
+    });
+  }
+
+
+
+
   ngOnDestroy() {
     this.routerSub?.unsubscribe();
   }
@@ -171,17 +579,17 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
   initialLoad() {
     this.isLoading.set(true);
 
-    // Abstracting to an immediate lock
-    setTimeout(() => this.isLoading.set(false), 800);
-
+    // Reduced immediate loading - only fetch what's needed for Overview
     this.customerService.getOverview().pipe(catchError(() => of(null))).subscribe(res => {
       if (res) {
         const ov = res?.data || res;
         this.summary.set(ov.summary);
+
+        // These are short lists returned by getOverview, we can use them temporarily
         this.policies.set(this.extractArray(ov.recentPolicies));
-        if (this.claims().length === 0) this.claims.set(this.extractArray(ov.recentClaims));
-        if (this.invoices().length === 0) this.invoices.set(this.extractArray(ov.recentInvoices));
-        if (this.endorsements().length <= 5) this.endorsements.set(this.extractArray(ov.recentEndorsements));
+        this.claims.set(this.extractArray(ov.recentClaims));
+        this.invoices.set(this.extractArray(ov.recentInvoices));
+        this.endorsements.set(this.extractArray(ov.recentEndorsements));
 
         // Process members if present in overview
         if (ov.recentMembers) {
@@ -192,6 +600,7 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
           })));
         }
       }
+      this.isLoading.set(false);
     });
 
     this.customerService.getAllPlans().pipe(catchError(() => of([]))).subscribe(res => {
@@ -200,7 +609,7 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
 
     this.customerService.getProfile().pipe(catchError(() => of(null))).subscribe(res => {
       if (res) this.handleProfileData(res?.data || res);
-      else this.handleProfileData({ status: 'Draft' }); // Enforce verification overlay
+      else this.handleProfileData({ status: 'Draft' });
     });
   }
 
@@ -397,9 +806,16 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
     }
 
     // Guard: For Remove Member & Add Dependent, a valid employee ID must be resolved to a member
-    const endType = parseInt(this.endorsementForm.get('type')?.value || '4', 10);
-    if ((endType === 1 || endType === 2) && !this.endorsementForm.get('memberId')?.value) {
+    const endType = parseInt(this.endorsementForm.get('type')?.value || EndorsementType.ChangeCoverage.toString(), 10);
+    if ((endType === EndorsementType.RemoveMember || endType === EndorsementType.AddDependent) && !this.endorsementForm.get('memberId')?.value) {
       this.toastService.error("Employee ID not found. Please enter a valid, existing Employee ID to identify the member.");
+      return;
+    }
+
+    // Guard: Revisions only allowed for active policies
+    const policy = this.policies().find(p => p.id === finalId);
+    if (policy && policy.status !== 'Active') {
+      this.toastService.error(`Revisions are restricted for ${policy.status} policies.`);
       return;
     }
 
@@ -408,7 +824,7 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
     const val = this.endorsementForm.value;
     let endData: any = {};
 
-    if (endType === 0) { // AddMember
+    if (endType === EndorsementType.AddMember) { // AddMember
       endData = {
         FirstName: val.firstName,
         LastName: val.lastName,
@@ -417,17 +833,17 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
         Email: val.email,
         PhoneNo: val.phoneNo,
         DateOfBirth: val.dateOfBirth,
-        Gender: parseInt(val.gender || '0', 10)
+        Gender: parseInt(val.gender || Gender.Male.toString(), 10)
       };
-    } else if (endType === 1) { // RemoveMember
+    } else if (endType === EndorsementType.RemoveMember) { // RemoveMember
       endData = { MemberId: val.memberId };
-    } else if (endType === 2) { // AddDependent
+    } else if (endType === EndorsementType.AddDependent) { // AddDependent
       endData = {
         MemberId: val.memberId,
         FullName: val.fullName,
-        Relationship: parseInt(val.relationship || '1', 10),
+        Relationship: parseInt(val.relationship || RelationshipType.Spouse.toString(), 10),
         DateOfBirth: val.dateOfBirth,
-        Gender: parseInt(val.gender || '0', 10)
+        Gender: parseInt(val.gender || Gender.Male.toString(), 10)
       };
     } else { // Other
       endData = { Instruction: val.description };
@@ -493,7 +909,7 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
     if (!this.selectedProfileDoc) return;
     this.isLoading.set(true);
     const fd = new FormData();
-    fd.append('documentType', '5'); // Other = 5
+    fd.append('documentType', DocumentType.Other.toString()); // Other
     fd.append('file', this.selectedProfileDoc);
     this.customerService.uploadDocument(fd).subscribe({
       next: () => {
@@ -581,7 +997,7 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
   onClaimDocsSelect(event: any) {
     const files = event.target.files;
     for (let i = 0; i < files.length; i++) {
-      this.selectedClaimFiles.push({ file: files[i], type: '1' }); // Default to Medical Bill
+      this.selectedClaimFiles.push({ file: files[i], type: ClaimDocumentType.MedicalBill.toString() }); // Default to Medical Bill
     }
   }
 
@@ -709,8 +1125,8 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  payInvoice(invoiceId: string, balance: number) {
-    this.selectedInvoiceForPayment.set({ id: invoiceId, balance: balance });
+  payInvoice(invoiceId: string, balance: number, totalAmount: number) {
+    this.selectedInvoiceForPayment.set({ id: invoiceId, balance: balance, totalAmount: totalAmount });
     this.paymentForm.patchValue({
       amount: balance,
       paymentMethod: 1,
@@ -756,10 +1172,11 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
 
   openPolicyOnboarding() {
     this.showPolicyForm.set(true);
+    this.policyOnboardingStep.set(1);
     this.selectedPlanForOnboarding.set(null);
     this.policyForm.reset({
       insurancePlanId: '',
-      billingFrequency: 2,
+      billingFrequency: 1,
       startDate: new Date().toISOString().split('T')[0],
       durationInYears: 1
     });
@@ -794,7 +1211,9 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
     this.isLoading.set(true);
     const formData = new FormData();
     const val = this.policyForm.value as any;
-    formData.append('CorporateClientId', this.profileData()?.id);
+    const pd = this.profileData() || {};
+    const corporateId = pd.id || pd.Id;
+    if (corporateId) formData.append('CorporateClientId', corporateId);
     formData.append('InsurancePlanId', val.insurancePlanId);
     formData.append('BillingFrequency', val.billingFrequency);
     formData.append('StartDate', val.startDate);

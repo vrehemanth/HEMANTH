@@ -106,15 +106,16 @@ namespace EGI_Backend.WebAPI.Controllers
         [HttpPost("upload-members")]
         public async Task<IActionResult> UploadMembersExcel([FromForm] UploadMembersDto dto)
         {
-            try
+            if (!ModelState.IsValid)
             {
-                var resultMessage = await _policyService.ProcessMembersExcelAsync(dto);
-                return Ok(new { message = resultMessage });
+                var errors = string.Join(" | ", ModelState.Values
+                    .SelectMany(v => v.Errors)
+                    .Select(e => e.ErrorMessage));
+                return BadRequest(new { message = "Validation Failed: " + errors });
             }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+
+            var resultMessage = await _policyService.ProcessMembersExcelAsync(dto);
+            return Ok(new { message = resultMessage });
         }
 
         // ─── Invoices ────────────────────────────────────────────

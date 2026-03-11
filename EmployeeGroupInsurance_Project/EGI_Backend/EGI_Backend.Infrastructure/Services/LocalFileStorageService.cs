@@ -22,5 +22,14 @@ namespace EGI_Backend.Infrastructure.Services
 
             return filePath;
         }
+
+        public Task DeleteAsync(string filePath)
+        {
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
+            return Task.CompletedTask;
+        }
     }
 }

@@ -19,6 +19,8 @@ export class ResetPasswordComponent {
   private route = inject(ActivatedRoute);
 
   isLoading = signal(false);
+  showPassword = signal(false);
+  showConfirmPassword = signal(false);
 
   onPasswordPaste(event: ClipboardEvent) {
     event.preventDefault();

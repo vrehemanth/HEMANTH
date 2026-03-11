@@ -4,6 +4,9 @@ using EGI_Backend.Application.Interfaces;
 using EGI_Backend.Application.Exceptions;
 using EGI_Backend.Domain.Entities;
 using EGI_Backend.Domain.Enums;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
 
 namespace EGI_Backend.Application.Services
 {
@@ -21,6 +24,7 @@ namespace EGI_Backend.Application.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly INotificationService _notificationService;
+        private readonly IEmailService _emailService;
 
         public ClaimService(
             IClaimRepository claimRepo,
@@ -34,7 +38,8 @@ namespace EGI_Backend.Application.Services
             IInvoiceRepository invoiceRepo,
             IUnitOfWork unitOfWork,
             IMapper mapper,
-            INotificationService notificationService)
+            INotificationService notificationService,
+            IEmailService emailService)
         {
             _claimRepo = claimRepo;
             _policyRepo = policyRepo;
@@ -48,6 +53,7 @@ namespace EGI_Backend.Application.Services
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _notificationService = notificationService;
+            _emailService = emailService;
         }
 
         public async Task<string> SubmitClaimAsync(Guid corporateClientUserId, SubmitClaimDto dto)
@@ -68,13 +74,13 @@ namespace EGI_Backend.Application.Services
             // 2.1 Verify Premium Payment (Strict check)
             var invoices = await _invoiceRepo.GetByPolicyAssignmentIdAsync(dto.PolicyAssignmentId);
             var unpaidInvoice = invoices
-                .Where(i => i.Status != InvoiceStatus.Paid)
+                .Where(i => i.Status != InvoiceStatus.Paid && i.InvoiceDate.AddDays(15) < DateTime.UtcNow)
                 .OrderBy(i => i.InvoiceDate)
                 .FirstOrDefault();
 
             if (unpaidInvoice != null)
             {
-                throw new BadRequestException("Premium not paid. Please settle your outstanding invoices to activate benefit claims.");
+                throw new BadRequestException($"Premium overdue since {unpaidInvoice.InvoiceDate.ToShortDateString()}. The 15-day grace period has expired. Please settle your outstanding invoices to activate benefit claims.");
             }
 
             // 3. Verify the Member belongs to this policy
@@ -163,27 +169,41 @@ namespace EGI_Backend.Application.Services
                 Status = ClaimStatus.Pending
             };
 
-            // 12. Upload and attach documents
-            for (int i = 0; i < dto.Documents.Count; i++)
+            var uploadedFilePaths = new List<string>();
+            try
             {
-                var file = dto.Documents[i];
-                var filePath = await _storage.UploadAsync(file);
-
-                claim.Documents.Add(new ClaimDocument
+                // 12. Upload and attach documents
+                for (int i = 0; i < dto.Documents.Count; i++)
                 {
-                    Id = Guid.NewGuid(),
-                    ClaimId = claim.Id,
-                    DocumentType = dto.DocumentTypes[i],
-                    FileName = file.FileName,
-                    FilePath = filePath,
-                    UploadedAt = DateTime.UtcNow
-                });
+                    var file = dto.Documents[i];
+                    var filePath = await _storage.UploadAsync(file);
+                    uploadedFilePaths.Add(filePath);
+
+                    claim.Documents.Add(new ClaimDocument
+                    {
+                        Id = Guid.NewGuid(),
+                        ClaimId = claim.Id,
+                        DocumentType = dto.DocumentTypes[i],
+                        FileName = file.FileName,
+                        FilePath = filePath,
+                        UploadedAt = DateTime.UtcNow
+                    });
+                }
+
+                await _claimRepo.AddAsync(claim);
+                await _unitOfWork.SaveChangesAsync();
+
+                return $"Claim submitted successfully. Claim Number: {claim.ClaimNumber}. Status: Pending Review.";
             }
-
-            await _claimRepo.AddAsync(claim);
-            await _unitOfWork.SaveChangesAsync();
-
-            return $"Claim submitted successfully. Claim Number: {claim.ClaimNumber}. Status: Pending Review.";
+            catch (Exception)
+            {
+                // 13. Cleanup uploaded files if the database transaction fails
+                foreach (var path in uploadedFilePaths)
+                {
+                    try { await _storage.DeleteAsync(path); } catch { /* Ignore cleanup errors */ }
+                }
+                throw;
+            }
         }
 
         public async Task ReviewClaimAsync(Guid claimsOfficerUserId, Guid claimId, ReviewClaimDto dto)
@@ -266,6 +286,14 @@ namespace EGI_Backend.Application.Services
                         if (memberUser != null)
                         {
                             await _notificationService.CreateNotificationAsync(memberUser.Id, title, msgBase, type);
+                        }
+
+                        // Send Approved Email with PDF Attachment if Approved
+                        if (dto.IsApproved)
+                        {
+                            var pdfBytes = GenerateClaimInvoicePdf(claim, member);
+                            string pdfFileName = $"Settlement_{claim.ClaimNumber}.pdf";
+                            await _emailService.SendClaimApprovedEmailAsync(member.Email, member.FullName, claim.ClaimNumber, claim.ClaimAmount, pdfBytes, pdfFileName);
                         }
                     }
                 }
@@ -408,6 +436,46 @@ namespace EGI_Backend.Application.Services
                 claim.ReviewedBy = null;
                 await _unitOfWork.SaveChangesAsync();
             }
+        }
+
+        private byte[] GenerateClaimInvoicePdf(Claim claim, Member member)
+        {
+            QuestPDF.Settings.License = LicenseType.Community;
+
+            return Document.Create(container =>
+            {
+                container.Page(page =>
+                {
+                    page.Size(PageSizes.A4);
+                    page.Margin(2, Unit.Centimetre);
+                    page.PageColor(Colors.White);
+                    page.DefaultTextStyle(x => x.FontSize(12));
+
+                    page.Header().Text("Claim Settlement Invoice")
+                        .SemiBold().FontSize(24).FontColor(Colors.Blue.Darken2);
+
+                    page.Content().PaddingVertical(1, Unit.Centimetre)
+                        .Column(x =>
+                        {
+                            x.Spacing(20);
+                            x.Item().Text($"Claim Number: {claim.ClaimNumber}");
+                            x.Item().Text($"Member: {member.FullName} ({member.EmployeeCode})");
+                            x.Item().Text($"Type: {claim.ClaimType}");
+                            x.Item().Text($"Approved Settled Amount: ₹{claim.ClaimAmount:N2}")
+                                .Bold().FontSize(16).FontColor(Colors.Green.Darken2);
+                            x.Item().Text($"Settlement Date: {DateTime.UtcNow.ToString("dd MMM yyyy")}");
+                            x.Item().Text("This is a system generated settlement receipt. No signature is required.");
+                        });
+
+                    page.Footer().AlignCenter().Text(x =>
+                    {
+                        x.Span("Page ");
+                        x.CurrentPageNumber();
+                        x.Span(" of ");
+                        x.TotalPages();
+                    });
+                });
+            }).GeneratePdf();
         }
     }
 }

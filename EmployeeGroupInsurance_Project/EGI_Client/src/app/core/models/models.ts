@@ -4,6 +4,61 @@ export enum InvoiceStatus { Pending = 'Pending', Paid = 'Paid', Overdue = 'Overd
 export enum ClaimStatus { Pending = 'Pending', Approved = 'Approved', Rejected = 'Rejected', InReview = 'InReview' }
 export enum BusinessCategory { Small = 'Small', Medium = 'Medium', Large = 'Large', Enterprise = 'Enterprise' }
 
+export enum RelationshipType {
+    Spouse = 1,
+    Child = 2,
+    Father = 3,
+    Mother = 4,
+    Other = 5
+}
+
+export enum DocumentType {
+    GSTIN = 1,
+    PAN = 2,
+    CIN = 3,
+    AddressProof = 4,
+    Other = 5
+}
+
+export enum ClaimDocumentType {
+    MedicalBill = 1,
+    HospitalDischargeReport = 2,
+    DoctorPrescription = 3,
+    FIR = 4,
+    PostMortemReport = 5,
+    DeathCertificate = 6,
+    AccidentReport = 7,
+    DiagnosisReport = 8,
+    InsuranceClaimForm = 9,
+    Other = 10
+}
+
+export enum BillingFrequency {
+    Monthly = 1,
+    Annually = 2
+}
+
+export enum EndorsementType {
+    AddMember = 0,
+    RemoveMember = 1,
+    AddDependent = 2,
+    RemoveDependent = 3,
+    ChangeCoverage = 4
+}
+
+export enum PaymentMethod {
+    Card = 1,
+    NetBanking = 2,
+    UPI = 3,
+    Wallet = 4
+}
+
+export enum Gender {
+    Male = 1,
+    Female = 2,
+    Other = 3
+}
+
 // ─── Core Interfaces ───────────────────────────────────────
 export interface UserResponse {
     id: string;

@@ -1,11 +1,13 @@
-import { Component, inject, signal, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, signal, OnInit, OnDestroy, computed, viewChild, ElementRef, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, NavigationEnd } from '@angular/router';
 import { AgentService } from '../../../data-access/api.services';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Subscription } from 'rxjs';
-import { filter } from 'rxjs/operators';
-import { ToastService } from '../../../core/services/toast.service'; // Added ToastService import
+import { filter, tap } from 'rxjs/operators';
+import { ToastService } from '../../../core/services/toast.service';
+import { Chart, registerables } from 'chart.js';
+Chart.register(...registerables);
 
 @Component({
   selector: 'app-agent-dashboard',
@@ -20,6 +22,30 @@ export class AgentDashboardComponent implements OnInit, OnDestroy {
   toastService = inject(ToastService);
   private routerSub?: Subscription;
 
+  // --- Chart Canvases ---
+  commissionCanvas = viewChild<ElementRef<HTMLCanvasElement>>('commissionChart');
+  outstandingCanvas = viewChild<ElementRef<HTMLCanvasElement>>('outstandingChart');
+  salesMixCanvas = viewChild<ElementRef<HTMLCanvasElement>>('salesMixChart');
+
+  private commissionChart?: Chart;
+  private outstandingChart?: Chart;
+  private salesMixChart?: Chart;
+
+  private chartEffect = effect(() => {
+    const cCanvas = this.commissionCanvas();
+    const oCanvas = this.outstandingCanvas();
+    const sCanvas = this.salesMixCanvas();
+
+    // Dependencies
+    this.summary();
+    this.policies();
+
+    if (cCanvas && oCanvas && sCanvas && this.activeTab() === 'overview') {
+      this.destroyCharts();
+      setTimeout(() => this.initCharts(), 300);
+    }
+  });
+
   activeTab = signal<'overview' | 'customers' | 'policies' | 'endorsements' | 'commissions'>('overview');
   pageTitle = signal('Agent Dashboard');
   showCustomerForm = signal(false);
@@ -30,6 +56,116 @@ export class AgentDashboardComponent implements OnInit, OnDestroy {
   policies = signal<any[]>([]);
   pendingEndorsements = signal<any[]>([]);
   commissionLogs = signal<any[]>([]);
+
+  // Filtering signals
+  customerSearchTerm = signal('');
+  customerStatusFilter = signal('All');
+  customerSortConfig = signal<{ column: string, direction: 'asc' | 'desc' }>({ column: 'company', direction: 'asc' });
+
+  policySearchTerm = signal('');
+  policySortConfig = signal<{ column: string, direction: 'asc' | 'desc' }>({ column: 'policyNo', direction: 'asc' });
+
+  endorsementSortConfig = signal<{ column: string, direction: 'asc' | 'desc' }>({ column: 'date', direction: 'desc' });
+  commissionSortConfig = signal<{ column: string, direction: 'asc' | 'desc' }>({ column: 'timestamp', direction: 'desc' });
+
+  // Computed filtered lists
+  filteredCustomers = computed(() => {
+    let result = this.customers();
+
+    const statusIdx = this.customerStatusFilter();
+    if (statusIdx !== 'All') {
+      result = result.filter(c => c.status === statusIdx);
+    }
+
+    const search = this.customerSearchTerm().toLowerCase().trim();
+    if (search) {
+      result = result.filter(c =>
+        (c.companyName && c.companyName.toLowerCase().includes(search)) ||
+        (c.address && c.address.toLowerCase().includes(search)) ||
+        (c.name && c.name.toLowerCase().includes(search))
+      );
+    }
+
+    const sort = this.customerSortConfig();
+    return [...result].sort((a, b) => {
+      let comparison = 0;
+      switch (sort.column) {
+        case 'company': comparison = (a.companyName || '').localeCompare(b.companyName || ''); break;
+        case 'category': comparison = (a.businessCategory || '').localeCompare(b.businessCategory || ''); break;
+        case 'status': comparison = (a.status || '').localeCompare(b.status || ''); break;
+      }
+      return sort.direction === 'asc' ? comparison : -comparison;
+    });
+  });
+
+  filteredPolicies = computed(() => {
+    let result = this.policies();
+
+    const search = this.policySearchTerm().toLowerCase().trim();
+    if (search) {
+      result = result.filter(p =>
+        (p.policyNo && p.policyNo.toLowerCase().includes(search)) ||
+        (p.companyName && p.companyName.toLowerCase().includes(search)) ||
+        (p.planName && p.planName.toLowerCase().includes(search))
+      );
+    }
+
+    const sort = this.policySortConfig();
+    return [...result].sort((a, b) => {
+      let comparison = 0;
+      switch (sort.column) {
+        case 'policyNo': comparison = (a.policyNo || '').localeCompare(b.policyNo || ''); break;
+        case 'company': comparison = (a.companyName || '').localeCompare(b.companyName || ''); break;
+        case 'plan': comparison = (a.planName || '').localeCompare(b.planName || ''); break;
+        case 'period': comparison = new Date(a.startDate || 0).getTime() - new Date(b.startDate || 0).getTime(); break;
+        case 'premium': comparison = (a.annualPremium || 0) - (b.annualPremium || 0); break;
+        case 'commission': comparison = (a.commissionAmount || 0) - (b.commissionAmount || 0); break;
+        case 'status': comparison = (a.status || '').localeCompare(b.status || ''); break;
+      }
+      return sort.direction === 'asc' ? comparison : -comparison;
+    });
+  });
+
+  filteredEndorsements = computed(() => {
+    const sort = this.endorsementSortConfig();
+    return [...this.pendingEndorsements()].sort((a, b) => {
+      let comparison = 0;
+      switch (sort.column) {
+        case 'type': comparison = (a.type || '').localeCompare(b.type || ''); break;
+        case 'policy': comparison = (a.policyAssignmentId || '').localeCompare(b.policyAssignmentId || ''); break;
+        case 'description': comparison = (a.description || '').localeCompare(b.description || ''); break;
+        case 'adjustment': comparison = (a.premiumAdjustment || 0) - (b.premiumAdjustment || 0); break;
+      }
+      return sort.direction === 'asc' ? comparison : -comparison;
+    });
+  });
+
+  filteredCommissions = computed(() => {
+    const sort = this.commissionSortConfig();
+    return [...this.commissionLogs()].sort((a, b) => {
+      let comparison = 0;
+      switch (sort.column) {
+        case 'timestamp': comparison = new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime(); break;
+        case 'event': comparison = (a.id || '').localeCompare(b.id || ''); break;
+        case 'detail': comparison = (a.newValues || '').localeCompare(b.newValues || ''); break;
+      }
+      return sort.direction === 'asc' ? comparison : -comparison;
+    });
+  });
+
+  updateSort(configSignal: any, column: string) {
+    const current = configSignal();
+    if (current.column === column) {
+      configSignal.set({ column, direction: current.direction === 'asc' ? 'desc' : 'asc' });
+    } else {
+      configSignal.set({ column, direction: 'asc' });
+    }
+  }
+
+  sortCustomers(column: string) { this.updateSort(this.customerSortConfig, column); }
+  sortPolicies(column: string) { this.updateSort(this.policySortConfig, column); }
+  sortEndorsements(column: string) { this.updateSort(this.endorsementSortConfig, column); }
+  sortCommissions(column: string) { this.updateSort(this.commissionSortConfig, column); }
 
   selectedFile: File | null = null;
 
@@ -78,7 +214,12 @@ export class AgentDashboardComponent implements OnInit, OnDestroy {
     if (tab === 'overview' && !this.summary() && !this.pendingReqs.has('overview')) {
       this.pendingReqs.add('overview');
       this.agentService.getSummary().subscribe({
-        next: res => { this.summary.set(res?.data || res); this.pendingReqs.delete('overview'); },
+        next: res => {
+          this.summary.set(res?.data || res);
+          this.pendingReqs.delete('overview');
+          // Load policies for charts
+          this.lazyLoadTab('policies');
+        },
         error: () => this.pendingReqs.delete('overview')
       });
     } else if (tab === 'customers') {
@@ -192,5 +333,124 @@ export class AgentDashboardComponent implements OnInit, OnDestroy {
     URL.revokeObjectURL(url);
 
     this.toastService.success('Pending Premium Report exported successfully.');
+  }
+
+  private destroyCharts() {
+    this.commissionChart?.destroy();
+    this.outstandingChart?.destroy();
+    this.salesMixChart?.destroy();
+  }
+
+  private initCharts() {
+    const cCtx = this.commissionCanvas()?.nativeElement;
+    const oCtx = this.outstandingCanvas()?.nativeElement;
+    const sCtx = this.salesMixCanvas()?.nativeElement;
+
+    if (!cCtx || !oCtx || !sCtx) return;
+
+    this.initCommissionChart(cCtx);
+    this.initOutstandingChart(oCtx);
+    this.initSalesMixChart(sCtx);
+  }
+
+  private initCommissionChart(ctx: HTMLCanvasElement) {
+    const s = this.summary();
+    const earned = s?.totalCommissionEarned || 0;
+    const projected = s?.projectedCommission || 0;
+
+    this.commissionChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Earned', 'Projected'],
+        datasets: [{
+          data: [earned, projected],
+          backgroundColor: ['#10b981', '#6366f1'],
+          borderWidth: 0,
+          borderRadius: 10,
+          hoverOffset: 12
+        }]
+      },
+      options: {
+        cutout: '75%',
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            titleFont: { size: 13, weight: 'bold' },
+            bodyFont: { size: 12 },
+            padding: 14,
+            displayColors: true,
+            boxWidth: 10,
+            boxHeight: 10,
+            boxPadding: 6,
+            usePointStyle: true,
+            borderColor: 'rgba(255,255,255,0.1)',
+            borderWidth: 1,
+            callbacks: {
+              label: (i: any) => ` ${i.label}: ₹${i.raw.toLocaleString()}`
+            }
+          }
+        }
+      }
+    });
+  }
+
+  private initOutstandingChart(ctx: HTMLCanvasElement) {
+    const pending = this.summary()?.customerPendingPremiums || [];
+    const labels = pending.map((p: any) => p.companyName.slice(0, 10) + (p.companyName.length > 10 ? '..' : ''));
+    const data = pending.map((p: any) => p.amount);
+
+    this.outstandingChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Outstanding (₹)',
+          data: data,
+          backgroundColor: '#ef4444',
+          borderRadius: 8,
+          barThickness: 20
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 9 } } },
+          y: { grid: { display: false }, ticks: { font: { size: 9, weight: 600 } } }
+        }
+      }
+    });
+  }
+
+  private initSalesMixChart(ctx: HTMLCanvasElement) {
+    const policies = this.policies();
+    const mix: { [key: string]: number } = {};
+    policies.forEach(p => { mix[p.planName] = (mix[p.planName] || 0) + 1; });
+
+    this.salesMixChart = new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: Object.keys(mix),
+        datasets: [{
+          data: Object.values(mix),
+          backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { boxWidth: 8, font: { size: 9, weight: 600 }, padding: 10, usePointStyle: true }
+          }
+        }
+      }
+    });
   }
 }

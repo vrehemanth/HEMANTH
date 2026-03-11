@@ -1,39 +1,42 @@
 <div class="space-y-6 animate-in fade-in duration-300">
     <div class="flex items-center justify-between">
         <div>
-            <h2 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{{ pageTitle() }}</h2>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage corporate profile, policies, claims, and
-                billing.</p>
+            <h2 class="text-3xl font-black tracking-tight text-premium">{{ pageTitle() }}</h2>
+            <p class="text-sm text-gray-400 dark:text-gray-500 mt-1 font-medium">Manage corporate profile, policies,
+                claims,
+                and
+                billing with high-fidelity analytics.</p>
         </div>
 
         @if (isLoading()) {
         <div
-            class="flex items-center gap-2 px-3 py-1 bg-primary-50 dark:bg-primary-900/20 text-primary-600 rounded-full text-xs font-bold animate-pulse">
-            <svg class="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                <path d="M21 12a9 9 0 11-6.219-8.56"></path>
-            </svg>
-            Syncing...
+            class="flex items-center gap-2 px-4 py-1.5 glass rounded-full text-[10px] font-black uppercase tracking-widest text-primary-600 animate-pulse">
+            <span class="w-2 h-2 bg-primary-500 rounded-full"></span>
+            Synchronizing Ecosystem...
         </div>
         }
     </div>
 
     @if (!isProfileApproved() && !isBlocked()) {
-    <div class="bg-amber-50 border-l-4 border-amber-400 p-4 rounded-xl mb-6">
+    <div class="glass border-l-4 border-amber-400 p-6 rounded-2xl mb-8 animate-in slide-in-from-top-4 duration-500">
         <div class="flex items-center">
-            <div class="flex-shrink-0 text-amber-400">
-                <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd"
-                        d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                        clip-rule="evenodd" />
+            <div class="flex-shrink-0 text-amber-500">
+                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path
+                        d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01" />
                 </svg>
             </div>
-            <div class="ml-3">
-                <p class="text-xs text-amber-700">
-                    <span class="font-bold">Verification Pending:</span> Complete your corporate identity and upload
-                    verification documents for account activation.
-                    <button (click)="activeTab.set('profile')" class="ml-2 font-black underline uppercase">Navigate to
-                        Profile</button>
+            <div class="ml-4">
+                <p class="text-[11px] font-black uppercase tracking-widest text-amber-800 dark:text-amber-400">
+                    Verification Protocol Pending
                 </p>
+                <p class="text-xs text-amber-600 dark:text-amber-500/80 mt-1">
+                    Complete your corporate identity and upload verification documents for account activation.
+                </p>
+                <button (click)="activeTab.set('profile')"
+                    class="mt-2 text-[10px] font-black underline uppercase text-amber-700 dark:text-amber-400 hover:text-amber-900 transition-colors">
+                    Access Profile Management
+                </button>
             </div>
         </div>
     </div>
@@ -42,34 +45,106 @@
     <!-- OVERVIEW -->
     @if (activeTab() === 'overview') {
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div class="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm transition-all hover:shadow-md cursor-pointer"
-            (click)="setActiveTab('policies')">
-            <p class="text-sm text-gray-500 font-medium lowercase first-letter:uppercase">Total Members</p>
-            <h3 class="text-2xl font-bold mt-1 dark:text-white">{{ summary()?.totalMembers || 0 }}</h3>
-            <p class="text-xs text-blue-500 mt-2 font-medium">Distribution active</p>
+        @if (isLoading() && !summary()) {
+        @for (i of [1,2,3,4]; track i) {
+        <div
+            class="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden">
+            <div class="absolute inset-0 animate-shimmer"></div>
+            <div class="h-3 w-20 bg-gray-100 dark:bg-gray-700 rounded mb-4"></div>
+            <div class="h-8 w-24 bg-gray-200 dark:bg-gray-600 rounded"></div>
         </div>
-        <div class="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm transition-all hover:shadow-md cursor-pointer"
+        }
+        } @else {
+        <div class="premium-hover bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm relative group overflow-hidden cursor-pointer"
             (click)="setActiveTab('policies')">
-            <p class="text-sm text-gray-500 font-medium lowercase first-letter:uppercase">Policies</p>
-            <h3 class="text-2xl font-bold mt-1 dark:text-white">{{ summary()?.totalPolicies || 0 }}</h3>
-            <p class="text-xs text-emerald-500 mt-2 font-medium">Segments live</p>
+            <div
+                class="absolute right-0 top-0 w-20 h-20 bg-blue-500/5 rounded-bl-full -mr-4 -mt-4 group-hover:scale-110 transition-transform duration-500">
+            </div>
+            <p class="text-xs font-black uppercase tracking-widest text-gray-400 relative z-10">Total Members</p>
+            <h3 class="text-3xl font-black mt-2 dark:text-white relative z-10">{{ summary()?.totalMembers || 0 }}</h3>
         </div>
-        <div class="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm transition-all hover:shadow-md cursor-pointer"
+        <div class="premium-hover bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm relative group overflow-hidden cursor-pointer"
+            (click)="setActiveTab('policies')">
+            <div
+                class="absolute right-0 top-0 w-20 h-20 bg-emerald-500/5 rounded-bl-full -mr-4 -mt-4 group-hover:scale-110 transition-transform duration-500">
+            </div>
+            <p class="text-xs font-black uppercase tracking-widest text-gray-400 relative z-10">Active Policies</p>
+            <h3 class="text-3xl font-black mt-2 dark:text-white relative z-10">{{ summary()?.totalPolicies || 0 }}</h3>
+        </div>
+        <div class="premium-hover bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm relative group overflow-hidden cursor-pointer"
             (click)="setActiveTab('claims')">
-            <p class="text-sm text-gray-500 font-medium lowercase first-letter:uppercase">Pending Claims</p>
-            <h3 class="text-2xl font-bold mt-1 dark:text-white">{{ summary()?.pendingClaims || 0 }}</h3>
-            <p class="text-xs text-amber-500 mt-2 font-medium">In adjudication</p>
+            <div
+                class="absolute right-0 top-0 w-20 h-20 bg-amber-500/5 rounded-bl-full -mr-4 -mt-4 group-hover:scale-110 transition-transform duration-500">
+            </div>
+            <p class="text-xs font-black uppercase tracking-widest text-gray-400 relative z-10">Claims Queue</p>
+            <h3 class="text-3xl font-black mt-2 dark:text-white relative z-10">{{ summary()?.pendingClaims || 0 }}</h3>
         </div>
-        <div class="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm transition-all hover:shadow-md cursor-pointer"
+        <div class="premium-hover bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm relative group overflow-hidden cursor-pointer border-l-4 border-l-red-500"
             (click)="setActiveTab('billing')">
-            <p class="text-sm text-gray-500 font-medium lowercase first-letter:uppercase">Premium Due</p>
-            <h3 class="text-2xl font-bold mt-1 text-red-600 dark:text-red-400">₹{{ summary()?.totalPremiumDue |
+            <div
+                class="absolute right-0 top-0 w-20 h-20 bg-red-500/5 rounded-bl-full -mr-4 -mt-4 group-hover:scale-110 transition-transform duration-500">
+            </div>
+            <div class="flex items-center gap-2 relative z-10">
+                <p class="text-xs font-black uppercase tracking-widest text-red-500">Premium Due</p>
+                @if (isPremiumDueSoon()) {
+                <span class="relative flex h-2 w-2">
+                    <span
+                        class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                </span>
+                }
+            </div>
+            <h3 class="text-3xl font-black mt-2 text-red-600 dark:text-red-400 relative z-10">₹{{
+                summary()?.totalPremiumDue
+                |
                 number:'1.0-0' }}</h3>
-            <p class="text-xs text-red-400 mt-2 font-medium">Action required</p>
         </div>
+        }
     </div>
 
-    <!-- OPERATIONS MONITORING -->
+    <!-- INTELLIGENCE & ANALYTICS -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
+        <!-- Premium Breakdown (Donut) -->
+        <div
+            class="lg:col-span-1 bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+            <div class="flex items-center justify-between mb-6">
+                <h4 class="text-sm font-black uppercase tracking-widest text-gray-400">Premium Breakdown</h4>
+                <span
+                    class="text-[10px] font-bold text-primary-600 bg-primary-50 dark:bg-primary-900/20 px-2 py-0.5 rounded-full">Paid
+                    vs Due</span>
+            </div>
+            <div class="relative h-64 flex items-center justify-center">
+                <canvas #premiumChart></canvas>
+                <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span class="text-2xl font-black dark:text-white">₹{{ summary()?.totalPremiumDue | number:'1.0-0'
+                        }}</span>
+                    <span class="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">Current Liability</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Claim Trends (Area) -->
+        <div
+            class="lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+            <div class="flex items-center justify-between mb-6">
+                <h4 class="text-sm font-black uppercase tracking-widest text-gray-400">Claim Transmission Trends</h4>
+                <div class="flex gap-2">
+                    <span class="flex items-center gap-1.5 text-[10px] font-bold text-emerald-500">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500/20 border border-emerald-500"></span> Approved
+                    </span>
+                    <span class="flex items-center gap-1.5 text-[10px] font-bold text-primary-500">
+                        <span class="w-2 h-2 rounded-full bg-primary-500/20 border border-primary-500"></span> Total
+                    </span>
+                </div>
+            </div>
+            <div class="h-64">
+                <canvas #claimsChart></canvas>
+            </div>
+        </div>
+
+
+    </div>
+
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
         <!-- Latest Claims -->
         <div
@@ -339,11 +414,34 @@
                             </td>
                             <td class="p-4 text-center">
                                 <span
-                                    class="px-2 py-0.5 text-[10px] font-black uppercase rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800">{{p.status}}</span>
+                                    class="px-2 py-0.5 text-[10px] font-black uppercase rounded border transition-colors"
+                                    [ngClass]="{
+                                        'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800': p.status === 'Active',
+                                        'bg-red-50 text-red-700 border-red-100 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800': p.status === 'Inactive' || p.status === 'Expired'
+                                    }">{{p.status}}</span>
                             </td>
-                            <td class="p-4">
-                                <button (click)="viewPolicyDetails(p)"
-                                    class="text-primary-600 hover:underline text-xs font-bold">Manage Context</button>
+                            <td class="p-4 relative">
+                                <button
+                                    (click)="activeActionMenu.set(activeActionMenu() === 'policy_' + p.id ? null : 'policy_' + p.id)"
+                                    class="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-gray-800 rounded-lg transition-colors focus:outline-none">
+                                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                        <path
+                                            d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z">
+                                        </path>
+                                    </svg>
+                                </button>
+                                @if(activeActionMenu() === 'policy_' + p.id) {
+                                <div class="fixed inset-0 z-40" (click)="activeActionMenu.set(null)"></div>
+                                <div
+                                    class="absolute right-0 top-full -mt-2 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 z-50 animate-in fade-in slide-in-from-top-2">
+                                    <div class="p-2 relative z-50">
+                                        <button (click)="viewPolicyDetails(p); activeActionMenu.set(null)"
+                                            class="w-full text-left px-4 py-2 text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center gap-2">
+                                            Manage Context
+                                        </button>
+                                    </div>
+                                </div>
+                                }
                             </td>
                         </tr>
                         }
@@ -354,18 +452,67 @@
             <div
                 class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden overflow-x-auto">
                 <div class="p-6 border-b border-gray-100 dark:border-gray-700 min-w-[500px]">
-                    <h3 class="font-bold text-lg dark:text-white">Enrolled Members Base</h3>
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <h3 class="font-bold text-lg dark:text-white">Enrolled Members Base</h3>
+
+                        <div class="flex items-center gap-2 w-full sm:w-auto">
+                            <div class="relative w-full sm:w-64">
+                                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none"
+                                    stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                </svg>
+                                <input type="text" [value]="memberSearchTerm()"
+                                    (input)="memberSearchTerm.set($any($event.target).value)"
+                                    placeholder="Search members..."
+                                    class="w-full pl-10 pr-4 py-2 text-xs border dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary-500 transition-all outline-none">
+                            </div>
+                            <select [value]="memberStatusFilter()"
+                                (change)="memberStatusFilter.set($any($event.target).value)"
+                                class="px-3 py-2 text-xs border dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary-500 transition-all outline-none">
+                                <option value="All">All</option>
+                                <option value="Active">Active</option>
+                                <option value="Expired">Expired</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
                 <table class="w-full text-left text-sm min-w-[500px]">
                     <thead class="bg-gray-50 dark:bg-gray-700/50">
                         <tr>
-                            <th class="p-4 dark:text-gray-300">Full Name</th>
-                            <th class="p-4 dark:text-gray-300">Relationship</th>
+                            <th class="p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition group"
+                                (click)="sortMembers('name')">
+                                <div class="flex items-center gap-1">
+                                    <span class="dark:text-gray-300">Full Name</span>
+                                    @if (memberSortConfig().column === 'name') {
+                                    <svg class="w-3 h-3 text-primary-500"
+                                        [ngClass]="{'rotate-180': memberSortConfig().direction === 'desc'}" fill="none"
+                                        stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M5 15l7-7 7 7"></path>
+                                    </svg>
+                                    }
+                                </div>
+                            </th>
+                            <th class="p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition group"
+                                (click)="sortMembers('relationship')">
+                                <div class="flex items-center gap-1">
+                                    <span class="dark:text-gray-300">Relationship</span>
+                                    @if (memberSortConfig().column === 'relationship') {
+                                    <svg class="w-3 h-3 text-primary-500"
+                                        [ngClass]="{'rotate-180': memberSortConfig().direction === 'desc'}" fill="none"
+                                        stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M5 15l7-7 7 7"></path>
+                                    </svg>
+                                    }
+                                </div>
+                            </th>
                             <th class="p-4 dark:text-gray-300">Status</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @for (m of members(); track m.id) {
+                        @for (m of filteredMembersList(); track m.id) {
                         <tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/30">
                             <td class="p-4 font-bold dark:text-white">{{m.fullName}}</td>
                             <td class="p-4 dark:text-gray-300">{{m.relationship || 'Primary'}}</td>
@@ -451,12 +598,40 @@
                                 @for(inv of policyInvoices(); track inv.id) {
                                 <tr class="border-b dark:border-gray-800">
                                     <td class="p-3 font-mono text-[10px]">{{inv.invoiceNo || (inv.id | slice:0:8)}}</td>
-                                    <td class="p-3 font-black">₹{{inv.amount}}</td>
-                                    <td class="p-3 uppercase font-bold"
+                                    <td class="p-3 font-black">
+                                        ₹{{inv.amount}}
+                                        @if (inv.isPenaltyApplied) {
+                                        <span
+                                            class="ml-2 px-1 text-[8px] bg-red-100 text-red-600 rounded font-black uppercase tracking-tighter">Penalty
+                                            Included (+10%)</span>
+                                        }
+                                    </td>
+                                    <td class="p-3 uppercase font-bold text-[10px]"
                                         [ngClass]="inv.status === 'Paid' ? 'text-emerald-500' : 'text-red-500'">
                                         {{inv.status}}</td>
-                                    <td class="p-3 text-right"><button (click)="viewInvoiceDetail(inv.id)"
-                                            class="text-primary-600 hover:underline">Detail Audit</button></td>
+                                    <td class="p-3 text-right relative">
+                                        <button
+                                            (click)="activeActionMenu.set(activeActionMenu() === 'invoice_' + inv.id ? null : 'invoice_' + inv.id)"
+                                            class="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-gray-800 rounded-lg transition-colors focus:outline-none inline-flex">
+                                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                                <path
+                                                    d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z">
+                                                </path>
+                                            </svg>
+                                        </button>
+                                        @if(activeActionMenu() === 'invoice_' + inv.id) {
+                                        <div class="fixed inset-0 z-40" (click)="activeActionMenu.set(null)"></div>
+                                        <div
+                                            class="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 z-50 animate-in fade-in slide-in-from-top-2 text-left">
+                                            <div class="p-2 relative z-50">
+                                                <button (click)="viewInvoiceDetail(inv.id); activeActionMenu.set(null)"
+                                                    class="w-full text-left px-4 py-2 text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center gap-2">
+                                                    Detail Audit
+                                                </button>
+                                            </div>
+                                        </div>
+                                        }
+                                    </td>
                                 </tr>
                                 }
                             </tbody>
@@ -469,39 +644,44 @@
                     <div class="flex justify-between items-center mb-4 px-2">
                         <h4 class="text-sm font-black uppercase tracking-widest text-gray-400">Contextual Endorsements
                         </h4>
+                        @if (selectedPolicy()?.status === 'Active') {
                         <button (click)="showEndorsementForm.set(true)"
                             class="text-[10px] font-black underline text-primary-600">Submit Revision Request</button>
+                        } @else {
+                        <span class="text-[10px] font-black text-red-500 uppercase italic">Revisions Blocked: Policy
+                            {{selectedPolicy()?.status}}</span>
+                        }
                     </div>
+                </div>
 
 
-                    <div
-                        class="bg-gray-50 dark:bg-gray-900/50 rounded-2xl border dark:border-gray-800 overflow-hidden overflow-x-auto">
-                        <table class="w-full text-left text-xs min-w-[400px]">
-                            <thead class="bg-gray-100 dark:bg-gray-800">
-                                <tr>
-                                    <th class="p-3">Type</th>
-                                    <th class="p-3">Status</th>
-                                    <th class="p-3">Request Date</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @for(e of policyEndorsements(); track e.id) {
-                                <tr class="border-b dark:border-gray-800">
-                                    <td class="p-3 font-bold dark:text-white">{{e.type}}</td>
-                                    <td class="p-3 uppercase font-black"
-                                        [ngClass]="{'text-amber-500': e.status === 'Pending', 'text-emerald-500': e.status === 'Approved'}">
-                                        {{e.status}}</td>
-                                    <td class="p-3 text-gray-500">{{e.createdAt | date}}</td>
-                                </tr>
-                                } @empty {
-                                <tr>
-                                    <td colspan="3" class="p-6 text-center text-gray-400 italic font-medium">No revision
-                                        requests detected.</td>
-                                </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
+                <div
+                    class="bg-gray-50 dark:bg-gray-900/50 rounded-2xl border dark:border-gray-800 overflow-hidden overflow-x-auto">
+                    <table class="w-full text-left text-xs min-w-[400px]">
+                        <thead class="bg-gray-100 dark:bg-gray-800">
+                            <tr>
+                                <th class="p-3">Type</th>
+                                <th class="p-3">Status</th>
+                                <th class="p-3">Request Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for(e of policyEndorsements(); track e.id) {
+                            <tr class="border-b dark:border-gray-800">
+                                <td class="p-3 font-bold dark:text-white">{{e.type}}</td>
+                                <td class="p-3 uppercase font-black"
+                                    [ngClass]="{'text-amber-500': e.status === 'Pending', 'text-emerald-500': e.status === 'Approved'}">
+                                    {{e.status}}</td>
+                                <td class="p-3 text-gray-500">{{e.createdAt | date}}</td>
+                            </tr>
+                            } @empty {
+                            <tr>
+                                <td colspan="3" class="p-6 text-center text-gray-400 italic font-medium">No revision
+                                    requests detected.</td>
+                            </tr>
+                            }
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -510,149 +690,307 @@
 
     <!-- Onboarding Modal -->
     @if (showPolicyForm()) {
-    <div class="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-xl z-[70] flex items-center justify-center p-4">
         <div
-            class="bg-white dark:bg-gray-800 rounded-3xl max-w-2xl w-full shadow-2xl p-8 transform animate-in zoom-in duration-300">
-            <div class="flex justify-between items-center mb-8">
-                <h3 class="text-2xl font-black dark:text-white tracking-tight">Policy Segment Initialization</h3>
+            class="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-2xl shadow-2xl p-10 transform animate-in zoom-in duration-300 overflow-y-auto max-h-[95vh] relative border border-white/20">
+
+            <!-- WIZARD HEADER -->
+            <div class="flex justify-between items-start mb-10">
+                <div>
+                    <h3 class="text-2xl font-black dark:text-white uppercase tracking-tighter text-primary-600">Plan
+                        Deployment Wizard</h3>
+                    <p class="text-[10px] text-gray-400 mt-1 uppercase font-bold tracking-[0.2em]">Strategic Group
+                        Insurance Provisioning</p>
+                </div>
                 <button (click)="showPolicyForm.set(false)"
-                    class="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 transition"><svg
-                        class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    class="p-3 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-2xl transition-all active:scale-90">
+                    <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M6 18L18 6M6 6l12 12"></path>
-                    </svg></button>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- STEPPER PROGRESS -->
+            <div class="mb-12">
+                <div class="flex items-center justify-between relative">
+                    <div
+                        class="absolute top-1/2 left-0 w-full h-1 bg-gray-100 dark:bg-gray-700/50 -translate-y-1/2 z-0 rounded-full">
+                    </div>
+                    <div class="absolute top-1/2 left-0 h-1 bg-primary-600 -translate-y-1/2 z-0 transition-all duration-700 rounded-full shadow-[0_0_15px_rgba(37,99,235,0.4)]"
+                        [style.width.%]="(policyOnboardingStep() - 1) * 33.33"></div>
+
+                    @for (s of [1,2,3,4]; track s) {
+                    <div class="relative z-10 flex flex-col items-center">
+                        <div (click)="setPolicyStep(s)"
+                            [class]="policyOnboardingStep() >= s ? 'bg-primary-600 text-white scale-110 shadow-xl shadow-primary-500/20' : 'bg-white dark:bg-gray-800 text-gray-400 border-2 border-gray-100 dark:border-gray-700'"
+                            class="w-10 h-10 rounded-2xl flex items-center justify-center text-xs font-black cursor-pointer transition-all duration-500 hover:border-primary-400">
+                            {{ s }}
+                        </div>
+                    </div>
+                    }
+                </div>
+                <div class="flex justify-between mt-4 px-1">
+                    <span class="text-[9px] font-black uppercase tracking-widest text-primary-600">Selection</span>
+                    <span [class.text-primary-600]="policyOnboardingStep() >= 2"
+                        class="text-[9px] font-black uppercase tracking-widest text-gray-400 transition-colors">Billing</span>
+                    <span [class.text-primary-600]="policyOnboardingStep() >= 3"
+                        class="text-[9px] font-black uppercase tracking-widest text-gray-400 transition-colors">Roster</span>
+                    <span [class.text-primary-600]="policyOnboardingStep() >= 4"
+                        class="text-[9px] font-black uppercase tracking-widest text-gray-400 transition-colors">Deploy</span>
+                </div>
             </div>
 
             <form [formGroup]="policyForm" (ngSubmit)="onboardToPolicy()" class="space-y-8">
-                @if (!selectedPlanForOnboarding()) {
-                <div class="space-y-4">
-                    <p class="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] mb-4">Select Deployment
-                        Blueprint</p>
-                    <div
-                        class="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                        @for(p of plans(); track p.id) {
-                        <div (click)="selectPlan(p)"
-                            class="group relative bg-white dark:bg-gray-700/30 border-2 border-gray-100 dark:border-gray-800 rounded-2xl p-5 cursor-pointer transition-all hover:border-primary-500 hover:shadow-xl hover:shadow-primary-500/5 active:scale-[0.98]">
-                            <div class="flex justify-between items-start mb-3">
-                                <h4 class="font-black dark:text-white text-sm uppercase tracking-tight">{{ p.planName }}
-                                </h4>
-                                <div
-                                    class="px-2 py-1 bg-primary-50 dark:bg-primary-900/20 text-primary-600 rounded-lg text-[10px] font-black">
-                                    ₹{{ p.basePremium | number:'1.0-0' }}</div>
-                            </div>
-                            <p class="text-[10px] text-gray-500 line-clamp-2 leading-relaxed italic mb-4">{{
-                                p.description }}</p>
-                            <div
-                                class="flex items-center gap-1.5 text-primary-600 font-bold text-[10px] uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
-                                Select Artifact
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path d="M17 8l4 4m0 0l-4 4m4-4H3"></path>
-                                </svg>
+
+                <!-- STEP 1: PLAN SELECTION -->
+                @if (policyOnboardingStep() === 1) {
+                <div class="animate-in slide-in-from-right-8 duration-500 space-y-6">
+                    <div class="grid grid-cols-1 gap-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                        @for (plan of plans(); track plan.id) {
+                        <div (click)="selectPlan(plan); setPolicyStep(2)"
+                            [class.border-primary-500]="selectedPlanForOnboarding()?.id === plan.id"
+                            [class.ring-4]="selectedPlanForOnboarding()?.id === plan.id"
+                            [class.ring-primary-500/10]="selectedPlanForOnboarding()?.id === plan.id"
+                            class="p-6 border-2 border-gray-100 dark:border-gray-800 rounded-[1.5rem] cursor-pointer hover:border-primary-400 transition-all group bg-gray-50/30 dark:bg-gray-900/20">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <h5
+                                        class="font-black text-sm uppercase tracking-tight dark:text-white group-hover:text-primary-600 transition-colors">
+                                        {{ plan.planName }}</h5>
+                                    <p class="text-[10px] text-gray-500 mt-1 font-medium italic line-clamp-1">{{
+                                        plan.description }}</p>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-lg font-black text-primary-600">₹{{ plan.basePremium | number
+                                        }}</span>
+                                    <p class="text-[8px] text-gray-400 font-bold uppercase">Base / Member</p>
+                                </div>
                             </div>
                         </div>
                         }
                     </div>
+                    <div class="pt-4 flex justify-end">
+                        <button type="button" (click)="setPolicyStep(2)" [disabled]="!selectedPlanForOnboarding()"
+                            class="px-10 py-4 bg-primary-600 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-primary-700 disabled:opacity-50 transition-all shadow-xl shadow-primary-500/20 active:scale-95">
+                            Engage Billing Configuration
+                        </button>
+                    </div>
                 </div>
-                } @else {
+                }
+
+                <!-- STEP 2: BILLING & DATES -->
+                @if (policyOnboardingStep() === 2) {
                 <div class="animate-in slide-in-from-right-8 duration-500 space-y-8">
-                    <!-- selected plan display -->
                     <div
-                        class="flex items-center justify-between p-4 bg-primary-50 dark:bg-primary-900/10 rounded-2xl border border-primary-100 dark:border-primary-800">
+                        class="bg-primary-50/50 dark:bg-primary-900/10 p-6 rounded-3xl border border-primary-100 dark:border-primary-800/50">
                         <div class="flex items-center gap-4">
-                            <div class="p-3 bg-primary-100 dark:bg-primary-900/40 text-primary-600 rounded-xl">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            <div
+                                class="w-12 h-12 bg-white dark:bg-gray-800 rounded-2xl flex items-center justify-center shadow-sm">
+                                <svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z">
+                                    </path>
                                 </svg>
                             </div>
                             <div>
-                                <p class="text-[9px] font-black text-primary-500 uppercase tracking-[0.2em] mb-0.5">
-                                    Deployment Blueprint</p>
-                                <h4 class="font-black dark:text-white text-sm uppercase">{{
-                                    selectedPlanForOnboarding().planName }}</h4>
+                                <h4 class="font-black text-sm uppercase dark:text-white">{{
+                                    selectedPlanForOnboarding()?.planName }}</h4>
+                                <p class="text-[10px] text-gray-500 font-bold">Selected Deployment Template</p>
                             </div>
                         </div>
-                        <button type="button" (click)="deselectPlan()"
-                            class="text-[10px] font-black text-gray-400 hover:text-red-500 underline uppercase tracking-widest transition-colors">Change
-                            Model</button>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-6">
-                        <div class="space-y-1.5">
-                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Billing
+                    <div class="grid grid-cols-2 gap-8">
+                        <div class="col-span-2 md:col-span-1">
+                            <label
+                                class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Settlement
                                 Frequency</label>
                             <select formControlName="billingFrequency"
-                                class="w-full px-4 py-3 border-2 border-gray-100 dark:border-gray-800 rounded-xl bg-gray-50 dark:bg-gray-700/50 dark:text-white focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 font-bold transition-all outline-none">
-                                <option [value]="1">Monthly (Payable every cycle)</option>
-                                <option [value]="2">Annual (Settlement via lump sum)</option>
+                                class="w-full px-5 py-4 border-2 border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-700 dark:text-white font-bold text-sm focus:ring-4 focus:ring-primary-500/10 outline-none">
+                                <option [value]="EnumBilling.Monthly">Monthly Reconcile</option>
+                                <option [value]="EnumBilling.Annually">Annual Settlement</option>
                             </select>
                         </div>
-                        <div class="space-y-1.5">
+                        <div class="col-span-2 md:col-span-1">
                             <label
-                                class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Activation
-                                Date</label>
+                                class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Activation
+                                Start</label>
                             <input type="date" formControlName="startDate" [min]="todayStr()" [max]="maxStartDateStr()"
-                                class="w-full px-4 py-3 border-2 border-gray-100 dark:border-gray-800 rounded-xl bg-gray-50 dark:bg-gray-700/50 dark:text-white focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 font-bold transition-all outline-none">
+                                class="w-full px-5 py-4 border-2 border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-700 dark:text-white font-bold text-sm focus:ring-4 focus:ring-primary-500/10 outline-none">
+                        </div>
+                        <div class="col-span-2">
+                            <label
+                                class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Coverage
+                                Duration (Years)</label>
+                            <div
+                                class="flex items-center gap-6 p-2 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800">
+                                <input type="range" formControlName="durationInYears" min="1" max="5" step="1"
+                                    class="flex-1 accent-primary-600 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700">
+                                <span class="w-16 text-center font-black text-primary-600 text-lg">{{
+                                    policyForm.get('durationInYears')?.value }}Y</span>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div
-                            class="p-5 bg-blue-50/50 dark:bg-blue-900/10 rounded-2xl border-2 border-dashed border-blue-100 dark:border-blue-800 transition-all hover:border-blue-400">
-                            <p
-                                class="text-[10px] font-black uppercase text-blue-700 tracking-widest mb-3 flex items-center gap-2">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path
+                    <div class="pt-6 flex justify-between">
+                        <button type="button" (click)="setPolicyStep(1)"
+                            class="px-8 py-3 dark:text-gray-400 text-[10px] font-black uppercase tracking-widest hover:underline transition-all">Back</button>
+                        <button type="button" (click)="setPolicyStep(3)"
+                            class="px-10 py-4 bg-primary-600 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-primary-700 transition-all shadow-xl shadow-primary-500/20 active:scale-95">
+                            Upload Roster Data
+                        </button>
+                    </div>
+                </div>
+                }
+
+                <!-- STEP 3: EXCEL UPLOAD -->
+                @if (policyOnboardingStep() === 3) {
+                <div class="animate-in slide-in-from-right-8 duration-500 space-y-8">
+                    <div class="grid grid-cols-1 gap-6">
+                        <!-- Members Upload -->
+                        <div class="group">
+                            <label
+                                class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Primary
+                                Member Roster (Required)</label>
+                            <div
+                                class="relative h-32 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-3xl flex flex-col items-center justify-center bg-gray-50/50 dark:bg-gray-900/30 group-hover:border-primary-400 transition-all overflow-hidden">
+                                @if (!membersFile) {
+                                <svg class="w-8 h-8 text-gray-300 group-hover:text-primary-500 transition-colors mb-2"
+                                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                        d="M9 17v-2a2 2 0 00-2-2H5a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                                    </path>
+                                </svg>
+                                <span class="text-[10px] font-black text-gray-400 uppercase">Drop
+                                    primary_members.xlsx</span>
+                                <input type="file" (change)="onMembersFileSelect($event)"
+                                    class="absolute inset-0 opacity-0 cursor-pointer">
+                                } @else {
+                                <div class="flex items-center gap-4 animate-in zoom-in">
+                                    <div
+                                        class="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-500">
+                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="text-left">
+                                        <p class="text-xs font-black dark:text-white">{{ membersFile.name }}</p>
+                                        <p class="text-[9px] text-gray-400 uppercase">{{ (membersFile.size / 1024) |
+                                            number:'1.0-0' }} KB • Verified</p>
+                                    </div>
+                                    <button type="button" (click)="membersFile = null"
+                                        class="ml-4 p-2 text-gray-400 hover:text-red-500"><svg class="w-4 h-4"
+                                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M6 18L18 6M6 6l12 12"></path>
+                                        </svg></button>
+                                </div>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Dependents Upload -->
+                        <div class="group">
+                            <label
+                                class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Dependents
+                                Supplement (Optional)</label>
+                            <div
+                                class="relative h-32 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-3xl flex flex-col items-center justify-center bg-gray-50/50 dark:bg-gray-900/30 group-hover:border-primary-400 transition-all overflow-hidden">
+                                @if (!dependentsFile) {
+                                <svg class="w-8 h-8 text-gray-300 group-hover:text-primary-500 transition-colors mb-2"
+                                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                         d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z">
                                     </path>
                                 </svg>
-                                Employee Roster (.xlsx)
-                            </p>
-                            <input type="file" #membersFilePicker (change)="onMembersFileSelect($event)" class="hidden"
-                                accept=".xlsx">
-                            <button type="button" (click)="membersFilePicker.click()"
-                                class="w-full px-4 py-3 bg-white dark:bg-gray-700 rounded-xl text-xs font-bold transition flex items-center justify-between border border-blue-100 dark:border-blue-900/40">
-                                <span class="truncate pr-2 overflow-hidden text-gray-600 dark:text-gray-300">
-                                    {{ membersFile ? membersFile.name : 'Select Primary Personnel' }}
-                                </span>
-                                <svg class="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor"
-                                    viewBox="0 0 24 24">
-                                    <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
-                                </svg>
-                            </button>
-                        </div>
-
-                        <div
-                            class="p-5 bg-violet-50/50 dark:bg-violet-900/10 rounded-2xl border-2 border-dashed border-violet-100 dark:border-violet-800 transition-all hover:border-violet-400">
-                            <p
-                                class="text-[10px] font-black uppercase text-violet-700 tracking-widest mb-3 flex items-center gap-2">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path
-                                        d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z">
-                                    </path>
-                                </svg>
-                                Dependent Data (.xlsx)
-                            </p>
-                            <input type="file" #dependentsFilePicker (change)="onDependentsFileSelect($event)"
-                                class="hidden" accept=".xlsx">
-                            <button type="button" (click)="dependentsFilePicker.click()"
-                                class="w-full px-4 py-3 bg-white dark:bg-gray-700 rounded-xl text-xs font-bold transition flex items-center justify-between border border-violet-100 dark:border-violet-900/40">
-                                <span class="truncate pr-2 overflow-hidden text-gray-600 dark:text-gray-300">
-                                    {{ dependentsFile ? dependentsFile.name : 'Select Dependents Set' }}
-                                </span>
-                                <svg class="w-4 h-4 text-violet-500 flex-shrink-0" fill="none" stroke="currentColor"
-                                    viewBox="0 0 24 24">
-                                    <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
-                                </svg>
-                            </button>
+                                <span class="text-[10px] font-black text-gray-400 uppercase">Drop
+                                    dependents_list.xlsx</span>
+                                <input type="file" (change)="onDependentsFileSelect($event)"
+                                    class="absolute inset-0 opacity-0 cursor-pointer">
+                                } @else {
+                                <div class="flex items-center gap-4 animate-in zoom-in">
+                                    <div
+                                        class="w-12 h-12 bg-primary-500/10 rounded-2xl flex items-center justify-center text-primary-500">
+                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="text-left">
+                                        <p class="text-xs font-black dark:text-white">{{ dependentsFile.name }}</p>
+                                        <p class="text-[9px] text-gray-400 uppercase">{{ (dependentsFile.size / 1024) |
+                                            number:'1.0-0' }} KB • Ingested</p>
+                                    </div>
+                                    <button type="button" (click)="dependentsFile = null"
+                                        class="ml-4 p-2 text-gray-400 hover:text-red-500"><svg class="w-4 h-4"
+                                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M6 18L18 6M6 6l12 12"></path>
+                                        </svg></button>
+                                </div>
+                                }
+                            </div>
                         </div>
                     </div>
 
-                    <div class="pt-4">
-                        <button type="submit" [disabled]="policyForm.invalid || !membersFile || isLoading()"
-                            class="w-full py-4 bg-primary-600 text-white rounded-2xl hover:bg-primary-700 disabled:opacity-50 font-black shadow-xl shadow-primary-500/30 uppercase tracking-[0.25em] text-xs transition-all active:scale-[0.97]">
-                            Release Deployment
+                    <div class="pt-6 flex justify-between">
+                        <button type="button" (click)="setPolicyStep(2)"
+                            class="px-8 py-3 dark:text-gray-400 text-[10px] font-black uppercase tracking-widest hover:underline transition-all">Back</button>
+                        <button type="button" (click)="setPolicyStep(4)" [disabled]="!membersFile"
+                            class="px-10 py-4 bg-primary-600 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-primary-700 transition-all shadow-xl shadow-primary-500/20 active:scale-95">
+                            Final Review & Commit
                         </button>
-                        <p class="text-[9px] text-gray-400 text-center mt-4 font-medium italic">By initializing, you
-                            confirm the integrity of the uploaded Excel artifacts.</p>
+                    </div>
+                </div>
+                }
+
+                <!-- STEP 4: REVIEW & DEPLOY -->
+                @if (policyOnboardingStep() === 4) {
+                <div class="animate-in slide-in-from-right-8 duration-500 space-y-8">
+                    <div
+                        class="bg-gray-50 dark:bg-gray-900 rounded-[2rem] p-8 border border-gray-100 dark:border-gray-800 space-y-6">
+                        <div class="flex justify-between items-center border-b dark:border-800 pb-4">
+                            <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Plan
+                                Blueprint</span>
+                            <span class="text-xs font-black dark:text-white uppercase">{{
+                                selectedPlanForOnboarding()?.planName }}</span>
+                        </div>
+                        <div class="flex justify-between items-center border-b dark:border-800 pb-4">
+                            <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Billing
+                                Cycle</span>
+                            <span class="text-xs font-bold dark:text-white">
+                                @if(policyForm.get('billingFrequency')?.value == EnumBilling.Monthly) { Monthly
+                                Settlement }
+                                @else { Annual Billing }
+                            </span>
+                        </div>
+                        <div class="flex justify-between items-center border-b dark:border-800 pb-4">
+                            <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Activation
+                                Date</span>
+                            <span class="text-xs font-bold dark:text-white">{{ policyForm.get('startDate')?.value |
+                                date:'longDate' }}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Personnel
+                                Artifacts</span>
+                            <div class="text-right">
+                                <p class="text-xs font-bold dark:text-white">{{ membersFile?.name }}</p>
+                                @if (dependentsFile) { <p class="text-[9px] text-emerald-500 font-bold uppercase mt-1">+
+                                    Dependents List Attached</p> }
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-6 flex justify-between items-center">
+                        <button type="button" (click)="setPolicyStep(3)"
+                            class="px-8 py-3 dark:text-gray-400 text-[10px] font-black uppercase tracking-widest hover:underline transition-all">Back</button>
+                        <button type="submit" [disabled]="policyForm.invalid || !membersFile || isLoading()"
+                            class="px-12 py-5 bg-emerald-600 text-white rounded-[1.5rem] font-black shadow-2xl shadow-emerald-500/30 uppercase tracking-[0.25em] text-xs transition-all active:scale-95 hover:bg-emerald-700 disabled:opacity-50">
+                            @if (isLoading()) { <span class="animate-pulse">Initializing Deployment...</span> } @else {
+                            Release Deployment }
+                        </button>
                     </div>
                 </div>
                 }
@@ -669,184 +1007,443 @@
         <div
             class="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-700/30 min-w-[700px]">
             <h3 class="font-bold text-lg dark:text-white">Adjudication Ledger</h3>
-            <button (click)="showClaimForm.set(!showClaimForm())"
+            <button (click)="toggleClaimForm()"
                 class="text-sm font-bold bg-primary-600 text-white px-6 py-2 rounded-xl hover:bg-primary-700 shadow-lg shadow-primary-500/10 transition active:scale-95">
-                {{ showClaimForm() ? 'Close Form' : 'Initialize Benefit Claim' }}
+                {{ showClaimForm() ? 'Close Wizard' : 'Initialize Benefit Claim' }}
             </button>
         </div>
 
         @if (showClaimForm()) {
         <div
             class="p-8 bg-gray-50 dark:bg-gray-900/50 border-b dark:border-gray-800 animate-in slide-in-from-top-4 duration-300">
-            <form [formGroup]="claimForm" (ngSubmit)="submitClaim()" class="space-y-6 max-w-4xl mx-auto">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="col-span-2">
-                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Target
-                            Policy Assignment</label>
-                        <select formControlName="policyAssignmentId"
-                            class="w-full px-4 py-3 border dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 dark:text-white font-bold transition-all focus:ring-2 focus:ring-primary-500">
-                            <option value="">-- Choose Target Policy Deployment --</option>
-                            @for(p of policies(); track p.id) { <option [value]="p.id">{{ p.planName }} (Segment: {{p.id
-                                | slice:0:8}})</option> }
-                        </select>
+
+            <!-- STEPPER HEADER -->
+            <div class="max-w-4xl mx-auto mb-10">
+                <div class="flex items-center justify-between relative">
+                    <!-- Progress Line -->
+                    <div class="absolute top-1/2 left-0 w-full h-0.5 bg-gray-200 dark:bg-gray-700 -translate-y-1/2 z-0">
+                    </div>
+                    <div class="absolute top-1/2 left-0 h-0.5 bg-primary-500 -translate-y-1/2 z-0 transition-all duration-500"
+                        [style.width.%]="(claimSubmissionStep() - 1) * 33.33"></div>
+
+                    <!-- Step 1: Policy -->
+                    <div class="relative z-10 flex flex-col items-center">
+                        <div (click)="setClaimStep(1)"
+                            [class]="claimSubmissionStep() >= 1 ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/20' : 'bg-white dark:bg-gray-800 text-gray-400 border border-gray-200 dark:border-gray-700'"
+                            class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black cursor-pointer transition-all duration-300">
+                            1</div>
+                        <span
+                            class="text-[9px] font-black uppercase tracking-widest mt-2 dark:text-gray-400">Context</span>
                     </div>
 
-                    <!-- Employee ID Verification -->
-                    <div>
-                        <label
-                            class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Employee
-                            Verification (Type ID)</label>
-                        <div class="relative group">
-                            <input type="text" formControlName="employeeCode" (input)="onEmployeeCodeInput($event)"
-                                class="w-full px-4 py-3 border dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 dark:text-white font-black text-primary-600 placeholder:text-gray-300 transition-all focus:ring-4 focus:ring-primary-500/10 outline-none"
-                                placeholder="e.g. EMP-101">
+                    <!-- Step 2: Employee -->
+                    <div class="relative z-10 flex flex-col items-center">
+                        <div (click)="setClaimStep(2)"
+                            [class]="claimSubmissionStep() >= 2 ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/20' : 'bg-white dark:bg-gray-800 text-gray-400 border border-gray-200 dark:border-gray-700'"
+                            class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black cursor-pointer transition-all duration-300">
+                            2</div>
+                        <span
+                            class="text-[9px] font-black uppercase tracking-widest mt-2 dark:text-gray-400">Identity</span>
+                    </div>
 
-                            @if (selectedClaimMember()) {
-                            <div
-                                class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-2 py-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-lg border border-emerald-100 dark:border-emerald-800/30 text-[9px] font-black uppercase animate-in zoom-in duration-200">
-                                <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3"
-                                        d="M5 13l4 4L19 7"></path>
-                                </svg>
-                                {{ selectedClaimMember().fullName }}
+                    <!-- Step 3: Details -->
+                    <div class="relative z-10 flex flex-col items-center">
+                        <div (click)="setClaimStep(3)"
+                            [class]="claimSubmissionStep() >= 3 ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/20' : 'bg-white dark:bg-gray-800 text-gray-400 border border-gray-200 dark:border-gray-700'"
+                            class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black cursor-pointer transition-all duration-300">
+                            3</div>
+                        <span
+                            class="text-[9px] font-black uppercase tracking-widest mt-2 dark:text-gray-400">Claims</span>
+                    </div>
+
+                    <!-- Step 4: Evidence -->
+                    <div class="relative z-10 flex flex-col items-center">
+                        <div (click)="setClaimStep(4)"
+                            [class]="claimSubmissionStep() >= 4 ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/20' : 'bg-white dark:bg-gray-800 text-gray-400 border border-gray-200 dark:border-gray-700'"
+                            class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black cursor-pointer transition-all duration-300">
+                            4</div>
+                        <span
+                            class="text-[9px] font-black uppercase tracking-widest mt-2 dark:text-gray-400">Archive</span>
+                    </div>
+                </div>
+            </div>
+
+            <form [formGroup]="claimForm" (ngSubmit)="submitClaim()" class="space-y-6 max-w-4xl mx-auto">
+
+                <!-- STEP 1: POLICY SELECTION -->
+                @if (claimSubmissionStep() === 1) {
+                <div class="animate-in slide-in-from-right-4 duration-300 space-y-4">
+                    <div class="flex flex-col items-center text-center mb-6">
+                        <div
+                            class="w-12 h-12 rounded-2xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary-600 mb-3">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                </path>
+                            </svg>
+                        </div>
+                        <h4 class="text-xl font-black dark:text-white">Active Deployment Segment</h4>
+                        <p class="text-xs text-gray-500">Choose the specific policy cluster for this benefit inquiry.
+                        </p>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        @for (p of policies(); track p.id) {
+                        <div (click)="claimForm.patchValue({policyAssignmentId: p.id}); setClaimStep(2)"
+                            [class.border-primary-500]="claimForm.get('policyAssignmentId')?.value === p.id"
+                            [class.bg-primary-50/50]="claimForm.get('policyAssignmentId')?.value === p.id"
+                            class="p-5 border-2 border-gray-100 dark:border-gray-800 rounded-2xl cursor-pointer hover:border-primary-400 transition-all group">
+                            <div class="flex justify-between items-center">
+                                <span
+                                    class="font-black text-xs uppercase tracking-tight dark:text-white group-hover:text-primary-600">{{
+                                    p.planName }}</span>
+                                <span class="text-[9px] font-mono text-gray-400">#{{ p.id | slice:0:8 }}</span>
                             </div>
-                            } @else if (isInvalidEmployeeCode() && claimForm.get('employeeCode')?.value) {
-                            <div
-                                class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-2 py-1 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg border border-red-100 dark:border-red-800/30 text-[9px] font-black uppercase animate-in zoom-in duration-200">
-                                <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3"
-                                        d="M6 18L18 6M6 6l12 12"></path>
-                                </svg>
-                                Invalid or Inactive ID
+                            <p class="text-[10px] text-gray-500 mt-2 font-medium italic">{{ p.status }} Protocol
+                                Activated</p>
+                        </div>
+                        }
+                    </div>
+
+                    <div class="pt-6 flex justify-end">
+                        <button type="button" (click)="setClaimStep(2)"
+                            [disabled]="!claimForm.get('policyAssignmentId')?.value"
+                            class="px-8 py-3 bg-primary-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-primary-700 disabled:opacity-50 transition-all">
+                            Initialize Identity Verification
+                        </button>
+                    </div>
+                </div>
+                }
+
+                <!-- STEP 2: EMPLOYEE VERIFICATION -->
+                @if (claimSubmissionStep() === 2) {
+                <div class="animate-in slide-in-from-right-4 duration-300 space-y-8">
+                    <div class="flex flex-col items-center text-center">
+                        <div
+                            class="w-12 h-12 rounded-2xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary-600 mb-3">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                            </svg>
+                        </div>
+                        <h4 class="text-xl font-black dark:text-white">Personnel Identification</h4>
+                        <p class="text-xs text-gray-500">Provide the unique employee index for adjudication.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <label
+                                class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Corporate
+                                ID Index</label>
+                            <div class="relative group">
+                                <input type="text" formControlName="employeeCode" (input)="onEmployeeCodeInput($event)"
+                                    class="w-full px-5 py-4 border-2 border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-700 dark:text-white font-black text-lg text-primary-600 placeholder:text-gray-300 transition-all focus:ring-4 focus:ring-primary-500/10 outline-none"
+                                    placeholder="e.g. EMP-101">
+
+                                @if (selectedClaimMember()) {
+                                <div
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-lg border border-emerald-100 dark:border-emerald-800/30 text-[10px] font-black uppercase animate-in zoom-in">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3"
+                                            d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                    {{ selectedClaimMember().fullName }}
+                                </div>
+                                } @else if (isInvalidEmployeeCode() && claimForm.get('employeeCode')?.value) {
+                                <div
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-3 py-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg border border-red-100 dark:border-red-800/30 text-[10px] font-black uppercase animate-in zoom-in">
+                                    No Record Found
+                                </div>
+                                }
                             </div>
-                            }
+                        </div>
+
+                        <div>
+                            <label
+                                class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Target
+                                Beneficiary</label>
+                            <select formControlName="dependentId"
+                                class="w-full px-5 py-4 border-2 border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-700 dark:text-white font-bold transition-all focus:ring-4 focus:ring-primary-500/10 outline-none">
+                                <option value="">Primary Member (The Employee)</option>
+                                @for(d of selectedClaimMember()?.dependents; track d.id) {
+                                @if (d.isActive) {
+                                <option [value]="d.id">{{ d.fullName }} ({{ d.relationship }})</option>
+                                }
+                                }
+                            </select>
+                            <p class="text-[9px] text-gray-400 mt-2 italic font-medium">Leave as Primary if claim is for
+                                the employee directly.</p>
                         </div>
                     </div>
 
-                    <!-- Beneficiary Definition -->
-                    <div>
-                        <label
-                            class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Claimant
-                            Beneficiary</label>
-                        <select formControlName="dependentId"
-                            class="w-full px-4 py-3 border dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 dark:text-white font-medium focus:ring-2 focus:ring-primary-500 transition-all outline-none">
-                            <option value="">Primary Member (The Employee)</option>
-                            @for(d of selectedClaimMember()?.dependents; track d.id) {
-                            @if (d.isActive) {
-                            <option [value]="d.id">{{ d.fullName }} ({{ d.relationship }})</option>
-                            }
-                            }
-                        </select>
+                    <div class="pt-6 flex justify-between">
+                        <button type="button" (click)="setClaimStep(1)"
+                            class="px-8 py-3 dark:text-gray-400 text-[10px] font-black uppercase tracking-widest hover:underline transition-all">Back</button>
+                        <button type="button" (click)="setClaimStep(3)" [disabled]="!selectedClaimMember()"
+                            class="px-8 py-3 bg-primary-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-primary-700 disabled:opacity-50 transition-all shadow-lg shadow-primary-500/20">
+                            Configure Claim Parameters
+                        </button>
+                    </div>
+                </div>
+                }
+
+                <!-- STEP 3: CLAIM DETAILS -->
+                @if (claimSubmissionStep() === 3) {
+                <div class="animate-in slide-in-from-right-4 duration-300 space-y-8">
+                    <div class="flex flex-col items-center text-center">
+                        <div
+                            class="w-12 h-12 rounded-2xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary-600 mb-3">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
+                                </path>
+                            </svg>
+                        </div>
+                        <h4 class="text-xl font-black dark:text-white">Quantitative Assessment</h4>
+                        <p class="text-xs text-gray-500">Define the classification and financial value of this inquiry.
+                        </p>
                     </div>
 
-                    <div>
-                        <label
-                            class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Investigation
-                            Classification</label>
-                        <select formControlName="claimType"
-                            class="w-full px-4 py-3 border dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 dark:text-white transition-all">
-                            <option value="" disabled>-- Choose Category --</option>
-                            <option value="Health">Health</option>
-                            <option value="Life">Life</option>
-                            <option value="Accident">Accident</option>
-                            <option value="CriticalIllness">Critical Illness</option>
-                        </select>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <label
+                                class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Investigation
+                                Type</label>
+                            <select formControlName="claimType"
+                                class="w-full px-5 py-4 border-2 border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-700 dark:text-white font-bold transition-all focus:ring-4 focus:ring-primary-500/10 outline-none">
+                                <option value="" disabled>-- Choose Category --</option>
+                                <option value="Health">Health / Medical</option>
+                                <option value="Life">Life / Mortality</option>
+                                <option value="Accident">Accidental Trauma</option>
+                                <option value="CriticalIllness">Critical Illness Architecture</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label
+                                class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Requested
+                                Setttlement (₹)</label>
+                            <div class="relative">
+                                <span
+                                    class="absolute left-4 top-1/2 -translate-y-1/2 font-black text-gray-400 text-lg">₹</span>
+                                <input type="number" formControlName="claimAmount"
+                                    class="w-full pl-10 pr-5 py-4 border-2 border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-700 dark:text-white font-black text-xl text-red-600 focus:ring-4 focus:ring-primary-500/10 outline-none">
+                            </div>
+                        </div>
+
+                        <div class="col-span-2">
+                            <label
+                                class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Adjudication
+                                Narratives</label>
+                            <textarea formControlName="description" rows="4"
+                                class="w-full px-5 py-4 border-2 border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-700 dark:text-white font-medium text-sm focus:ring-4 focus:ring-primary-500/10 outline-none transition-all"
+                                placeholder="Provide detailed medical context or justification for this inquiry..."></textarea>
+                        </div>
                     </div>
-                    <div>
-                        <label
-                            class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Requested
-                            Settlement (₹)</label>
-                        <input type="number" formControlName="claimAmount"
-                            class="w-full px-4 py-3 border dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 dark:text-white font-black text-red-600">
+
+                    <div class="pt-6 flex justify-between">
+                        <button type="button" (click)="setClaimStep(2)"
+                            class="px-8 py-3 dark:text-gray-400 text-[10px] font-black uppercase tracking-widest hover:underline transition-all">Back</button>
+                        <button type="button" (click)="setClaimStep(4)"
+                            [disabled]="claimForm.get('claimType')?.invalid || claimForm.get('claimAmount')?.invalid || claimForm.get('description')?.invalid"
+                            class="px-8 py-3 bg-primary-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-primary-700 disabled:opacity-50 transition-all shadow-lg shadow-primary-500/20">
+                            Upload Digital Evidence
+                        </button>
                     </div>
+                </div>
+                }
+
+                <!-- STEP 4: EVIDENCE UPLOAD & SUBMIT -->
+                @if (claimSubmissionStep() === 4) {
+                <div class="animate-in slide-in-from-right-4 duration-300 space-y-8">
+                    <div class="flex flex-col items-center text-center">
+                        <div
+                            class="w-12 h-12 rounded-2xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary-600 mb-3">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12">
+                                </path>
+                            </svg>
+                        </div>
+                        <h4 class="text-xl font-black dark:text-white">Artifact Archive</h4>
+                        <p class="text-xs text-gray-500">Consolidate medical bills and reports into the adjudication
+                            stream.</p>
+                    </div>
+
                     <div
-                        class="md:col-span-2 p-8 rounded-3xl bg-gray-50 dark:bg-gray-800/50 border-2 border-dashed border-gray-200 dark:border-gray-700 hover:border-primary-500/50 transition-all group">
+                        class="p-10 rounded-3xl bg-white dark:bg-gray-800 border-2 border-dashed border-gray-200 dark:border-gray-700 hover:border-primary-500/50 transition-all group">
                         <div class="flex flex-col items-center text-center">
-                            <div class="p-3 bg-white dark:bg-gray-800 rounded-2xl shadow-sm mb-4">
+                            <div class="p-4 bg-primary-50 dark:bg-gray-900 rounded-2xl shadow-sm mb-5">
                                 <svg class="w-8 h-8 text-primary-500" fill="none" stroke="currentColor"
                                     viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12">
+                                        d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z">
                                     </path>
                                 </svg>
                             </div>
-                            <h5 class="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tight">Upload
-                                Evidence</h5>
-                            <p class="text-[10px] text-gray-500 mt-1 mb-4">Bills, Prescriptions, or Lab Reports (Max
-                                10MB each)</p>
+                            <h5 class="text-base font-black text-gray-900 dark:text-white uppercase tracking-tight">
+                                Upload Protocol Artifacts</h5>
+                            <p class="text-[10px] text-gray-500 mt-1 mb-6">Attach high-resolution scans or digital
+                                receipts (PDF, PNG, JPG)</p>
 
                             <label
-                                class="px-6 py-2.5 bg-primary-600 text-white text-[10px] font-black uppercase rounded-xl cursor-pointer hover:bg-primary-700 transition shadow-lg shadow-primary-500/20">
-                                Select Files
+                                class="px-8 py-3 bg-primary-600 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl cursor-pointer hover:bg-primary-700 transition shadow-xl shadow-primary-500/20">
+                                Engage File Browser
                                 <input type="file" multiple (change)="onClaimDocsSelect($event)" class="hidden">
                             </label>
 
                             <!-- Selected Files List -->
                             @if (selectedClaimFiles.length > 0) {
-                            <div class="w-full mt-6 space-y-2 text-left">
+                            <div class="w-full mt-10 space-y-3 text-left">
                                 @for (item of selectedClaimFiles; track $index) {
                                 <div
-                                    class="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 animate-in slide-in-from-left-2">
+                                    class="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-2xl border border-gray-100 dark:border-gray-800 animate-in slide-in-from-bottom-2">
+                                    <div
+                                        class="w-10 h-10 bg-white dark:bg-gray-800 rounded-xl flex items-center justify-center text-primary-500 shadow-sm">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z">
+                                            </path>
+                                        </svg>
+                                    </div>
                                     <div class="flex-1 min-w-0">
-                                        <p class="text-[10px] font-black text-gray-900 dark:text-white truncate">{{
+                                        <p class="text-[11px] font-black text-gray-900 dark:text-white truncate">{{
                                             item.file.name }}</p>
-                                        <p class="text-[9px] text-gray-500 uppercase">{{ (item.file.size / 1024 / 1024)
-                                            | number:'1.1-1' }} MB</p>
+                                        <p class="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">{{
+                                            (item.file.size / 1024 / 1024) | number:'1.1-1' }} MB</p>
                                     </div>
 
-                                    <select [value]="item.type"
-                                        (change)="updateFileType($index, $any($event.target).value)"
-                                        class="px-3 py-1.5 bg-gray-50 dark:bg-gray-700 border-0 rounded-lg text-[9px] font-bold text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-primary-500 outline-none">
-                                        @for(type of docTypes; track type.id) {
-                                        <option [value]="type.id">{{ type.name }}</option>
-                                        }
-                                    </select>
+                                    <div class="flex items-center gap-3">
+                                        <select [value]="item.type"
+                                            (change)="updateFileType($index, $any($event.target).value)"
+                                            class="px-4 py-2 bg-white dark:bg-gray-800 border dark:border-gray-600 rounded-xl text-[10px] font-black text-gray-600 dark:text-gray-400 focus:ring-2 focus:ring-primary-500 outline-none">
+                                            @for(type of docTypes; track type.id) { <option [value]="type.id">{{
+                                                type.name }}</option> }
+                                        </select>
 
-                                    <button type="button" (click)="removeClaimFile($index)"
-                                        class="p-1.5 text-gray-400 hover:text-red-500 transition">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M6 18L18 6M6 6l12 12"></path>
-                                        </svg>
-                                    </button>
+                                        <button type="button" (click)="removeClaimFile($index)"
+                                            class="p-2 text-gray-400 hover:text-red-500 transition-colors bg-white dark:bg-gray-800 rounded-xl border dark:border-gray-600">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                                                </path>
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </div>
                                 }
                             </div>
                             }
                         </div>
                     </div>
-                    <div class="col-span-2">
-                        <label
-                            class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Adjudication
-                            Context Summary</label>
-                        <textarea formControlName="description" rows="3"
-                            class="w-full px-4 py-3 border dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 dark:text-white"
-                            placeholder="Explain the medical situation..."></textarea>
+
+                    <div class="pt-6 flex justify-between items-center">
+                        <button type="button" (click)="setClaimStep(3)"
+                            class="px-8 py-3 dark:text-gray-400 text-[10px] font-black uppercase tracking-widest hover:underline transition-all">Back</button>
+                        <div class="flex gap-4">
+                            <button type="submit"
+                                [disabled]="claimForm.invalid || isLoading() || selectedClaimFiles.length === 0"
+                                class="px-12 py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-xl shadow-emerald-500/20 uppercase tracking-[0.2em] text-xs transition-all active:scale-[0.98] disabled:opacity-50">
+                                @if (isLoading()) { <span class="animate-pulse">Dispatching...</span> } @else { Dispatch
+                                Settlement Inquiry }
+                            </button>
+                        </div>
                     </div>
+                    <p class="text-[9px] text-center text-gray-400 font-medium italic">Final review recommended before
+                        archival dispatch. All uploads are encrypted.</p>
                 </div>
-                <div class="flex justify-center">
-                    <button type="submit"
-                        [disabled]="claimForm.invalid || isLoading() || selectedClaimFiles.length === 0"
-                        class="w-full md:w-auto px-12 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-black shadow-lg shadow-emerald-500/10 uppercase tracking-widest transition active:scale-95 disabled:opacity-50">
-                        Dispatch Settlement Inquiry
-                    </button>
-                </div>
+                }
             </form>
         </div>
         }
 
+        <div
+            class="p-4 bg-white dark:bg-gray-800 border-b dark:border-gray-700 flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div class="relative w-full md:w-96">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none"
+                    stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                <input type="text" [value]="claimSearchTerm()" (input)="claimSearchTerm.set($any($event.target).value)"
+                    placeholder="Search claims..."
+                    class="w-full pl-10 pr-4 py-2 text-sm border dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary-500 transition-all outline-none">
+            </div>
+            <div class="flex items-center gap-2 w-full md:w-auto">
+                <label class="text-xs font-bold text-gray-400 uppercase tracking-widest shrink-0">Status:</label>
+                <select [value]="claimStatusFilter()" (change)="claimStatusFilter.set($any($event.target).value)"
+                    class="w-full md:w-auto px-4 py-2 text-sm border dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary-500 transition-all outline-none">
+                    <option value="All">All Claims</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Rejected">Rejected</option>
+                </select>
+            </div>
+        </div>
+
         <table class="w-full text-left text-sm">
             <thead class="bg-gray-50/50 dark:bg-gray-700/30">
                 <tr>
-                    <th class="p-4 dark:text-gray-300">Timestamp</th>
-                    <th class="p-4 dark:text-gray-300">Beneficiary</th>
-                    <th class="p-4 dark:text-gray-300">Classification</th>
-                    <th class="p-4 dark:text-gray-300">Value</th>
+                    <th class="p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition group"
+                        (click)="sortClaims('date')">
+                        <div class="flex items-center gap-1">
+                            <span class="dark:text-gray-300">Timestamp</span>
+                            @if (claimSortConfig().column === 'date') {
+                            <svg class="w-3 h-3 text-primary-500"
+                                [ngClass]="{'rotate-180': claimSortConfig().direction === 'desc'}" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7">
+                                </path>
+                            </svg>
+                            }
+                        </div>
+                    </th>
+                    <th class="p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition group"
+                        (click)="sortClaims('name')">
+                        <div class="flex items-center gap-1">
+                            <span class="dark:text-gray-300">Beneficiary</span>
+                            @if (claimSortConfig().column === 'name') {
+                            <svg class="w-3 h-3 text-primary-500"
+                                [ngClass]="{'rotate-180': claimSortConfig().direction === 'desc'}" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7">
+                                </path>
+                            </svg>
+                            }
+                        </div>
+                    </th>
+                    <th class="p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition group"
+                        (click)="sortClaims('type')">
+                        <div class="flex items-center gap-1">
+                            <span class="dark:text-gray-300">Classification</span>
+                            @if (claimSortConfig().column === 'type') {
+                            <svg class="w-3 h-3 text-primary-500"
+                                [ngClass]="{'rotate-180': claimSortConfig().direction === 'desc'}" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7">
+                                </path>
+                            </svg>
+                            }
+                        </div>
+                    </th>
+                    <th class="p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition group"
+                        (click)="sortClaims('amount')">
+                        <div class="flex items-center gap-1">
+                            <span class="dark:text-gray-300">Value</span>
+                            @if (claimSortConfig().column === 'amount') {
+                            <svg class="w-3 h-3 text-primary-500"
+                                [ngClass]="{'rotate-180': claimSortConfig().direction === 'desc'}" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7">
+                                </path>
+                            </svg>
+                            }
+                        </div>
+                    </th>
                     <th class="p-4 dark:text-gray-300">Status</th>
                 </tr>
             </thead>
             <tbody>
-                @for (cl of claims(); track cl.id) {
+                @for (cl of filteredClaims(); track cl.id) {
                 <tr class="border-b dark:border-gray-700 font-medium hover:bg-gray-50/50 dark:hover:bg-gray-800/30">
                     <td class="p-4 dark:text-white">{{cl.claimDate | date:'mediumDate'}}</td>
                     <td class="p-4">
@@ -876,21 +1473,69 @@
     @if (activeTab() === 'billing') {
     <div
         class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden overflow-x-auto">
-        <div class="p-6 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-700/30 min-w-[800px]">
-            <h3 class="font-bold text-lg dark:text-white">Revenue & Billing Settlements</h3>
+        <div
+            class="p-6 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-700/30 min-w-[800px] flex flex-col md:flex-row gap-4 items-center justify-between">
+            <h3 class="font-bold text-lg dark:text-white shrink-0">Revenue & Billing Settlements</h3>
+
+            <div class="flex items-center gap-2 w-full md:w-auto">
+                <div class="relative w-full md:w-64">
+                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none"
+                        stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                    <input type="text" [value]="invoiceSearchTerm()"
+                        (input)="invoiceSearchTerm.set($any($event.target).value)" placeholder="Search invoices..."
+                        class="w-full pl-10 pr-4 py-2 text-xs border dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-primary-500 transition-all outline-none">
+                </div>
+                <select [value]="invoiceStatusFilter()" (change)="invoiceStatusFilter.set($any($event.target).value)"
+                    class="px-3 py-2 text-xs border dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-primary-500 transition-all outline-none">
+                    <option value="All">All</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Paid">Paid</option>
+                    <option value="Overdue">Overdue</option>
+                    <option value="PartiallyPaid">Partially Paid</option>
+                </select>
+            </div>
         </div>
         <table class="w-full text-left text-sm whitespace-nowrap min-w-[800px]">
             <thead class="bg-gray-50/50 dark:bg-gray-700/30">
                 <tr>
                     <th class="p-4 dark:text-gray-300">Invoice Reference</th>
-                    <th class="p-4 dark:text-gray-300">Issue Date</th>
-                    <th class="p-4 dark:text-gray-300 text-right">Settlement Amt</th>
+                    <th class="p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition group"
+                        (click)="sortInvoices('date')">
+                        <div class="flex items-center gap-1">
+                            <span class="dark:text-gray-300">Issue Date</span>
+                            @if (invoiceSortConfig().column === 'date') {
+                            <svg class="w-3 h-3 text-primary-500"
+                                [ngClass]="{'rotate-180': invoiceSortConfig().direction === 'desc'}" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7">
+                                </path>
+                            </svg>
+                            }
+                        </div>
+                    </th>
+                    <th class="p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition group"
+                        (click)="sortInvoices('amount')">
+                        <div class="flex items-center justify-end gap-1">
+                            @if (invoiceSortConfig().column === 'amount') {
+                            <svg class="w-3 h-3 text-primary-500"
+                                [ngClass]="{'rotate-180': invoiceSortConfig().direction === 'desc'}" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7">
+                                </path>
+                            </svg>
+                            }
+                            <span class="dark:text-gray-300">Settlement Amt</span>
+                        </div>
+                    </th>
                     <th class="p-4 dark:text-gray-300 text-center">Status</th>
                     <th class="p-4 dark:text-gray-300 text-center">Operation</th>
                 </tr>
             </thead>
             <tbody>
-                @for (inv of invoices(); track inv.id) {
+                @for (inv of filteredInvoiceList(); track inv.id) {
                 <tr
                     class="border-b dark:border-gray-700 font-bold hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
                     <td class="p-4 font-mono text-[10px] dark:text-primary-400 text-primary-600">{{inv.invoiceNo ||
@@ -898,6 +1543,11 @@
                     <td class="p-4 dark:text-white font-medium">{{inv.invoiceDate | date}}</td>
                     <td class="p-4 dark:text-white text-right font-black">
                         <div>₹{{inv.amount | number:'1.0-0'}}</div>
+                        @if (inv.isPenaltyApplied) {
+                        <div
+                            class="text-[8px] text-red-600 bg-red-100 px-1 inline-block rounded uppercase tracking-tighter">
+                            Late Penalty Applied (+10%)</div>
+                        }
                         @if (inv.totalPaid > 0) {
                         <div class="text-[9px] text-emerald-500">-₹{{inv.totalPaid | number:'1.0-0'}} Paid</div>
                         <div class="text-[10px] text-red-500">Bal: ₹{{inv.balanceAmount | number:'1.0-0'}}</div>
@@ -910,13 +1560,24 @@
                                 'bg-red-100 text-red-700': inv.status === 'Pending' || inv.status === 'Overdue'
                             }">{{inv.status}}</span>
                     </td>
-                    <td class="p-4 text-center space-x-2">
+                    <td class="p-4 text-center space-x-2 whitespace-nowrap">
                         <button (click)="viewInvoiceDetailDrilldown(inv.id)"
-                            class="text-[10px] font-black underline text-gray-500 uppercase tracking-widest">View
-                            Invoice</button>
+                            class="text-[10px] font-black underline text-gray-500 uppercase tracking-widest hover:text-primary-600 transition-colors">
+                            View Invoice
+                        </button>
                         @if (inv.status !== 'Paid') {
-                        <button (click)="payInvoice(inv.id, inv.balanceAmount ?? inv.amount)" [disabled]="isLoading()"
-                            class="text-[10px] bg-emerald-600 text-white px-4 py-1 rounded-lg font-black uppercase tracking-widest hover:bg-emerald-700 transition disabled:opacity-50">Settle</button>
+                        @if (!inv.isPaymentBlocked) {
+                        <button (click)="payInvoice(inv.id, inv.balanceAmount ?? inv.amount, inv.amount)"
+                            [disabled]="isLoading()"
+                            class="text-[10px] bg-emerald-600 text-white px-4 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-emerald-700 transition shadow-md disabled:opacity-50 inline-flex items-center gap-1">
+                            Settle Funds
+                        </button>
+                        } @else {
+                        <button [disabled]="true"
+                            class="text-[10px] bg-red-50 text-red-600 border border-red-100 px-4 py-1.5 rounded-lg font-black uppercase tracking-widest cursor-not-allowed opacity-80 inline-flex items-center gap-1">
+                            Blocked
+                        </button>
+                        }
                         }
                     </td>
                 </tr>
@@ -1216,8 +1877,9 @@
                         Download PDF
                     </button>
                     @if (selectedInvoice()?.status !== 'Paid') {
+                    @if (!selectedInvoice()?.isPaymentBlocked) {
                     <button
-                        (click)="payInvoice(selectedInvoice()?.id, selectedInvoice()?.balanceAmount ?? selectedInvoice()?.amount)"
+                        (click)="payInvoice(selectedInvoice()?.id, selectedInvoice()?.balanceAmount ?? selectedInvoice()?.amount, selectedInvoice()?.amount)"
                         [disabled]="isLoading()"
                         class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 text-xs font-black uppercase tracking-widest rounded-xl transition active:scale-95 disabled:opacity-50 flex items-center gap-2 border-2 border-transparent">
                         @if (isLoading()) {
@@ -1239,6 +1901,17 @@
                         Pay Securely
                         }
                     </button>
+                    } @else {
+                    <button [disabled]="true"
+                        class="px-6 py-2.5 bg-gray-400 text-white text-xs font-black uppercase tracking-widest rounded-xl opacity-60 cursor-not-allowed flex items-center gap-2 border-2 border-transparent">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z">
+                            </path>
+                        </svg>
+                        Payment Blocked
+                    </button>
+                    }
                     }
                 </div>
             </div>
@@ -1276,7 +1949,11 @@
                         class="w-full px-4 py-3 border dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 dark:text-white font-bold focus:ring-2 focus:ring-primary-500">
                         <option value="">-- Choose Deployment Context --</option>
                         @for(p of policies(); track p.id) {
-                        <option [value]="p.id">{{ p.planName }} ({{ p.id | slice:0:8 }})</option>
+                        <option [value]="p.id" [disabled]="p.status !== 'Active'">
+                            {{ p.planName }} ({{ p.id | slice:0:8 }}) {{ p.status !== 'Active' ? '[' + p.status + ']' :
+                            ''
+                            }}
+                        </option>
                         }
                     </select>
                 </div>
@@ -1287,16 +1964,16 @@
                         Category</label>
                     <select formControlName="type"
                         class="w-full px-4 py-3 border dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 dark:text-white font-bold focus:ring-2 focus:ring-primary-500">
-                        <option value="0">Add a New Member (Employee)</option>
-                        <option value="1">Remove an Existing Member</option>
-                        <option value="2">Add a Dependent to Member</option>
-                        <option value="4">Other Policy Adjustments</option>
+                        <option [value]="EnumEndorsement.AddMember.toString()">Add a New Member (Employee)</option>
+                        <option [value]="EnumEndorsement.RemoveMember.toString()">Remove an Existing Member</option>
+                        <option [value]="EnumEndorsement.AddDependent.toString()">Add a Dependent to Member</option>
+                        <option [value]="EnumEndorsement.ChangeCoverage.toString()">Other Policy Adjustments</option>
                     </select>
                 </div>
 
                 <!-- Dynamic Data Section -->
                 <div class="p-5 bg-gray-50/50 dark:bg-gray-900/40 rounded-2xl border dark:border-gray-800">
-                    @if (endorsementForm.get('type')?.value === '0') {
+                    @if (endorsementForm.get('type')?.value === EnumEndorsement.AddMember.toString()) {
                     <div class="grid grid-cols-2 gap-4">
                         <div class="col-span-2 md:col-span-1">
                             <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">First Name</label>
@@ -1407,10 +2084,10 @@
                                 class="block text-[10px] font-black text-gray-400 uppercase mb-1">Relationship</label>
                             <select formControlName="relationship"
                                 class="w-full px-3 py-2.5 border dark:border-gray-600 rounded-lg text-sm dark:bg-gray-700 dark:text-white font-bold focus:ring-2 focus:ring-primary-500">
-                                <option value="1">Spouse</option>
-                                <option value="2">Child</option>
-                                <option value="3">Father</option>
-                                <option value="4">Mother</option>
+                                <option [value]="EnumRelationship.Spouse.toString()">Spouse</option>
+                                <option [value]="EnumRelationship.Child.toString()">Child</option>
+                                <option [value]="EnumRelationship.Father.toString()">Father</option>
+                                <option [value]="EnumRelationship.Mother.toString()">Mother</option>
                             </select>
                         </div>
                         <div class="col-span-2 md:col-span-1">
@@ -1469,7 +2146,10 @@
                         <p class="text-xs text-amber-600 mt-0.5 leading-relaxed font-medium">As per policy agreement,
                             100% of the premium instrument must be settled within <span
                                 class="font-black text-amber-700 underline">7 calendar days</span> of generation to
-                            avoid coverage suspension.</p>
+                            avoid coverage suspension. <br />
+                            <strong class="text-amber-800">Note: Partial payments must cover at least 50% of the total
+                                invoice amount.</strong>
+                        </p>
                     </div>
                 </div>
             </div>
@@ -1483,12 +2163,22 @@
                         <input type="number" formControlName="amount"
                             class="w-full pl-8 pr-4 py-4 border-2 border-gray-100 dark:border-gray-800 rounded-2xl bg-gray-50 dark:bg-gray-700/50 dark:text-white font-black text-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all outline-none">
                     </div>
-                    <div class="mt-2 flex justify-between">
-                        <span class="text-[10px] font-bold text-gray-400">Remaining Balance:
-                            ₹{{selectedInvoiceForPayment()?.balance}}</span>
+                    <div class="mt-2 flex justify-between items-start">
+                        <div class="flex flex-col">
+                            <span class="text-[10px] font-bold text-gray-400">Remaining Balance:
+                                ₹{{selectedInvoiceForPayment()?.balance}}</span>
+                            @if ((selectedInvoiceForPayment()?.totalAmount / 2) < selectedInvoiceForPayment()?.balance)
+                                { <span class="text-[10px] font-bold text-amber-500 mt-1">Min. Required:
+                                ₹{{selectedInvoiceForPayment()?.totalAmount / 2}}</span>
+                                } @else {
+                                <span class="text-[10px] font-bold text-amber-500 mt-1">Min. Required:
+                                    ₹{{selectedInvoiceForPayment()?.balance}} (Full Balance)</span>
+                                }
+                        </div>
                         <button type="button"
                             (click)="paymentForm.patchValue({amount: selectedInvoiceForPayment()?.balance})"
-                            class="text-[10px] font-black text-primary-600 underline uppercase tracking-tight">Pay Full
+                            class="text-[10px] font-black text-primary-600 underline uppercase tracking-tight mt-0.5">Pay
+                            Full
                             Balance</button>
                     </div>
                 </div>
@@ -1508,9 +2198,9 @@
                             Instrument</label>
                         <select formControlName="paymentMethod"
                             class="w-full px-4 py-3 border-2 border-gray-100 dark:border-gray-800 rounded-xl bg-gray-50 dark:bg-gray-700/50 dark:text-white font-bold text-sm outline-none focus:border-primary-500">
-                            <option [value]="1">Credit / Debit Card</option>
-                            <option [value]="2">Corporate Net Banking</option>
-                            <option [value]="3">UPI / Digital Wallet</option>
+                            <option [value]="EnumPayment.Card">Credit / Debit Card</option>
+                            <option [value]="EnumPayment.NetBanking">Corporate Net Banking</option>
+                            <option [value]="EnumPayment.UPI">UPI / Digital Wallet</option>
                         </select>
                     </div>
                 </div>

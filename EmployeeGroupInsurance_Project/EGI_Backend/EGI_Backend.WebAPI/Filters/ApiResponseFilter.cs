@@ -17,6 +17,13 @@ namespace EGI_Backend.WebAPI.Filters
                     return;
                 }
 
+                // IMPORTANT: Do not wrap error statuses (400, 404, 500, etc.)
+                if (objectResult.StatusCode.HasValue && objectResult.StatusCode.Value >= 400)
+                {
+                    await next();
+                    return;
+                }
+
                 // Wrap the successful result
                 var resultType = objectResult.Value.GetType();
                 var wrapperType = typeof(ApiResponse<>).MakeGenericType(resultType);

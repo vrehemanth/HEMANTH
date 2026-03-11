@@ -35,6 +35,9 @@ namespace EGI_Backend.Domain.Entities
         public bool Status { get; set; } = true;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        
+        [Timestamp]
+        public byte[] RowVersion { get; set; }
 
         // Navigation Properties
         public ICollection<Dependent> Dependents { get; set; } = new List<Dependent>();

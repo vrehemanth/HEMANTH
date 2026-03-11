@@ -23,8 +23,8 @@ namespace EGI_Backend.Application.Tests.Services
         private readonly Mock<IInvoiceRepository> _mockInvoiceRepo;
         private readonly Mock<IPolicyEndorsementRepository> _mockEndorsementRepo;
         private readonly Mock<IMapper> _mockMapper;
-        private readonly Mock<IServiceScopeFactory> _mockScopeFactory;
         private readonly Mock<IMemoryCache> _mockCache;
+        private readonly Mock<IInvoiceService> _mockInvoiceService;
         private readonly CustomerDashboardService _service;
 
         public CustomerDashboardServiceTests()
@@ -40,26 +40,24 @@ namespace EGI_Backend.Application.Tests.Services
             var mockCacheEntry = new Mock<ICacheEntry>();
             _mockCache.Setup(x => x.CreateEntry(It.IsAny<object>())).Returns(mockCacheEntry.Object);
 
-            // Setup Scope Factory
-            _mockScopeFactory = new Mock<IServiceScopeFactory>();
-            var mockScope = new Mock<IServiceScope>();
-            var mockServiceProvider = new Mock<IServiceProvider>();
-
-            mockServiceProvider.Setup(x => x.GetService(typeof(ICorporateClientRepository))).Returns(_mockClientRepo.Object);
-            mockServiceProvider.Setup(x => x.GetService(typeof(IPolicyAssignmentRepository))).Returns(_mockPolicyRepo.Object);
-            mockServiceProvider.Setup(x => x.GetService(typeof(IMemberRepository))).Returns(_mockMemberRepo.Object);
-            mockServiceProvider.Setup(x => x.GetService(typeof(IClaimRepository))).Returns(_mockClaimRepo.Object);
-            mockServiceProvider.Setup(x => x.GetService(typeof(IInvoiceRepository))).Returns(_mockInvoiceRepo.Object);
-            mockServiceProvider.Setup(x => x.GetService(typeof(IPolicyEndorsementRepository))).Returns(_mockEndorsementRepo.Object);
-
-            mockScope.Setup(x => x.ServiceProvider).Returns(mockServiceProvider.Object);
-            _mockScopeFactory.Setup(x => x.CreateScope()).Returns(mockScope.Object);
+            // Setup Mock Invoice Service
+            _mockInvoiceService = new Mock<IInvoiceService>();
 
             // Mock Cache TryGetValue to always return false (miss)
             object cacheEntry = null;
             _mockCache.Setup(x => x.TryGetValue(It.IsAny<object>(), out cacheEntry)).Returns(false);
 
-            _service = new CustomerDashboardService(_mockScopeFactory.Object, _mockMapper.Object, _mockCache.Object);
+            _service = new CustomerDashboardService(
+                _mockClientRepo.Object,
+                _mockPolicyRepo.Object,
+                _mockMemberRepo.Object,
+                _mockClaimRepo.Object,
+                _mockInvoiceRepo.Object,
+                _mockEndorsementRepo.Object,
+                _mockInvoiceService.Object,
+                _mockMapper.Object,
+                _mockCache.Object
+            );
         }
 
         [Fact]
