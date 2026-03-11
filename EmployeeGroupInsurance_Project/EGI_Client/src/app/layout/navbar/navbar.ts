@@ -6,7 +6,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { ThemeService } from '../../core/services/theme.service';
 import { ToastService } from '../../core/services/toast.service';
 import { NotificationService } from '../../core/services/notification.service';
-import { CustomerService } from '../../data-access/api.services';
+import { CustomerService } from '../../data-access/customer.service';
 
 @Component({
   selector: 'app-layout',

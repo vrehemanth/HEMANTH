@@ -1,6 +1,8 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { API_BASE } from '../../data-access/api.services';
+import { environment } from '../../../environments/environment';
+
+const API_BASE = environment.apiBase;
 import { ToastService } from './toast.service';
 
 export interface Notification {

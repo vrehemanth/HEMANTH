@@ -1,0 +1,347 @@
+<!-- ==================== DASHBOARD TAB ==================== -->
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        @if (p.isLoading() && !p.summary()) {
+        @for (i of [1,2,3,4]; track i) {
+        <div
+            class="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden">
+            <div class="absolute inset-0 animate-shimmer"></div>
+            <div class="h-3 w-20 bg-gray-100 dark:bg-gray-700 rounded mb-4"></div>
+            <div class="h-8 w-24 bg-gray-200 dark:bg-gray-600 rounded"></div>
+        </div>
+        }
+        } @else {
+        <div
+            class="premium-hover bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden group">
+            <div
+                class="absolute right-0 top-0 w-24 h-24 bg-blue-500/10 dark:bg-blue-500/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110 duration-500">
+            </div>
+            <div class="flex justify-between items-start z-10 relative">
+                <div>
+                    <p class="text-xs font-black uppercase tracking-widest text-gray-400">System Revenue</p>
+                    <h3 class="text-3xl font-black text-gray-900 dark:text-white mt-2">₹{{ p.summary()?.totalRevenue |
+                        number:'1.0-0' }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <div
+            class="premium-hover bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden group">
+            <div
+                class="absolute right-0 top-0 w-24 h-24 bg-emerald-500/10 dark:bg-emerald-500/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110 duration-500">
+            </div>
+            <div class="flex justify-between items-start z-10 relative">
+                <div>
+                    <p class="text-xs font-black uppercase tracking-widest text-gray-400">Partners (Clients)</p>
+                    <h3 class="text-3xl font-black text-gray-900 dark:text-white mt-2">{{ p.summary()?.customerCount || 0
+                        }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <div
+            class="premium-hover bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden group">
+            <div
+                class="absolute right-0 top-0 w-24 h-24 bg-amber-500/10 dark:bg-amber-500/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110 duration-500">
+            </div>
+            <div class="flex justify-between items-start z-10 relative">
+                <div>
+                    <p class="text-xs font-black uppercase tracking-widest text-gray-400">Claims in Queue</p>
+                    <h3 class="text-3xl font-black text-gray-900 dark:text-white mt-2">{{ p.summary()?.pendingClaimsCount
+                        || 0 }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <div
+            class="premium-hover bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden group border-l-4 border-l-primary-500">
+            <div
+                class="absolute right-0 top-0 w-24 h-24 bg-primary-500/10 dark:bg-primary-500/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110 duration-500">
+            </div>
+            <div class="flex justify-between items-start z-10 relative">
+                <div>
+                    <p class="text-xs font-black uppercase tracking-widest text-primary-500">Payouts Volume</p>
+                    <h3 class="text-3xl font-black text-gray-900 dark:text-white mt-2">₹{{ p.summary()?.totalPayouts |
+                        number:'1.0-0' }}</h3>
+                </div>
+            </div>
+        </div>
+        }
+    </div>
+
+    <!-- INTELLIGENCE & ANALYTICS -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+        <!-- Portfolio Health (Donut) -->
+        <div
+            class="premium-hover group bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm transition-all">
+            <div class="flex items-center justify-between mb-6">
+                <h4 class="text-xs font-black uppercase tracking-widest text-gray-400">Portfolio Profitability</h4>
+                <div
+                    class="px-2 py-0.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-full text-[10px] font-bold text-emerald-600">
+                    Health: Stable</div>
+            </div>
+            <div class="relative h-64 flex items-center justify-center">
+                <canvas #financialChart></canvas>
+                <div
+                    class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none group-hover:opacity-0 transition-opacity duration-300">
+                    <span class="text-2xl font-black dark:text-white">₹{{ p.summary()?.netProfit | number:'1.0-0'
+                        }}</span>
+                    <span class="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">Retained Profit</span>
+                </div>
+            </div>
+            <!-- Legend -->
+            <div class="mt-6 flex flex-wrap justify-center gap-4 border-t border-gray-50 dark:border-gray-700/50 pt-6">
+                <div class="flex items-center gap-1.5 min-w-[80px]">
+                    <span class="w-2 h-2 rounded-full bg-[#10b981]"></span>
+                    <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">Net
+                        Profit</span>
+                </div>
+                <div class="flex items-center gap-1.5 min-w-[80px]">
+                    <span class="w-2 h-2 rounded-full bg-[#f59e0b]"></span>
+                    <span
+                        class="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">Payouts</span>
+                </div>
+                <div class="flex items-center gap-1.5 min-w-[80px]">
+                    <span class="w-2 h-2 rounded-full bg-[#6366f1]"></span>
+                    <span
+                        class="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">Commission</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Global Claim Trends (Area) -->
+        <div
+            class="premium-hover lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm transition-all">
+            <div class="flex items-center justify-between mb-6">
+                <div class="flex flex-col">
+                    <h4 class="text-xs font-black uppercase tracking-widest text-gray-400">System Adjudication Volume
+                    </h4>
+                    <p class="text-[10px] text-gray-500 mt-0.5 font-medium">Claims processed across the entire ecosystem
+                        (6M)</p>
+                </div>
+                <div class="flex gap-4">
+                    <div class="flex items-center gap-1.5 text-[10px] font-bold text-blue-500">
+                        <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Total
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[10px] font-bold text-emerald-500">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Approved
+                    </div>
+                </div>
+            </div>
+            <div class="h-64">
+                <canvas #claimTrendChart></canvas>
+            </div>
+        </div>
+
+        <!-- Product Market Mix (Bar) -->
+        <div
+            class="premium-hover lg:col-span-3 bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden transition-all">
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <h4 class="text-xs font-black uppercase tracking-widest text-gray-400">Insurance Product Mix</h4>
+                    <p class="text-[10px] text-gray-500 mt-0.5 font-medium">Market penetration by active policy count
+                    </p>
+                </div>
+                <div
+                    class="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg text-indigo-600 font-mono text-[10px] font-bold uppercase tracking-widest">
+                    Market Share
+                </div>
+            </div>
+            <div class="h-64">
+                <canvas #planMixChart></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
+        <!-- System Vitality Radar -->
+        <div
+            class="lg:col-span-8 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm p-8">
+            <div class="flex items-center justify-between mb-8">
+                <div>
+                    <h4 class="text-lg font-bold text-gray-900 dark:text-white">System Vitality Radar</h4>
+                    <p class="text-xs text-gray-500 mt-1">Real-time performance metrics and adjudication health.</p>
+                </div>
+                <div class="flex items-center gap-2 p-1.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                    <span class="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
+                    <span class="text-[10px] font-black text-emerald-600 uppercase tracking-tighter">Live
+                        Analysis</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="space-y-3">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Claim Approval Rate</p>
+                    <div class="flex items-end gap-2">
+                        <span class="text-4xl font-black text-gray-900 dark:text-white">{{ p.summary()?.claimApprovalRate
+                            }}%</span>
+                    </div>
+                    <div class="w-full h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                        <div class="h-full bg-emerald-500 transition-all duration-1000"
+                            [style.width.%]="p.summary()?.claimApprovalRate"></div>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Avg Claim Ticket</p>
+                    <div class="flex items-end gap-2">
+                        <span class="text-4xl font-black text-gray-900 dark:text-white">₹{{
+                            p.summary()?.averageClaimAmount | number:'1.0-0' }}</span>
+                    </div>
+                    <p class="text-[10px] text-gray-500">Floating average per adjudicated claim</p>
+                </div>
+
+                <div class="space-y-3">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">24h System Velocity</p>
+                    <div class="flex items-end gap-2 text-primary-600">
+                        <span class="text-4xl font-black">{{ p.summary()?.recentActivitiesCount }}</span>
+                        <span class="text-xs font-bold mb-1.5 uppercase">Events</span>
+                    </div>
+                    <p class="text-[10px] text-gray-500 italic">Atomic operations recorded in last 24h</p>
+                </div>
+            </div>
+
+            <div class="mt-8 pt-8 border-t border-gray-50 dark:border-gray-700 flex flex-wrap gap-8">
+                <div class="flex items-center gap-3">
+                    <div
+                        class="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path
+                                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.407 2.67 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.407-2.67-1M12 16c-1.11 0-2.08-.407-2.67-1">
+                            </path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-bold text-gray-400">NET RETAINED PROFIT</p>
+                        <p class="text-sm font-black text-gray-900 dark:text-white">₹{{ p.summary()?.netProfit |
+                            number:'1.0-0' }}</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div
+                        class="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center text-purple-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path
+                                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z">
+                            </path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-bold text-gray-400">SYSTEM CAPACITY</p>
+                        <p class="text-sm font-black text-gray-900 dark:text-white">{{ p.summary()?.agentCount }} Agents |
+                            {{ p.summary()?.claimsOfficerCount }} Officers</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Activity Stream -->
+        <div
+            class="lg:col-span-4 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm p-6 flex flex-col">
+            <div class="flex items-center justify-between mb-6">
+                <h4 class="text-md font-bold text-gray-900 dark:text-white">Live Event Stream</h4>
+                <button (click)="p.activeTab.set('logs')"
+                    class="text-[10px] font-bold text-primary-600 hover:underline">Full
+                    Feed</button>
+            </div>
+
+            <div class="space-y-4 flex-1 overflow-hidden relative">
+                <!-- Fade Effect Top -->
+                <div
+                    class="absolute top-0 inset-x-0 h-4 bg-gradient-to-b from-white dark:from-gray-800 to-transparent z-10">
+                </div>
+
+                <div class="space-y-3">
+                    @for (log of p.summary()?.topRecentLogs; track log.timestamp) {
+                    <div class="flex gap-3 animate-in slide-in-from-right duration-500">
+                        <div class="w-1.5 h-1.5 rounded-full mt-2 shrink-0" [ngClass]="{
+                                'bg-emerald-500': log.action.includes('Added'),
+                                'bg-blue-500': log.action.includes('Modified'),
+                                'bg-red-500': log.action.includes('Deleted'),
+                                'bg-gray-400': !log.action.includes('Added') && !log.action.includes('Modified') && !log.action.includes('Deleted')
+                            }"></div>
+                        <div class="min-w-0">
+                            <p class="text-xs font-bold text-gray-900 dark:text-gray-100 truncate">{{ log.action }} {{
+                                log.entity }}</p>
+                            <p class="text-[10px] text-gray-500">{{ log.timestamp | date:'shortTime' }} • Validated</p>
+                        </div>
+                    </div>
+                    } @empty {
+                    <p class="text-xs text-gray-500 italic text-center py-10">No recent system pulse detected.</p>
+                    }
+                </div>
+
+                <!-- Fade Effect Bottom -->
+                <div
+                    class="absolute bottom-0 inset-x-0 h-4 bg-gradient-to-t from-white dark:from-gray-800 to-transparent z-10">
+                </div>
+            </div>
+
+            <div
+                class="mt-6 p-4 rounded-2xl bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-[10px] font-bold text-gray-400">DATABASE HEALTH</span>
+                    <span class="text-[10px] font-bold text-emerald-500">STABLE</span>
+                </div>
+                <div class="flex gap-1">
+                    <div class="h-1 flex-1 bg-emerald-500 rounded-full opacity-30"></div>
+                    <div class="h-1 flex-1 bg-emerald-500 rounded-full opacity-50"></div>
+                    <div class="h-1 flex-1 bg-emerald-500 rounded-full opacity-40"></div>
+                    <div class="h-1 flex-1 bg-emerald-500 rounded-full animate-pulse"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Elite Agent Performance -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
+        <div
+            class="lg:col-span-12 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm p-8">
+            <div class="flex items-center justify-between mb-8">
+                <div>
+                    <h4 class="text-lg font-bold text-gray-900 dark:text-white">Elite Agent Performance</h4>
+                    <p class="text-xs text-gray-500 mt-1">Ranking of top performing p.agents by commission earned and
+                        policy volume.</p>
+                </div>
+                <div class="p-2 bg-amber-50 dark:bg-amber-900/20 rounded-xl text-amber-600">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                        <path
+                            d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                    </svg>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                @for (agent of p.summary()?.topAgents; track agent.agentId; let i = $index) {
+                <div
+                    class="p-5 rounded-2xl border dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30 relative overflow-hidden group hover:border-amber-200 dark:hover:border-amber-900/50 transition-all">
+                    <!-- Rank Badge -->
+                    <div class="absolute top-0 right-0 p-3">
+                        <span
+                            class="text-2xl font-black text-gray-200 dark:text-gray-700 group-hover:text-amber-100 dark:group-hover:text-amber-900/30 transition-colors">#{{
+                            i + 1 }}</span>
+                    </div>
+
+                    <div class="relative z-10">
+                        <div
+                            class="w-12 h-12 rounded-full bg-white dark:bg-gray-700 shadow-sm flex items-center justify-center text-primary-600 font-bold mb-4 border border-gray-100 dark:border-gray-600">
+                            {{ agent.name.charAt(0) }}
+                        </div>
+                        <h5 class="font-bold text-gray-900 dark:text-white truncate">{{ agent.name }}</h5>
+                        <p class="text-[10px] text-gray-500 uppercase font-black mt-1">{{ agent.policyCount }} Policies
+                            Active</p>
+
+                        <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                            <p class="text-[10px] font-bold text-gray-400 capitalize">Commission Earned</p>
+                            <p class="text-lg font-black text-emerald-600">₹{{ agent.totalCommission | number:'1.0-0' }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                } @empty {
+                <div class="col-span-5 py-10 text-center text-gray-500 italic">No agent performance data available yet.
+                </div>
+                }
+            </div>
+        </div>
+    </div>

@@ -1,0 +1,112 @@
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    @if (p.isLoading() && !p.summary()) {
+    @for (i of [1,2,3]; track i) {
+    <div
+        class="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden">
+        <div class="absolute inset-0 animate-shimmer"></div>
+        <div class="h-3 w-20 bg-gray-100 dark:bg-gray-700 rounded mb-4"></div>
+        <div class="h-8 w-24 bg-gray-200 dark:bg-gray-600 rounded"></div>
+    </div>
+    }
+    } @else {
+    <div
+        class="premium-hover bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm relative group overflow-hidden">
+        <div
+            class="absolute right-0 top-0 w-24 h-24 bg-blue-500/10 dark:bg-blue-500/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110 duration-500">
+        </div>
+        <p class="text-xs font-black uppercase tracking-widest text-gray-400 relative z-10">Pending (System)</p>
+        <h3 class="text-3xl font-black mt-2 dark:text-white relative z-10">{{ p.summary()?.totalPendingClaimsInSystem
+            || 0 }}</h3>
+    </div>
+    <div
+        class="premium-hover bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm relative group overflow-hidden">
+        <div
+            class="absolute right-0 top-0 w-24 h-24 bg-emerald-500/10 dark:bg-emerald-500/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110 duration-500">
+        </div>
+        <p class="text-xs font-black uppercase tracking-widest text-gray-400 relative z-10">Adjudicated by Me</p>
+        <h3 class="text-3xl font-black mt-2 dark:text-white relative z-10">{{ p.summary()?.claimsReviewedByMe || 0 }}
+        </h3>
+    </div>
+    <div
+        class="premium-hover bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm relative group overflow-hidden border-l-4 border-l-violet-500">
+        <div
+            class="absolute right-0 top-0 w-24 h-24 bg-violet-500/10 dark:bg-violet-500/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110 duration-500">
+        </div>
+        <p class="text-xs font-black uppercase tracking-widest text-violet-500 relative z-10">Approved Value</p>
+        <h3 class="text-3xl font-black mt-2 dark:text-white relative z-10">₹{{ p.summary()?.approvedAmountByMe |
+            number:'1.0-0' }}
+        </h3>
+    </div>
+    }
+</div>
+<!-- ANALYTICS INSIGHTS -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+    <!-- Decision Performance (Donut) -->
+    <div
+        class="group bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm transition-all hover:shadow-md">
+        <div class="flex items-center justify-between mb-6">
+            <h4 class="text-xs font-black uppercase tracking-widest text-gray-400">Adjudication Mix</h4>
+            <div
+                class="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 rounded-full text-[10px] font-bold text-blue-600">
+                Sync: Real-time</div>
+        </div>
+        <div class="relative h-48 flex items-center justify-center">
+            <canvas #decisionChart></canvas>
+            <div
+                class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none group-hover:opacity-0 transition-opacity duration-300">
+                <span class="text-xl font-black dark:text-white">{{ (p.summary()?.approvedClaimsCount || 0) +
+                    (p.summary()?.rejectedClaimsCount || 0) + (p.summary()?.pendingClaimsCount || 0) }}</span>
+                <span class="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">Total Review</span>
+            </div>
+        </div>
+        <div class="mt-6 flex justify-center gap-4 border-t border-gray-50 dark:border-gray-700/50 pt-4">
+            <div class="flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#10b981]"></span>
+                <span class="text-[9px] font-bold text-gray-400 uppercase">Apprv</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
+                <span class="text-[9px] font-bold text-gray-400 uppercase">Rej</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#f59e0b]"></span>
+                <span class="text-[9px] font-bold text-gray-400 uppercase">Pend</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Productivity Trend (Line) -->
+    <div
+        class="lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm transition-all hover:shadow-md">
+    <div class="flex items-center justify-between mb-6">
+        <div class="flex flex-col">
+            <h4 class="text-xs font-black uppercase tracking-widest text-gray-400">Adjudication Velocity</h4>
+            <p class="text-[10px] text-gray-500 mt-0.5 font-medium">Claims reviewed across the rolling 7-day
+                window</p>
+        </div>
+        <div class="flex flex-col items-end">
+            <span class="text-lg font-black dark:text-white">{{ p.summary()?.averageProcessingTimeDays || 0
+                }}d</span>
+            <span class="text-[8px] text-gray-400 font-bold uppercase tracking-widest">Avg. Cycle Time</span>
+        </div>
+    </div>
+        <div class="h-64">
+            <canvas #adjudicationChart></canvas>
+        </div>
+    </div>
+
+    <!-- Claim Type distribution (Polar) -->
+    <div
+        class="lg:col-span-3 bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden transition-all hover:shadow-md">
+        <div class="flex items-center justify-between mb-6">
+            <h4 class="text-xs font-black uppercase tracking-widest text-gray-400">Treatment Frequency Analysis</h4>
+            <div
+                class="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg text-indigo-600 font-mono text-[10px] font-bold uppercase tracking-widest">
+                Categorical Mix
+            </div>
+        </div>
+        <div class="h-64">
+            <canvas #typeChart></canvas>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,277 @@
+<div
+    class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+    <div
+        class="px-6 py-5 border-b border-gray-100 dark:border-gray-700 min-w-[600px] flex justify-between items-center gap-4 flex-col md:flex-row">
+        <h3 class="font-semibold text-gray-900 dark:text-white shrink-0"> Actionable Queue </h3>
+        <div class="relative w-full md:w-64 font-normal">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none"
+                stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+            <input type="text" [value]="p.pendingSearchTerm()"
+                (input)="p.pendingSearchTerm.set($any($event.target).value)" placeholder="Search pending claims..."
+                class="w-full pl-10 pr-4 py-2 text-xs border dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary-500 transition-all outline-none">
+        </div>
+    </div>
+    <table class="w-full text-left text-sm">
+        <thead class="bg-gray-50 dark:bg-gray-700/50">
+            <tr>
+                <th class="p-4 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition"
+                    (click)="p.sortPending('id')">
+                    <div class="flex items-center gap-1">Claim ID @if(p.pendingSortConfig().column === 'id') {<svg
+                            class="w-3 h-3 text-primary-500"
+                            [ngClass]="{'rotate-180': p.pendingSortConfig().direction === 'desc'}" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7">
+                            </path>
+                        </svg>}</div>
+                </th>
+                <th class="p-4 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition"
+                    (click)="p.sortPending('member')">
+                    <div class="flex items-center gap-1">Member @if(p.pendingSortConfig().column === 'member') {<svg
+                            class="w-3 h-3 text-primary-500"
+                            [ngClass]="{'rotate-180': p.pendingSortConfig().direction === 'desc'}" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7">
+                            </path>
+                        </svg>}</div>
+                </th>
+                <th class="p-4 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition"
+                    (click)="p.sortPending('type')">
+                    <div class="flex items-center gap-1">Type @if(p.pendingSortConfig().column === 'type') {<svg
+                            class="w-3 h-3 text-primary-500"
+                            [ngClass]="{'rotate-180': p.pendingSortConfig().direction === 'desc'}" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7">
+                            </path>
+                        </svg>}</div>
+                </th>
+                <th class="p-4 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition"
+                    (click)="p.sortPending('amount')">
+                    <div class="flex items-center gap-1">Amount @if(p.pendingSortConfig().column === 'amount') {<svg
+                            class="w-3 h-3 text-primary-500"
+                            [ngClass]="{'rotate-180': p.pendingSortConfig().direction === 'desc'}" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7">
+                            </path>
+                        </svg>}</div>
+                </th>
+                <th class="p-4 dark:text-gray-300 text-center">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            @for (cl of p.filteredPendingClaims(); track cl.id) {
+            <tr class="border-b dark:border-gray-700 group transition hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                <td class="p-4 font-mono text-xs dark:text-gray-300">{{cl.id | slice:0:8}}</td>
+                <td class="p-4 dark:text-white font-medium">{{cl.memberName}}</td>
+                <td class="p-4 dark:text-gray-300">{{cl.claimType}}</td>
+                <td class="p-4 font-bold text-red-600 dark:text-red-400">₹{{cl.claimAmount | number:'1.0-0'}}</td>
+                <td class="p-4 text-center">
+                    @if (cl.inReviewByOfficerName) {
+                    <span
+                        class="text-[10px] bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-bold uppercase tracking-wider block mb-1">In
+                        Review by {{cl.inReviewByOfficerName}}</span>
+                    <button disabled
+                        class="opacity-50 cursor-not-allowed bg-gray-100 text-gray-400 text-xs px-3 py-1.5 rounded transition">Locked</button>
+                    } @else {
+                    <button (click)="p.viewClaimDetails(cl.id)"
+                        class="bg-primary-50 text-primary-700 hover:bg-primary-100 dark:bg-primary-900/40 dark:text-primary-400 text-xs px-3 py-1.5 rounded transition">Review
+                        Documents</button>
+                    }
+                </td>
+            </tr>
+            } @empty {
+            <tr>
+                <td colspan="5" class="p-6 text-center text-gray-500 dark:text-gray-400">Queue is empty. Great job!
+                </td>
+            </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<!-- Claim Processing Modal -->
+@if (p.selectedClaim()) {
+<div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div
+        class="bg-white dark:bg-gray-800 rounded-2xl max-w-4xl w-full shadow-2xl p-6 relative max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-start mb-6">
+            <div>
+                <h3 class="text-xl font-bold dark:text-white">Process Claim #{{p.selectedClaim()?.id | slice:0:6}}
+                </h3>
+                <p class="text-sm text-gray-500 mt-1">{{p.selectedClaim()?.memberName}} |
+                    {{p.selectedClaim()?.claimType}}</p>
+            </div>
+            <button (click)="p.closeModal()" class="text-gray-400 hover:text-gray-600 p-1">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                    </path>
+                </svg>
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="col-span-2 space-y-6">
+                <!-- Verification Details -->
+                <div
+                    class="bg-gray-50 dark:bg-gray-900/30 p-4 rounded-xl border border-gray-100 dark:border-gray-800">
+                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Coverage Engine
+                        Verification</h4>
+                    @if (p.coverageSummary()) {
+                    <div class="grid grid-cols-3 gap-4">
+                        <div>
+                            <p class="text-[10px] text-gray-500 uppercase">Policy Limit</p>
+                            <p class="text-lg font-bold dark:text-white">₹{{p.coverageSummary()?.totalLimitAllowed |
+                                number:'1.0-0'}}
+                            </p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-gray-500 uppercase">Utilized</p>
+                            <p class="text-lg font-bold text-amber-600">₹{{p.coverageSummary()?.totalAmountUtilized |
+                                number:'1.0-0'}}
+                            </p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-gray-500 uppercase">Remaining</p>
+                            <p class="text-lg font-bold text-emerald-600">₹{{p.coverageSummary()?.remainingBalance |
+                                number:'1.0-0'}}
+                            </p>
+                        </div>
+                    </div>
+                    } @else {
+                    <div class="h-12 flex items-center gap-2 text-primary-600">
+                        <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"
+                                fill="none"></circle>
+                            <path class="opacity-75" fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                            </path>
+                        </svg>
+                        <span class="text-sm font-medium">Analyzing policy limits...</span>
+                    </div>
+                    }
+                </div>
+
+                <!-- Documents -->
+                <div>
+                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Supporting Medical
+                        Evidence</h4>
+                    @if (p.selectedClaim()?.documents && p.selectedClaim()?.documents.length > 0) {
+                    <div class="grid grid-cols-2 gap-3">
+                        @for (doc of p.selectedClaim()?.documents; track doc.id) {
+                        <a [href]="'https://localhost:7146' + doc.fileUrl" target="_blank"
+                            class="flex items-center gap-3 p-3 rounded-lg border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-primary-500 hover:ring-1 hover:ring-primary-500 transition-all group">
+                            <div
+                                class="w-10 h-10 rounded bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                    <polyline points="14 2 14 8 20 8" />
+                                </svg>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-xs font-bold dark:text-white truncate">{{ doc.documentType }}</p>
+                                <p class="text-[10px] text-gray-500">View Attachment</p>
+                            </div>
+                        </a>
+                        }
+                    </div>
+                    } @else {
+                    <div
+                        class="p-4 text-center border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl">
+                        <p class="text-sm text-gray-500 italic">No evidence uploaded by customer.</p>
+                    </div>
+                    }
+                </div>
+
+                <!-- Member Claim History -->
+                <div>
+                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Member Claim History
+                    </h4>
+                    <div
+                        class="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl overflow-hidden text-[11px]">
+                        @if (p.memberHistory().length > 0) {
+                        <table class="w-full text-left">
+                            <thead class="bg-gray-50 dark:bg-gray-700/50">
+                                <tr>
+                                    <th class="p-2">Date</th>
+                                    <th class="p-2">Type</th>
+                                    <th class="p-2">Amt</th>
+                                    <th class="p-2">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (h of p.memberHistory(); track h.id) {
+                                <tr class="border-b dark:border-gray-700">
+                                    <td class="p-2 text-gray-500">{{h.claimDate | date:'shortDate'}}</td>
+                                    <td class="p-2 dark:text-gray-300">{{h.claimType}}</td>
+                                    <td class="p-2 font-bold dark:text-white">₹{{h.claimAmount | number:'1.0-0'}}
+                                    </td>
+                                    <td class="p-2">
+                                        <span
+                                            [class]="h.status === 'Approved' ? 'text-emerald-600' : (h.status === 'Pending' ? 'text-amber-500' : 'text-red-500')">{{h.status}}</span>
+                                    </td>
+                                </tr>
+                                }
+                            </tbody>
+                        </table>
+                        } @else {
+                        <p class="p-4 text-center text-gray-500">No previous claims found for this member.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <!-- Claim Details Sidebar -->
+                <div
+                    class="bg-white dark:bg-gray-800 p-5 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Adjudication Console
+                    </h4>
+
+                    <div class="space-y-4 mb-6">
+                        <div>
+                            <p class="text-[10px] text-gray-500 uppercase">Requested Amount</p>
+                            <p class="text-2xl font-black text-red-600 dark:text-red-400">
+                                ₹{{p.selectedClaim()?.claimAmount | number:'1.0-0'}}</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-gray-500 uppercase">Incident Date</p>
+                            <p class="text-sm font-medium dark:text-white">{{p.selectedClaim()?.claimDate |
+                                date:'mediumDate'}}</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-gray-500 uppercase">Incident Summary</p>
+                            <p class="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
+                                {{p.selectedClaim()?.claimReason || 'No description provided.'}}</p>
+                        </div>
+                    </div>
+
+                    <hr class="mb-6 dark:border-gray-700" />
+
+                    <div class="space-y-3 font-medium">
+                        <button (click)="p.adjudicate(p.selectedClaim()?.id, true)"
+                            class="w-full py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 shadow-lg shadow-emerald-500/20 transition active:scale-[0.98]">
+                            Approve Settle
+                        </button>
+                        <button (click)="p.adjudicate(p.selectedClaim()?.id, false)"
+                            class="w-full py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 shadow-lg shadow-red-500/20 transition active:scale-[0.98]">
+                            Reject Item
+                        </button>
+                    </div>
+                </div>
+
+                <div
+                    class="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30">
+                    <p class="text-[10px] font-bold text-amber-700 dark:text-amber-500 uppercase mb-1">Officer Note
+                    </p>
+                    <p class="text-[11px] text-amber-800 dark:text-amber-400/80 leading-snug">Ensure medical bills
+                        match the requested amount and don't exceed remaining policy balance before approval.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+}

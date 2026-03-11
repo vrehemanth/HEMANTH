@@ -1,0 +1,228 @@
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+    @if (p.isLoading() && !p.summary()) {
+    @for (i of [1,2,3,4]; track i) {
+    <div
+        class="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden">
+        <div class="absolute inset-0 animate-shimmer"></div>
+        <div class="h-3 w-20 bg-gray-100 dark:bg-gray-700 rounded mb-4"></div>
+        <div class="h-8 w-24 bg-gray-200 dark:bg-gray-600 rounded"></div>
+    </div>
+    }
+    } @else {
+    <div class="premium-hover bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm relative group overflow-hidden cursor-pointer"
+        (click)="p.setActiveTab('policies')">
+        <div
+            class="absolute right-0 top-0 w-20 h-20 bg-blue-500/5 rounded-bl-full -mr-4 -mt-4 group-hover:scale-110 transition-transform duration-500">
+        </div>
+        <p class="text-xs font-black uppercase tracking-widest text-gray-400 relative z-10">Total Members</p>
+        <h3 class="text-3xl font-black mt-2 dark:text-white relative z-10">{{ p.summary()?.totalMembers || 0 }}</h3>
+    </div>
+    <div class="premium-hover bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm relative group overflow-hidden cursor-pointer"
+        (click)="p.setActiveTab('policies')">
+        <div
+            class="absolute right-0 top-0 w-20 h-20 bg-emerald-500/5 rounded-bl-full -mr-4 -mt-4 group-hover:scale-110 transition-transform duration-500">
+        </div>
+        <p class="text-xs font-black uppercase tracking-widest text-gray-400 relative z-10">Active Policies</p>
+        <h3 class="text-3xl font-black mt-2 dark:text-white relative z-10">{{ p.summary()?.totalPolicies || 0 }}</h3>
+    </div>
+    <div class="premium-hover bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm relative group overflow-hidden cursor-pointer"
+        (click)="p.setActiveTab('claims')">
+        <div
+            class="absolute right-0 top-0 w-20 h-20 bg-amber-500/5 rounded-bl-full -mr-4 -mt-4 group-hover:scale-110 transition-transform duration-500">
+        </div>
+        <p class="text-xs font-black uppercase tracking-widest text-gray-400 relative z-10">Claims Queue</p>
+        <h3 class="text-3xl font-black mt-2 dark:text-white relative z-10">{{ p.summary()?.pendingClaims || 0 }}</h3>
+    </div>
+    <div class="premium-hover bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm relative group overflow-hidden cursor-pointer border-l-4 border-l-red-500"
+        (click)="p.setActiveTab('billing')">
+        <div
+            class="absolute right-0 top-0 w-20 h-20 bg-red-500/5 rounded-bl-full -mr-4 -mt-4 group-hover:scale-110 transition-transform duration-500">
+        </div>
+        <div class="flex items-center gap-2 relative z-10">
+            <p class="text-xs font-black uppercase tracking-widest text-red-500">Premium Due</p>
+            @if (p.isPremiumDueSoon()) {
+            <span class="relative flex h-2 w-2">
+                <span
+                    class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+            </span>
+            }
+        </div>
+        <h3 class="text-3xl font-black mt-2 text-red-600 dark:text-red-400 relative z-10">₹{{
+            p.formatINR(p.summary()?.totalPremiumDue) }}</h3>
+    </div>
+    }
+</div>
+
+<!-- INTELLIGENCE & ANALYTICS -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
+    <!-- Premium Breakdown (Donut) -->
+    <div
+        class="lg:col-span-1 bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+        <div class="flex items-center justify-between mb-6">
+            <h4 class="text-sm font-black uppercase tracking-widest text-gray-400">Premium Breakdown</h4>
+            <span
+                class="text-[10px] font-bold text-primary-600 bg-primary-50 dark:bg-primary-900/20 px-2 py-0.5 rounded-full">Paid
+                vs Due</span>
+        </div>
+        <div class="relative h-64 flex items-center justify-center">
+            <canvas #premiumChart></canvas>
+            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span class="text-2xl font-black dark:text-white">₹{{ p.formatINR(p.summary()?.totalPremiumDue)
+                    }}</span>
+                <span class="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">Current Liability</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Claim Trends (Area) -->
+    <div
+        class="lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+        <div class="flex items-center justify-between mb-6">
+            <h4 class="text-sm font-black uppercase tracking-widest text-gray-400">Claim Transmission Trends</h4>
+            <div class="flex gap-2">
+                <span class="flex items-center gap-1.5 text-[10px] font-bold text-emerald-500">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500/20 border border-emerald-500"></span> Approved
+                </span>
+                <span class="flex items-center gap-1.5 text-[10px] font-bold text-primary-500">
+                    <span class="w-2 h-2 rounded-full bg-primary-500/20 border border-primary-500"></span> Total
+                </span>
+            </div>
+        </div>
+        <div class="h-64">
+            <canvas #claimsChart></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
+    <!-- Latest Claims -->
+    <div
+        class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm transition-all overflow-hidden flex flex-col">
+        <div
+            class="p-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/20">
+            <div>
+                <h4 class="text-base font-bold dark:text-white">Latest Employee Claims</h4>
+                <p class="text-[10px] text-gray-500 uppercase tracking-widest mt-0.5">Real-time Adjudication Stream
+                </p>
+            </div>
+            <button (click)="p.setActiveTab('claims')"
+                class="text-xs font-bold text-primary-600 hover:text-primary-700 transition flex items-center gap-1">
+                View All
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+            </button>
+        </div>
+        <div class="flex-1 overflow-x-auto min-h-[320px]">
+            <table class="w-full text-left table-fixed">
+                <thead class="bg-gray-50 dark:bg-gray-700/50">
+                    <tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                        <th class="p-4 w-1/3">Employee</th>
+                        <th class="p-4 w-1/4">Amount</th>
+                        <th class="p-4 w-1/4">Status</th>
+                        <th class="p-4 w-1/6">Date</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    @for (cl of p.claims().slice(0, 5); track cl.id) {
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition text-xs">
+                        <td class="p-4">
+                            <div class="font-bold dark:text-white truncate" [title]="cl.memberName">{{ cl.memberName
+                                }}</div>
+                            <div class="text-[10px] text-gray-400 font-mono">{{ cl.claimType }}</div>
+                        </td>
+                        <td class="p-4 font-black dark:text-white">₹{{ p.formatINR(cl.claimAmount) }}</td>
+                        <td class="p-4">
+                            <span
+                                [class]="cl.status === 'Approved' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : (cl.status === 'Pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400')"
+                                class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-tighter">
+                                {{ cl.status }}
+                            </span>
+                        </td>
+                        <td class="p-4 text-gray-500 font-medium">{{ cl.claimDate | date:'MMM dd' }}</td>
+                    </tr>
+                    } @empty {
+                    <tr>
+                        <td colspan="4" class="p-12 text-center">
+                            <div class="flex flex-col items-center gap-2 opacity-30">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10">
+                                    </path>
+                                </svg>
+                                <span class="text-xs font-bold uppercase tracking-widest">No Claims Reported</span>
+                            </div>
+                        </td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Recent Endorsements -->
+    <div
+        class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm transition-all overflow-hidden flex flex-col">
+        <div
+            class="p-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/20">
+            <div>
+                <h4 class="text-base font-bold dark:text-white">Recent Policy Revisions</h4>
+                <p class="text-[10px] text-gray-500 uppercase tracking-widest mt-0.5">Endorsement Lifecycle</p>
+            </div>
+            <button (click)="p.setActiveTab('revisions')"
+                class="text-xs font-bold text-primary-600 hover:text-primary-700 transition flex items-center gap-1">
+                View Ledger
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+            </button>
+        </div>
+        <div class="flex-1 overflow-x-auto min-h-[320px]">
+            <table class="w-full text-left table-fixed">
+                <thead class="bg-gray-50 dark:bg-gray-700/50">
+                    <tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                        <th class="p-4 w-1/3">Revision Type</th>
+                        <th class="p-4 w-1/4">Status</th>
+                        <th class="p-4 w-1/4">Dispatched</th>
+                        <th class="p-4 w-1/6">ID</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    @for (en of p.endorsements().slice(0, 5); track en.id) {
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition text-xs">
+                        <td class="p-4">
+                            <div class="font-bold dark:text-white truncate" [title]="en.description">{{ en.type
+                                || 'Policy Update' }}</div>
+                            <div class="text-[10px] text-gray-400 italic">{{ en.description | slice:0:30 }}{{
+                                en.description?.length > 30 ? '...' : '' }}</div>
+                        </td>
+                        <td class="p-4">
+                            <div class="flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full"
+                                    [class]="en.status === 'Approved' ? 'bg-emerald-500' : (en.status === 'Pending' ? 'bg-amber-500' : 'bg-red-500')"></span>
+                                <span class="font-bold dark:text-white text-[10px]">{{ en.status }}</span>
+                            </div>
+                        </td>
+                        <td class="p-4 text-gray-500 font-medium">{{ en.createdAt | date:'MMM dd, HH:mm' }}</td>
+                        <td class="p-4 text-gray-400 font-mono text-[10px]">#{{ en.id | slice:0:6 }}</td>
+                    </tr>
+                    } @empty {
+                    <tr>
+                        <td colspan="4" class="p-12 text-center">
+                            <div class="flex flex-col items-center gap-2 opacity-30">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                    </path>
+                                </svg>
+                                <span class="text-xs font-bold uppercase tracking-widest">No Revisions Found</span>
+                            </div>
+                        </td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

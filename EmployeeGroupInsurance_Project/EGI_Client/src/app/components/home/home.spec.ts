@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HomeComponent } from './home';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { RouterModule } from '@angular/router';
-import { PublicService } from '../../data-access/api.services';
+import { PublicService } from '../../data-access/public.service';
 import { ThemeService } from '../../core/services/theme.service';
 import { of, throwError } from 'rxjs';
 

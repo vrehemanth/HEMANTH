@@ -1,17 +1,25 @@
-﻿import { Component, inject, signal, OnInit, OnDestroy, computed, viewChild, ElementRef, effect } from '@angular/core';
+import { Component, inject, signal, OnInit, OnDestroy, computed, viewChild, ElementRef, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { AdminService } from '../../../data-access/api.services';
+import { AdminService } from '../../../data-access/admin.service';
 import { FormsModule } from '@angular/forms';
 import { Router, NavigationEnd } from '@angular/router';
 import { filter, Subscription, forkJoin, of, catchError } from 'rxjs';
 import { ToastService } from '../../../core/services/toast.service';
 import { Chart, registerables } from 'chart.js';
+import { OverviewTabComponent } from './tabs/overview/overview';
+import { PlansTabComponent } from './tabs/plans/plans';
+import { ClientsTabComponent } from './tabs/clients/clients';
+import { StaffTabComponent } from './tabs/staff/staff';
+import { PoliciesTabComponent } from './tabs/policies/policies';
+import { ClaimsTabComponent } from './tabs/claims/claims';
+import { LogsTabComponent } from './tabs/logs/logs';
+
 Chart.register(...registerables);
 
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, OverviewTabComponent, PlansTabComponent, ClientsTabComponent, StaffTabComponent, PoliciesTabComponent, ClaimsTabComponent, LogsTabComponent],
   templateUrl: './dashboard.html'
 })
 export class AdminDashboardComponent implements OnInit, OnDestroy {
@@ -23,31 +31,10 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   routerSub: Subscription | undefined;
   isLoading = signal(false);
 
-  // --- Chart Canvases ---
-  financialCanvas = viewChild<ElementRef<HTMLCanvasElement>>('financialChart');
-  claimTrendCanvas = viewChild<ElementRef<HTMLCanvasElement>>('claimTrendChart');
-  planMixCanvas = viewChild<ElementRef<HTMLCanvasElement>>('planMixChart');
-
+  // --- Chart Instances ---
   private financialChart?: Chart;
   private claimTrendChart?: Chart;
   private planMixChart?: Chart;
-
-  // --- Chart Lifecycle Effect ---
-  private chartEffect = effect(() => {
-    const fCanvas = this.financialCanvas();
-    const cCanvas = this.claimTrendCanvas();
-    const pCanvas = this.planMixCanvas();
-
-    // Track signals for reactivity
-    this.summary();
-    this.allClaimsRegistry();
-    this.allPolicyAssignments();
-
-    if (fCanvas && cCanvas && pCanvas && this.activeTab() === 'dashboard') {
-      this.destroyCharts();
-      setTimeout(() => this.initCharts(), 300);
-    }
-  });
 
   summary = signal<any>(null);
   pendingClients = signal<any[]>([]);
@@ -344,17 +331,16 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  private destroyCharts() {
+  destroyCharts() {
     this.financialChart?.destroy();
     this.claimTrendChart?.destroy();
     this.planMixChart?.destroy();
+    this.financialChart = undefined;
+    this.claimTrendChart = undefined;
+    this.planMixChart = undefined;
   }
 
-  private initCharts() {
-    const fEl = this.financialCanvas()?.nativeElement;
-    const cEl = this.claimTrendCanvas()?.nativeElement;
-    const pEl = this.planMixCanvas()?.nativeElement;
-
+  initCharts(fEl: HTMLCanvasElement, cEl: HTMLCanvasElement, pEl: HTMLCanvasElement) {
     if (!fEl || !cEl || !pEl) return;
 
     this.initFinancialChart(fEl);

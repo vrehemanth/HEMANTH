@@ -2,7 +2,9 @@ import { Injectable, signal, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
-import { API_BASE } from '../../data-access/api.services';
+import { environment } from '../../../environments/environment';
+
+const API_BASE = environment.apiBase;
 
 export type UserRole = 'Admin' | 'Agent' | 'Customer' | 'ClaimsOfficer';
 

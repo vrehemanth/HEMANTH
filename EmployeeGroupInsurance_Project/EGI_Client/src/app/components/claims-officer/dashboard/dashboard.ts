@@ -1,17 +1,20 @@
 import { Component, inject, signal, OnInit, OnDestroy, computed, viewChild, ElementRef, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, NavigationEnd } from '@angular/router';
-import { ClaimsOfficerService } from '../../../data-access/api.services';
+import { ClaimsOfficerService } from '../../../data-access/claims-officer.service';
 import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 import { ToastService } from '../../../core/services/toast.service';
 import { Chart, registerables } from 'chart.js';
+import { OverviewTabComponent } from './tabs/overview/overview';
+import { QueueTabComponent } from './tabs/queue/queue';
+import { HistoryTabComponent } from './tabs/history/history';
 Chart.register(...registerables);
 
 @Component({
   selector: 'app-claims-officer-dashboard',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, OverviewTabComponent, QueueTabComponent, HistoryTabComponent],
   templateUrl: './dashboard.html'
 })
 export class ClaimsOfficerDashboardComponent implements OnInit, OnDestroy {
@@ -20,29 +23,9 @@ export class ClaimsOfficerDashboardComponent implements OnInit, OnDestroy {
   toastService = inject(ToastService);
   private routerSub?: Subscription;
 
-  // --- Chart Canvases ---
-  decisionCanvas = viewChild<ElementRef<HTMLCanvasElement>>('decisionChart');
-  adjudicationCanvas = viewChild<ElementRef<HTMLCanvasElement>>('adjudicationChart');
-  typeCanvas = viewChild<ElementRef<HTMLCanvasElement>>('typeChart');
-
   private decisionChart?: Chart;
   private adjudicationChart?: Chart;
   private typeChart?: Chart;
-
-  private chartEffect = effect(() => {
-    const dCanvas = this.decisionCanvas();
-    const aCanvas = this.adjudicationCanvas();
-    const tCanvas = this.typeCanvas();
-
-    // Dependencies
-    this.summary();
-    this.claimHistory();
-
-    if (dCanvas && aCanvas && tCanvas && this.activeTab() === 'overview') {
-      this.destroyCharts();
-      setTimeout(() => this.initCharts(), 300);
-    }
-  });
 
   activeTab = signal<'overview' | 'queue' | 'history'>('overview');
   pageTitle = signal('Claims Adjudication Dashboard');
@@ -329,17 +312,17 @@ export class ClaimsOfficerDashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  private destroyCharts() {
+  public destroyCharts() {
     this.decisionChart?.destroy();
     this.adjudicationChart?.destroy();
     this.typeChart?.destroy();
+    
+    this.decisionChart = undefined;
+    this.adjudicationChart = undefined;
+    this.typeChart = undefined;
   }
 
-  private initCharts() {
-    const dCtx = this.decisionCanvas()?.nativeElement;
-    const aCtx = this.adjudicationCanvas()?.nativeElement;
-    const tCtx = this.typeCanvas()?.nativeElement;
-
+  public initCharts(dCtx: HTMLCanvasElement, aCtx: HTMLCanvasElement, tCtx: HTMLCanvasElement) {
     if (!dCtx || !aCtx || !tCtx) return;
 
     this.initDecisionChart(dCtx);

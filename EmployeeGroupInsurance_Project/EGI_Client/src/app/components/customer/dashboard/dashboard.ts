@@ -1,6 +1,6 @@
-import { Component, inject, signal, OnInit, OnDestroy, computed, viewChild, effect, ElementRef } from '@angular/core';
+import { Component, inject, signal, OnInit, OnDestroy, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { CustomerService } from '../../../data-access/api.services';
+import { CustomerService } from '../../../data-access/customer.service';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, NavigationEnd } from '@angular/router';
 import { Subscription, forkJoin, of } from 'rxjs';
@@ -8,8 +8,13 @@ import { filter, catchError } from 'rxjs/operators';
 import { ToastService } from '../../../core/services/toast.service';
 import * as htmlToImage from 'html-to-image';
 import { jsPDF } from 'jspdf';
-import { Chart, registerables } from 'chart.js';
-Chart.register(...registerables);
+
+import { OverviewTabComponent } from './tabs/overview/overview';
+import { ProfileTabComponent } from './tabs/profile/profile';
+import { PoliciesTabComponent } from './tabs/policies/policies';
+import { ClaimsTabComponent } from './tabs/claims/claims';
+import { BillingTabComponent } from './tabs/billing/billing';
+import { RevisionsTabComponent } from './tabs/revisions/revisions';
 
 import {
   RelationshipType,
@@ -24,7 +29,16 @@ import {
 @Component({
   selector: 'app-customer-dashboard',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    OverviewTabComponent,
+    ProfileTabComponent,
+    PoliciesTabComponent,
+    ClaimsTabComponent,
+    BillingTabComponent,
+    RevisionsTabComponent
+  ],
   templateUrl: './dashboard.html'
 })
 export class CustomerDashboardComponent implements OnInit, OnDestroy {
@@ -33,29 +47,6 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
   router = inject(Router);
   toastService = inject(ToastService);
   private routerSub?: Subscription;
-
-  // --- Chart Canvases ---
-  premiumCanvas = viewChild<ElementRef<HTMLCanvasElement>>('premiumChart');
-  claimsCanvas = viewChild<ElementRef<HTMLCanvasElement>>('claimsChart');
-
-  private premiumChart?: Chart;
-  private claimsChart?: Chart;
-
-  // --- Analytics Initialization Effect (Fixed: Moved to class field for Injection Context) ---
-  private chartEffect = effect(() => {
-    const pCanvas = this.premiumCanvas();
-    const cCanvas = this.claimsCanvas();
-
-    // Track data changes to re-trigger charts
-    this.invoices();
-    this.claims();
-    this.policies();
-
-    if (pCanvas && cCanvas && this.activeTab() === 'overview') {
-      this.destroyCharts();
-      setTimeout(() => this.initCharts(), 300);
-    }
-  });
 
 
   activeTab = signal<'overview' | 'profile' | 'policies' | 'claims' | 'billing' | 'revisions'>('overview');
@@ -71,6 +62,13 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
   endorsements = signal<any[]>([]);
   plans = signal<any[]>([]);
   profileData = signal<any>(null);
+
+  // --- Data Loading Flags (Ensures full lists are fetched even if partials exist from Overview) ---
+  fullInvoicesLoaded = signal(false);
+  fullClaimsLoaded = signal(false);
+  fullMembersLoaded = signal(false);
+  fullEndorsementsLoaded = signal(false);
+  fullPoliciesLoaded = signal(false);
 
   // --- Wizard/Stepper State ---
   policyOnboardingStep = signal(1);
@@ -397,6 +395,16 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
     relationship: [RelationshipType.Spouse.toString()]
   });
 
+  // Helper for Indian Currency Formatting (Thousands and Lakhs)
+  formatINR(val: any): string {
+    if (val === null || val === undefined) return '0';
+    const num = typeof val === 'string' ? parseFloat(val) : val;
+    return new Intl.NumberFormat('en-IN', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    }).format(num);
+  }
+
   private extractArray(payload: any): any[] {
     if (!payload) return [];
     if (Array.isArray(payload)) return payload;
@@ -424,146 +432,10 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
   }
 
 
-  private destroyCharts() {
-    this.premiumChart?.destroy();
-    this.claimsChart?.destroy();
-  }
 
-  private initCharts() {
-    const pEl = this.premiumCanvas()?.nativeElement;
-    const cEl = this.claimsCanvas()?.nativeElement;
 
-    if (!pEl || !cEl) return;
+  // Chart initialization moved to OverviewTabComponent
 
-    this.initPremiumChart(pEl);
-    this.initClaimsChart(cEl);
-  }
-
-  private initPremiumChart(ctx: HTMLCanvasElement) {
-    const totalDue = this.summary()?.totalPremiumDue || 0;
-    // Calculate paid amount from total invoices where status is Paid
-    const totalPaid = this.invoices()
-      .filter(inv => inv.status === 'Paid')
-      .reduce((sum, current) => sum + (current.amount || 0), 0);
-
-    const data = {
-      labels: ['Settled', 'Outstanding'],
-      datasets: [{
-        data: [totalPaid, totalDue],
-        backgroundColor: ['#10b981', '#ef4444'],
-        borderWidth: 0,
-        hoverOffset: 10,
-        borderRadius: 5
-      }]
-    };
-
-    this.premiumChart = new Chart(ctx, {
-      type: 'doughnut',
-      data: data,
-      options: {
-        cutout: '80%',
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            backgroundColor: 'rgba(0,0,0,0.8)',
-            padding: 12,
-            titleFont: { size: 14, weight: 'bold' },
-            bodyFont: { size: 12 },
-            callbacks: {
-              label: (item: any) => ` ₹${item.raw.toLocaleString()}`
-            }
-          }
-        }
-      }
-    });
-  }
-
-  private initClaimsChart(ctx: HTMLCanvasElement) {
-    const claims = this.claims();
-    if (claims.length === 0) return;
-
-    // Last 6 months labels
-    const months = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
-      months.push(d.toLocaleString('default', { month: 'short' }));
-    }
-
-    // Grouping
-    const groupedTotal = new Array(6).fill(0);
-    const groupedApproved = new Array(6).fill(0);
-
-    claims.forEach(cl => {
-      const date = new Date(cl.claimDate);
-      const diffMonths = (new Date().getFullYear() - date.getFullYear()) * 12 + (new Date().getMonth() - date.getMonth());
-      if (diffMonths >= 0 && diffMonths < 6) {
-        const idx = 5 - diffMonths;
-        groupedTotal[idx] += 1;
-        if (cl.status === 'Approved') {
-          groupedApproved[idx] += 1;
-        }
-      }
-    });
-
-    const gradientApproved = ctx.getContext('2d')?.createLinearGradient(0, 0, 0, 400);
-    gradientApproved?.addColorStop(0, 'rgba(16, 185, 129, 0.4)');
-    gradientApproved?.addColorStop(1, 'rgba(16, 185, 129, 0)');
-
-    const gradientTotal = ctx.getContext('2d')?.createLinearGradient(0, 0, 0, 400);
-    gradientTotal?.addColorStop(0, 'rgba(59, 130, 246, 0.4)');
-    gradientTotal?.addColorStop(1, 'rgba(59, 130, 246, 0)');
-
-    this.claimsChart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: months,
-        datasets: [
-          {
-            label: 'Approved',
-            data: groupedApproved,
-            borderColor: '#10b981',
-            backgroundColor: gradientApproved,
-            fill: true,
-            tension: 0.4,
-            pointRadius: 4,
-            pointBackgroundColor: '#10b981',
-            borderWidth: 3
-          },
-          {
-            label: 'Total Transmission',
-            data: groupedTotal,
-            borderColor: '#3b82f6',
-            backgroundColor: gradientTotal,
-            fill: true,
-            tension: 0.4,
-            pointRadius: 0,
-            borderWidth: 2,
-            borderDash: [5, 5]
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            mode: 'index',
-            intersect: false,
-            backgroundColor: 'rgba(0,0,0,0.8)',
-            padding: 12
-          }
-        },
-        scales: {
-          x: { display: true, grid: { display: false }, ticks: { font: { size: 10, weight: 600 } } },
-          y: { display: true, grid: { color: 'rgba(0,0,0,0.05)' }, border: { dash: [5, 5] }, ticks: { stepSize: 1, font: { size: 10 } } }
-        }
-      }
-    });
-  }
 
 
 
@@ -585,14 +457,14 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
         const ov = res?.data || res;
         this.summary.set(ov.summary);
 
-        // These are short lists returned by getOverview, we can use them temporarily
-        this.policies.set(this.extractArray(ov.recentPolicies));
-        this.claims.set(this.extractArray(ov.recentClaims));
-        this.invoices.set(this.extractArray(ov.recentInvoices));
-        this.endorsements.set(this.extractArray(ov.recentEndorsements));
+        // Prevent overwriting full lists if they were already fetched by lazyLoadTab
+        if (!this.fullPoliciesLoaded()) this.policies.set(this.extractArray(ov.recentPolicies));
+        if (!this.fullClaimsLoaded()) this.claims.set(this.extractArray(ov.recentClaims));
+        if (!this.fullInvoicesLoaded()) this.invoices.set(this.extractArray(ov.recentInvoices));
+        if (!this.fullEndorsementsLoaded()) this.endorsements.set(this.extractArray(ov.recentEndorsements));
 
         // Process members if present in overview
-        if (ov.recentMembers) {
+        if (ov.recentMembers && !this.fullMembersLoaded()) {
           const rawMembers = this.extractArray(ov.recentMembers);
           this.members.set(rawMembers.map(m => ({
             ...m,
@@ -601,6 +473,18 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
         }
       }
       this.isLoading.set(false);
+
+      // --- Proactive Fetch for Accurate Charts (Overview depends on this) ---
+      if (!this.fullInvoicesLoaded()) {
+        this.customerService.getMyInvoices().subscribe({
+          next: res => { this.invoices.set(this.extractArray(res)); this.fullInvoicesLoaded.set(true); }
+        });
+      }
+      if (!this.fullClaimsLoaded()) {
+        this.customerService.getMyClaims().subscribe({
+          next: res => { this.claims.set(this.extractArray(res)); this.fullClaimsLoaded.set(true); }
+        });
+      }
     });
 
     this.customerService.getAllPlans().pipe(catchError(() => of([]))).subscribe(res => {
@@ -677,30 +561,20 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  // OPTIMIZATION: Individual execution without blocking UI mapping
   lazyLoadTab(tab: string) {
-    if (tab === 'policies' && this.members().length === 0 && !this.pendingReqs.has('members')) {
-      this.pendingReqs.add('members');
-      this.customerService.getMyMembers().subscribe({
-        next: res => {
-          const rawMembers = this.extractArray(res);
-          this.members.set(rawMembers.map(m => ({
-            ...m,
-            dependents: this.extractArray(m.dependents)
-          })));
-          this.pendingReqs.delete('members');
-        },
-        error: () => this.pendingReqs.delete('members')
-      });
-    } else if (tab === 'claims') {
-      if (this.claims().length === 0 && !this.pendingReqs.has('claims')) {
-        this.pendingReqs.add('claims');
-        this.customerService.getMyClaims().subscribe({
-          next: res => { this.claims.set(this.extractArray(res)); this.pendingReqs.delete('claims'); },
-          error: () => this.pendingReqs.delete('claims')
+    if (tab === 'policies') {
+      if (!this.fullPoliciesLoaded() && !this.pendingReqs.has('policies')) {
+        this.pendingReqs.add('policies');
+        this.customerService.getMyPolicies().subscribe({
+          next: res => {
+            this.policies.set(this.extractArray(res));
+            this.fullPoliciesLoaded.set(true);
+            this.pendingReqs.delete('policies');
+          },
+          error: () => this.pendingReqs.delete('policies')
         });
       }
-      if (this.members().length === 0 && !this.pendingReqs.has('members')) {
+      if (!this.fullMembersLoaded() && !this.pendingReqs.has('members')) {
         this.pendingReqs.add('members');
         this.customerService.getMyMembers().subscribe({
           next: res => {
@@ -709,29 +583,73 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
               ...m,
               dependents: this.extractArray(m.dependents)
             })));
+            this.fullMembersLoaded.set(true);
             this.pendingReqs.delete('members');
           },
           error: () => this.pendingReqs.delete('members')
         });
       }
-    } else if (tab === 'billing' && this.invoices().length === 0 && !this.pendingReqs.has('invoices')) {
+    } else if (tab === 'claims') {
+      if (!this.fullClaimsLoaded() && !this.pendingReqs.has('claims')) {
+        this.pendingReqs.add('claims');
+        this.customerService.getMyClaims().subscribe({
+          next: res => {
+            this.claims.set(this.extractArray(res));
+            this.fullClaimsLoaded.set(true);
+            this.pendingReqs.delete('claims');
+          },
+          error: () => this.pendingReqs.delete('claims')
+        });
+      }
+      if (!this.fullMembersLoaded() && !this.pendingReqs.has('members')) {
+        this.pendingReqs.add('members');
+        this.customerService.getMyMembers().subscribe({
+          next: res => {
+            const rawMembers = this.extractArray(res);
+            this.members.set(rawMembers.map(m => ({
+              ...m,
+              dependents: this.extractArray(m.dependents)
+            })));
+            this.fullMembersLoaded.set(true);
+            this.pendingReqs.delete('members');
+          },
+          error: () => this.pendingReqs.delete('members')
+        });
+      }
+    } else if (tab === 'billing' && !this.fullInvoicesLoaded() && !this.pendingReqs.has('invoices')) {
       this.pendingReqs.add('invoices');
       this.customerService.getMyInvoices().subscribe({
-        next: res => { this.invoices.set(this.extractArray(res)); this.pendingReqs.delete('invoices'); },
+        next: res => {
+          this.invoices.set(this.extractArray(res));
+          this.fullInvoicesLoaded.set(true);
+          this.pendingReqs.delete('invoices');
+        },
         error: () => this.pendingReqs.delete('invoices')
       });
     } else if (tab === 'revisions') {
-      if ((this.endorsements().length === 0 || this.endorsements().length <= 5) && !this.pendingReqs.has('endorsements')) {
+      if (!this.fullEndorsementsLoaded() && !this.pendingReqs.has('endorsements')) {
         this.pendingReqs.add('endorsements');
         this.customerService.getMyEndorsements().subscribe({
-          next: res => { this.endorsements.set(this.extractArray(res)); this.pendingReqs.delete('endorsements'); },
+          next: res => {
+            this.endorsements.set(this.extractArray(res));
+            this.fullEndorsementsLoaded.set(true);
+            this.pendingReqs.delete('endorsements');
+          },
           error: () => this.pendingReqs.delete('endorsements')
         });
       }
-      if (this.members().length === 0 && !this.pendingReqs.has('members')) {
+      if (!this.fullMembersLoaded() && !this.pendingReqs.has('members')) {
         this.pendingReqs.add('members');
         this.customerService.getMyMembers().subscribe({
-          next: res => { this.members.set(this.extractArray(res)); this.pendingReqs.delete('members'); },
+          next: res => {
+            const rawMembers = this.extractArray(res);
+            this.members.set(rawMembers.map(m => ({
+              ...m,
+              dependents: this.extractArray(m.dependents)
+            })));
+            this.fullMembersLoaded.set(true);
+            this.pendingReqs.delete('members');
+          },
           error: () => this.pendingReqs.delete('members')
         });
       }

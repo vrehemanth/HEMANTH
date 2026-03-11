@@ -1,0 +1,92 @@
+<div class="space-y-6">
+    <div
+        class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+        <div
+            class="p-6 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/20 flex justify-between items-center">
+            <div>
+                <h3 class="font-bold text-lg dark:text-white">Policy Revision History</h3>
+                <p class="text-xs text-gray-500 mt-1 uppercase tracking-widest">Endorsement Adjudication Log</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <button (click)="p.toggleGlobalEndorsementForm()"
+                    class="px-4 py-2 bg-primary-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-primary-700 transition active:scale-95 shadow-lg shadow-primary-500/20 flex items-center gap-2">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4">
+                        </path>
+                    </svg>
+                    Add New Policy Revision
+                </button>
+                <div class="flex items-center gap-3 border-l dark:border-gray-700 pl-4">
+                    <span class="flex items-center gap-2 text-[10px] font-bold text-gray-400">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Approved
+                    </span>
+                    <span class="flex items-center gap-2 text-[10px] font-bold text-gray-400">
+                        <span class="w-2 h-2 rounded-full bg-amber-500"></span> Pending
+                    </span>
+                    <span class="flex items-center gap-2 text-[10px] font-bold text-gray-400">
+                        <span class="w-2 h-2 rounded-full bg-red-500"></span> Rejected
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm whitespace-nowrap">
+                <thead class="bg-gray-50/50 dark:bg-gray-700/30">
+                    <tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                        <th class="p-4">Revision Classification</th>
+                        <th class="p-4">Business Context</th>
+                        <th class="p-4">Dispatched On</th>
+                        <th class="p-4 text-center">Status</th>
+                        <th class="p-4 text-center">Reference ID</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    @for (en of p.endorsements(); track en.id) {
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                        <td class="p-4">
+                            <span
+                                class="px-3 py-1 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 rounded-lg text-xs font-black uppercase tracking-tight">
+                                {{ en.type }}
+                            </span>
+                        </td>
+                        <td class="p-4">
+                            <div class="font-bold dark:text-white max-w-md truncate" [title]="en.description">{{
+                                en.description }}</div>
+                        </td>
+                        <td class="p-4 dark:text-gray-300 font-medium">
+                            {{ en.createdAt | date:'MMM dd, yyyy' }}
+                            <div class="text-[10px] text-gray-400">{{ en.createdAt | date:'HH:mm:ss' }}</div>
+                        </td>
+                        <td class="p-4 text-center">
+                            <span
+                                [class]="en.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' : (en.status === 'Pending' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700')"
+                                class="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm">
+                                {{ en.status }}
+                            </span>
+                        </td>
+                        <td class="p-4 text-center">
+                            <span
+                                class="font-mono text-[10px] p-2 bg-gray-100 dark:bg-gray-900 text-gray-500 rounded-lg">#{{
+                                en.id }}</span>
+                        </td>
+                    </tr>
+                    } @empty {
+                    <tr>
+                        <td colspan="5" class="p-32 text-center">
+                            <div class="flex flex-col items-center gap-4 opacity-20">
+                                <svg class="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                    </path>
+                                </svg>
+                                <span class="text-sm font-black uppercase tracking-[0.3em]">Revision Vault
+                                    Empty</span>
+                            </div>
+                        </td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

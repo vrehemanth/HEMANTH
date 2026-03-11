@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { ThemeService } from '../../core/services/theme.service';
 import { AuthService } from '../../core/services/auth.service';
-import { PublicService } from '../../data-access/api.services';
+import { PublicService } from '../../data-access/public.service';
 
 @Component({
   selector: 'app-home',

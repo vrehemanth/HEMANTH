@@ -1,0 +1,241 @@
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+    @if (p.isLoading() && !p.summary()) {
+    @for (i of [1,2,3,4]; track i) {
+    <div
+        class="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden">
+        <div class="absolute inset-0 animate-shimmer"></div>
+        <div class="h-3 w-20 bg-gray-100 dark:bg-gray-700 rounded mb-4"></div>
+        <div class="h-8 w-24 bg-gray-200 dark:bg-gray-600 rounded"></div>
+    </div>
+    }
+    } @else {
+    <div
+        class="premium-hover bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden group">
+        <div
+            class="absolute -right-4 -bottom-4 w-24 h-24 bg-primary-50 dark:bg-primary-900/10 rounded-full group-hover:scale-110 transition-transform duration-500">
+        </div>
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest relative z-10">Total Customers</p>
+        <h3 class="text-3xl font-black mt-2 dark:text-white relative z-10">{{ p.summary()?.totalCustomers || 0 }}</h3>
+        <p class="text-[10px] text-gray-500 mt-4 relative z-10">Managed Portfolio</p>
+    </div>
+
+    <div
+        class="premium-hover bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden group">
+        <div
+            class="absolute -right-4 -bottom-4 w-24 h-24 bg-blue-50 dark:bg-blue-900/10 rounded-full group-hover:scale-110 transition-transform duration-500">
+        </div>
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest relative z-10">Active Policies</p>
+        <h3 class="text-3xl font-black mt-2 dark:text-white relative z-10">{{ p.summary()?.activePolicies || 0 }}</h3>
+        <p class="text-[10px] text-gray-500 mt-4 relative z-10">In-force implementations</p>
+    </div>
+
+    <div
+        class="premium-hover bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden group">
+        <div
+            class="absolute -right-4 -bottom-4 w-24 h-24 bg-emerald-50 dark:bg-emerald-900/10 rounded-full group-hover:scale-110 transition-transform duration-500">
+        </div>
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest relative z-10">Sales (This Month)</p>
+        <h3 class="text-3xl font-black mt-2 text-emerald-600 dark:text-emerald-400 relative z-10">{{
+            p.summary()?.policiesSoldThisMonth || 0 }}</h3>
+        <p class="text-[10px] text-gray-500 mt-4 relative z-10">New policies issued</p>
+    </div>
+
+    <div
+        class="premium-hover bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm border-l-4 border-l-emerald-500">
+        <p class="text-xs font-bold text-emerald-500 uppercase tracking-widest">Commission Received</p>
+        <h3 class="text-3xl font-black mt-2 text-gray-900 dark:text-white">₹{{ p.summary()?.totalCommissionEarned |
+            number:'1.0-0' }}</h3>
+        <div class="flex items-center gap-1.5 mt-4 text-[10px] text-emerald-600 font-bold">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            Verified Earnings
+        </div>
+    </div>
+    }
+</div>
+
+<!-- Intelligence & Global Insights -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Commission Engine (Donut) -->
+    <div
+        class="premium-hover group bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm transition-all">
+        <div class="flex items-center justify-between mb-6">
+            <h4 class="text-xs font-black uppercase tracking-widest text-gray-400">Commission Growth</h4>
+            <div
+                class="px-2 py-0.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-full text-[10px] font-bold text-emerald-600">
+                Performance: Positive</div>
+        </div>
+        <div class="relative h-48 flex items-center justify-center">
+            <canvas #commissionChart></canvas>
+            <div
+                class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none group-hover:opacity-0 transition-opacity duration-300">
+                <span class="text-xl font-black dark:text-white">₹{{ (p.summary()?.totalCommissionEarned +
+                    p.summary()?.projectedCommission) | number:'1.0-0' }}</span>
+                <span class="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">Total Portfolio</span>
+            </div>
+        </div>
+        <div class="mt-6 grid grid-cols-2 gap-4 border-t border-gray-50 dark:border-gray-700/50 pt-4">
+            <div class="flex flex-col items-center border-r border-gray-50 dark:border-gray-700/50">
+                <div class="flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-[#10b981]"></span>
+                    <span class="text-[9px] font-bold text-gray-400 uppercase">Earned</span>
+                </div>
+                <span class="text-sm font-bold dark:text-gray-200">₹{{ p.summary()?.totalCommissionEarned |
+                    number:'1.0-0' }}</span>
+            </div>
+            <div class="flex flex-col items-center">
+                <div class="flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-[#6366f1]"></span>
+                    <span class="text-[9px] font-bold text-gray-400 uppercase">Projected</span>
+                </div>
+                <span class="text-sm font-bold dark:text-gray-200">₹{{ p.summary()?.projectedCommission |
+                    number:'1.0-0' }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div
+        class="premium-hover bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm transition-all">
+        <div class="flex items-center justify-between mb-4">
+            <h4 class="text-xs font-black uppercase tracking-widest text-gray-400">Outstanding pipeline</h4>
+            <span class="text-[10px] text-red-500 font-bold uppercase">Urgent Follow-up</span>
+        </div>
+        <div class="h-64">
+            <canvas #outstandingChart></canvas>
+        </div>
+    </div>
+
+    <div
+        class="premium-hover bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm transition-all">
+        <div class="flex items-center justify-between mb-4">
+            <h4 class="text-xs font-black uppercase tracking-widest text-gray-400">Portfolio Sales Mix</h4>
+            <span class="text-[10px] text-blue-500 font-bold uppercase">Product Focus</span>
+        </div>
+        <div class="h-64">
+            <canvas #salesMixChart></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Dynamic Business Oversight -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <!-- DETAILED PENDING PREMIUM -->
+    <div
+        class="premium-hover lg:col-span-5 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm p-8 flex flex-col">
+        <div class="flex items-center justify-between mb-8">
+            <div>
+                <h4 class="text-lg font-bold text-gray-900 dark:text-white">Pending Premiums</h4>
+                <p class="text-xs text-gray-500 mt-1">Outstanding balances requiring follow-up.</p>
+            </div>
+            <div class="p-2 bg-red-50 dark:bg-red-900/20 rounded-xl text-red-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+        </div>
+
+        <div class="space-y-4 flex-1">
+            @for (item of p.summary()?.customerPendingPremiums; track item.companyName) {
+            <div
+                class="flex items-center justify-between p-4 rounded-2xl bg-gray-50 dark:bg-gray-700/30 border border-gray-100 dark:border-gray-600 group hover:border-red-200 transition-colors">
+                <div class="min-w-0">
+                    <p class="text-xs font-black text-gray-900 dark:text-white truncate uppercase tracking-tighter">
+                        {{ item.companyName }}</p>
+                    <p class="text-[9px] text-gray-400 font-bold uppercase mt-1">Due Balance</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-sm font-black text-red-600">₹{{ item.amount | number:'1.0-0' }}</p>
+                </div>
+            </div>
+            } @empty {
+            <div class="flex-1 flex flex-col items-center justify-center opacity-30 py-10">
+                <svg class="w-12 h-12 mb-3 text-emerald-500" fill="none" stroke="currentColor" stroke-width="1.5"
+                    viewBox="0 0 24 24">
+                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <p class="text-xs font-bold text-emerald-600">All premiums collected!</p>
+            </div>
+            }
+        </div>
+
+        <div class="mt-8 pt-6 border-t border-gray-100 dark:border-gray-700">
+            <div class="flex justify-between items-end">
+                <div>
+                    <p class="text-[10px] text-gray-400 font-bold uppercase">Total Outstanding</p>
+                    <p class="text-2xl font-black text-gray-900 dark:text-white">₹{{
+                        p.summary()?.pendingPremium | number:'1.0-0' }}</p>
+                </div>
+                <button (click)="p.exportReport()"
+                    class="px-4 py-2 bg-primary-600 text-white text-[10px] font-black uppercase rounded-xl hover:bg-primary-700 transition-all">Export
+                    Report</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CUSTOMER CLAIM MONITOR -->
+    <div
+        class="premium-hover lg:col-span-7 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm p-8 flex flex-col">
+        <div class="flex items-center justify-between mb-8">
+            <div>
+                <h4 class="text-lg font-bold text-gray-900 dark:text-white">Claim Status Monitor</h4>
+                <p class="text-xs text-gray-500 mt-1">Live adjudication and document access.</p>
+            </div>
+            <div class="flex items-center gap-2 p-1.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                <span class="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
+                <span class="text-[10px] font-black text-emerald-600 uppercase">Live Pulse</span>
+            </div>
+        </div>
+
+        <div class="space-y-4 flex-1">
+            @for (claim of p.summary()?.recentClaims; track claim.id) {
+            <div
+                class="p-4 rounded-2xl bg-white dark:bg-gray-700/20 border border-gray-100 dark:border-gray-700 group">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="min-w-0">
+                        <p
+                            class="text-xs font-black text-gray-900 dark:text-white truncate uppercase tracking-tighter">
+                            {{ claim.memberName }}</p>
+                        <p class="text-[10px] text-gray-500">{{ claim.date | date:'mediumDate' }} • ₹{{
+                            claim.amount | number:'1.0-0' }}</p>
+                    </div>
+                    <span class="text-[9px] font-black px-2 py-0.5 rounded-full uppercase" [ngClass]="{
+                        'bg-emerald-100 text-emerald-700': claim.status === 'Approved',
+                        'bg-red-100 text-red-700': claim.status === 'Rejected',
+                        'bg-amber-100 text-amber-700': claim.status !== 'Approved' && claim.status !== 'Rejected'
+                    }">{{ claim.status }}</span>
+                </div>
+
+                <div class="flex items-center gap-3 pt-4 border-t border-gray-50 dark:border-gray-700/50">
+                    <p class="text-[10px] text-gray-400 font-bold uppercase">Files:</p>
+                    @if (claim.status === 'Approved') {
+                    <div class="flex flex-wrap gap-2">
+                        @for (doc of claim.documents; track doc.id) {
+                        <a [href]="'https://localhost:7146' + doc.fileUrl" target="_blank"
+                            class="flex items-center gap-1 text-[10px] font-bold text-primary-600 hover:text-primary-700 bg-primary-50 dark:bg-primary-900/20 px-2 py-1 rounded-lg transition-colors">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5"
+                                viewBox="0 0 24 24">
+                                <path
+                                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                </path>
+                            </svg>
+                            {{ doc.fileName | slice:0:15 }}...
+                        </a>
+                        } @empty {
+                        <span class="text-[9px] text-gray-400 italic">No files attached</span>
+                        }
+
+                    </div>
+                    } @else {
+                    <span class="text-[9px] text-gray-400 italic">Available upon approval</span>
+                    }
+                </div>
+            </div>
+            } @empty {
+            <div class="flex-1 flex flex-col items-center justify-center py-20 opacity-30 italic text-xs">
+                No recent claim activity detected.
+            </div>
+            }
+        </div>
+    </div>
+</div>

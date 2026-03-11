@@ -1,18 +1,23 @@
 import { Component, inject, signal, OnInit, OnDestroy, computed, viewChild, ElementRef, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, NavigationEnd } from '@angular/router';
-import { AgentService } from '../../../data-access/api.services';
+import { AgentService } from '../../../data-access/agent.service';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { filter, tap } from 'rxjs/operators';
 import { ToastService } from '../../../core/services/toast.service';
 import { Chart, registerables } from 'chart.js';
+import { OverviewTabComponent } from './tabs/overview/overview';
+import { CustomersTabComponent } from './tabs/customers/customers';
+import { PoliciesTabComponent } from './tabs/policies/policies';
+import { EndorsementsTabComponent } from './tabs/endorsements/endorsements';
+import { CommissionsTabComponent } from './tabs/commissions/commissions';
 Chart.register(...registerables);
 
 @Component({
   selector: 'app-agent-dashboard',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, OverviewTabComponent, CustomersTabComponent, PoliciesTabComponent, EndorsementsTabComponent, CommissionsTabComponent],
   templateUrl: './dashboard.html'
 })
 export class AgentDashboardComponent implements OnInit, OnDestroy {
@@ -22,29 +27,9 @@ export class AgentDashboardComponent implements OnInit, OnDestroy {
   toastService = inject(ToastService);
   private routerSub?: Subscription;
 
-  // --- Chart Canvases ---
-  commissionCanvas = viewChild<ElementRef<HTMLCanvasElement>>('commissionChart');
-  outstandingCanvas = viewChild<ElementRef<HTMLCanvasElement>>('outstandingChart');
-  salesMixCanvas = viewChild<ElementRef<HTMLCanvasElement>>('salesMixChart');
-
   private commissionChart?: Chart;
   private outstandingChart?: Chart;
   private salesMixChart?: Chart;
-
-  private chartEffect = effect(() => {
-    const cCanvas = this.commissionCanvas();
-    const oCanvas = this.outstandingCanvas();
-    const sCanvas = this.salesMixCanvas();
-
-    // Dependencies
-    this.summary();
-    this.policies();
-
-    if (cCanvas && oCanvas && sCanvas && this.activeTab() === 'overview') {
-      this.destroyCharts();
-      setTimeout(() => this.initCharts(), 300);
-    }
-  });
 
   activeTab = signal<'overview' | 'customers' | 'policies' | 'endorsements' | 'commissions'>('overview');
   pageTitle = signal('Agent Dashboard');
@@ -194,6 +179,7 @@ export class AgentDashboardComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.routerSub?.unsubscribe();
+    this.destroyCharts();
   }
 
   updateTab(url: string) {
@@ -335,17 +321,17 @@ export class AgentDashboardComponent implements OnInit, OnDestroy {
     this.toastService.success('Pending Premium Report exported successfully.');
   }
 
-  private destroyCharts() {
+  public destroyCharts() {
     this.commissionChart?.destroy();
     this.outstandingChart?.destroy();
     this.salesMixChart?.destroy();
+
+    this.commissionChart = undefined;
+    this.outstandingChart = undefined;
+    this.salesMixChart = undefined;
   }
 
-  private initCharts() {
-    const cCtx = this.commissionCanvas()?.nativeElement;
-    const oCtx = this.outstandingCanvas()?.nativeElement;
-    const sCtx = this.salesMixCanvas()?.nativeElement;
-
+  public initCharts(cCtx: HTMLCanvasElement, oCtx: HTMLCanvasElement, sCtx: HTMLCanvasElement) {
     if (!cCtx || !oCtx || !sCtx) return;
 
     this.initCommissionChart(cCtx);
