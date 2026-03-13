@@ -58,11 +58,26 @@ export class NotificationService {
             const count = typeof data === 'number' ? data : (data?.count || 0);
 
             if (count > this.unreadCount()) {
-                this.toast.info('You have new notifications');
-                this.fetchNotifications();
+                // Fetch notifications to get the latest message
+                this.http.get<any>(`${this.apiUrl}?take=1`).subscribe(notifRes => {
+                    const latestData = notifRes?.data || notifRes;
+                    const list = Array.isArray(latestData) ? latestData : (latestData?.$values || []);
+                    if (list.length > 0) {
+                        const latest = list[0];
+                        this.showNotificationToast(latest);
+                    } else {
+                        this.toast.info('You have new notifications');
+                    }
+                    this.fetchNotifications();
+                });
             }
             this.unreadCount.set(count);
         });
+    }
+
+    private showNotificationToast(notification: Notification) {
+        const type = notification.type.toLowerCase() as 'success' | 'error' | 'info' | 'warning';
+        this.toast.show(notification.message, type);
     }
 
     markAsRead(id: string) {

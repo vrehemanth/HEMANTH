@@ -98,6 +98,7 @@ export class AppLayoutComponent implements OnInit, OnDestroy {
     const iconCreditCard = this.sanitizer.bypassSecurityTrustHtml('<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>');
     const iconFilePlus = this.sanitizer.bypassSecurityTrustHtml('<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="12" x2="12" y1="18" y2="12"/><line x1="9" x2="15" y1="15" y2="15"/></svg>');
     const iconList = this.sanitizer.bypassSecurityTrustHtml('<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>');
+    const iconBell = this.sanitizer.bypassSecurityTrustHtml('<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>');
 
     // BLOCK ACCESS: If password change is required, show no navigation links
     if (this.authService.currentUser()?.requirePasswordChange) {
@@ -115,7 +116,8 @@ export class AppLayoutComponent implements OnInit, OnDestroy {
           { path: '/admin/staff', label: 'Staff Management', icon: iconUsers },
           { path: '/admin/policies', label: 'Policies & Invoices', icon: iconFileText },
           { path: '/admin/claims', label: 'System Claims', icon: iconList },
-          { path: '/admin/logs', label: 'Audit Logs', icon: iconEdit3 }
+          { path: '/admin/logs', label: 'Audit Logs', icon: iconEdit3 },
+          { path: '/notifications/history', label: 'Activity History', icon: iconBell }
         ];
       case 'agent':
         return [
@@ -123,7 +125,8 @@ export class AppLayoutComponent implements OnInit, OnDestroy {
           { path: '/agent/customers', label: 'Customers', icon: iconUsers },
           { path: '/agent/policies', label: 'Policies', icon: iconFileText },
           { path: '/agent/endorsements', label: 'Endorsements', icon: iconEdit3 },
-          { path: '/agent/commissions', label: 'Commission Ledger', icon: iconCreditCard }
+          { path: '/agent/commissions', label: 'Commission Ledger', icon: iconCreditCard },
+          { path: '/notifications/history', label: 'Activity History', icon: iconBell }
         ];
       case 'customer':
         return [
@@ -132,13 +135,15 @@ export class AppLayoutComponent implements OnInit, OnDestroy {
           { path: '/customer/policies', label: 'Policies & Members', icon: iconFileText },
           { path: '/customer/invoices', label: 'Invoices', icon: iconCreditCard },
           { path: '/customer/claims', label: 'Claims', icon: iconFilePlus },
-          { path: '/customer/revisions', label: 'Revisions', icon: iconEdit3 }
+          { path: '/customer/revisions', label: 'Revisions', icon: iconEdit3 },
+          { path: '/notifications/history', label: 'Activity History', icon: iconBell }
         ];
       case 'claimsofficer':
         return [
           { path: '/claims-officer/dashboard', label: 'Dashboard', icon: iconDashboard },
           { path: '/claims-officer/queue', label: 'Actionable Queue', icon: iconList },
-          { path: '/claims-officer/history', label: 'Review History', icon: iconFileText }
+          { path: '/claims-officer/history', label: 'Review History', icon: iconFileText },
+          { path: '/notifications/history', label: 'Activity History', icon: iconBell }
         ];
       default:
         return [];

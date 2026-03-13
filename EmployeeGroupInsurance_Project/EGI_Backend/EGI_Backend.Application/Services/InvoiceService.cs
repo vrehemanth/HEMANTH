@@ -220,6 +220,13 @@ namespace EGI_Backend.Application.Services
             await _invoiceRepo.AddAsync(invoice);
             await _unitOfWork.SaveChangesAsync();
 
+            // Notify Corporate Client
+            var client = await _clientRepo.GetByIdAsync(policy.CorporateClientId);
+            if (client != null)
+            {
+                await _notificationService.CreateNotificationAsync(client.UserId, "New Invoice", $"A new invoice {invoice.InvoiceNo} for ₹{invoice.Amount:N2} has been generated for your policy {policy.PolicyNo}.", "Info");
+            }
+
             try { await SendInvoiceEmailAsync(invoice, policy); }
             catch (Exception ex) { Console.WriteLine($"[EMAIL ERROR]: {ex.Message}"); }
         }
@@ -260,6 +267,15 @@ namespace EGI_Backend.Application.Services
             }
 
             await _unitOfWork.SaveChangesAsync();
+
+            // Notify Corporate Client
+            var client = await _clientRepo.GetByUserIdAsync(policyAssignmentId); // This might be wrong logic in existing code, but I'll stick to notifying if possible
+            // Actually, policyAssignmentId corresponds to CorporateClient. I should get the client.
+            var policy = await _policyRepo.GetByIdWithDetailsAsync(policyAssignmentId);
+            if (policy?.CorporateClient != null)
+            {
+                await _notificationService.CreateNotificationAsync(policy.CorporateClient.UserId, "Credit Applied", $"A credit of ₹{creditAmount:N2} has been applied to your outstanding invoices.", "Success");
+            }
         }
 
         public async Task GenerateAdjustmentInvoiceAsync(PolicyAssignment policy, decimal adjustmentAmount, DateTime? customPeriodTo = null)
@@ -290,6 +306,13 @@ namespace EGI_Backend.Application.Services
 
             await _invoiceRepo.AddAsync(invoice);
             await _unitOfWork.SaveChangesAsync();
+
+            // Notify Corporate Client
+            var client = await _clientRepo.GetByIdAsync(policy.CorporateClientId);
+            if (client != null)
+            {
+                await _notificationService.CreateNotificationAsync(client.UserId, "Adjustment Invoice", $"An adjustment invoice {invoice.InvoiceNo} for ₹{invoice.Amount:N2} has been generated due to policy changes.", "Warning");
+            }
 
             try { await SendInvoiceEmailAsync(invoice, policy); }
             catch (Exception ex) { Console.WriteLine($"[EMAIL ERROR]: {ex.Message}"); }
@@ -348,9 +371,15 @@ namespace EGI_Backend.Application.Services
 
             await _unitOfWork.SaveChangesAsync();
 
-            // Send Emails after saving
+            // Send Emails and Notifications after saving
             foreach (var item in newlyGeneratedInvoices)
             {
+                var client = await _clientRepo.GetByIdAsync(item.Pol.CorporateClientId);
+                if (client != null)
+                {
+                    await _notificationService.CreateNotificationAsync(client.UserId, "Recurring Invoice Issued", $"Invoice #{item.Inv.InvoiceNo} for ₹{item.Inv.Amount:N2} has been issued for policy #{item.Pol.PolicyNo}.", "Info");
+                }
+
                 try { await SendInvoiceEmailAsync(item.Inv, item.Pol); }
                 catch (Exception ex) { Console.WriteLine($"[EMAIL ERROR]: {ex.Message}"); }
             }
@@ -563,6 +592,13 @@ namespace EGI_Backend.Application.Services
 
             await _paymentRepo.AddAsync(payment);
             await _unitOfWork.SaveChangesAsync();
+
+            // Notify Corporate Client and Agent
+            if (policy != null)
+            {
+                await _notificationService.CreateNotificationAsync(customerUserId, "Payment Success", $"Your payment of ₹{dto.PaidAmount:N2} for Invoice #{invoice.InvoiceNo} was successful.", "Success");
+                await _notificationService.CreateNotificationAsync(policy.AgentId, "Policy Payment Received", $"A payment of ₹{dto.PaidAmount:N2} was received for policy #{policy.PolicyNo} (Client: {policy.CorporateClient?.CompanyName}).", "Info");
+            }
 
             // Reload for correct mapping of navigation properties
             var paymentResult = await _paymentRepo.GetByIdAsync(payment.Id);

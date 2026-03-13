@@ -20,6 +20,8 @@ namespace EGI_Backend.Application.Services
         private readonly IMapper _mapper;
         private readonly IEmailService _emailService;
         private readonly ICorporateClientRepository _clientRepo;
+        private readonly INotificationService _notificationService;
+
         private string GenerateTemporaryPassword()
         {
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%";
@@ -27,13 +29,14 @@ namespace EGI_Backend.Application.Services
             return new string(Enumerable.Repeat(chars, 10)
                 .Select(s => s[random.Next(s.Length)]).ToArray());
         }
-        public AuthService(IUserRepository repo, IJwtTokenGenerator jwt, IMapper mapper, IEmailService emailService, ICorporateClientRepository clientRepo)
+        public AuthService(IUserRepository repo, IJwtTokenGenerator jwt, IMapper mapper, IEmailService emailService, ICorporateClientRepository clientRepo, INotificationService notificationService)
         {
             _repo = repo;
             _jwt = jwt;
             _mapper = mapper;
             _emailService = emailService;
             _clientRepo = clientRepo;
+            _notificationService = notificationService;
         }
         public async Task<AuthResponse> Register(RegisterRequest req)
         {
@@ -118,6 +121,8 @@ namespace EGI_Backend.Application.Services
             user.MustChangePassword = true;
             await _repo.AddAsync(user);
             await _emailService.SendCredentialsEmailAsync(req.Email, tempPassword);
+
+            await _notificationService.CreateNotificationAsync(user.Id, "Account Created", $"Welcome to EGI! Your {user.Role} account has been created by the administrator.", "Info");
         }
         public async Task ChangePassword(Guid userId, string newPassword)
         {
@@ -130,6 +135,8 @@ namespace EGI_Backend.Application.Services
             user.MustChangePassword = false;
 
             await _repo.UpdateAsync(user);
+
+            await _notificationService.CreateNotificationAsync(userId, "Password Changed", "Your password has been updated successfully.", "Success");
         }
 
         public async Task ForgotPassword(ForgotPasswordRequest req)
@@ -149,6 +156,8 @@ namespace EGI_Backend.Application.Services
 
             // Re-using the Credentials email logic as it sends a temporary password
             await _emailService.SendCredentialsEmailAsync(user.Email, tempPassword);
+
+            await _notificationService.CreateNotificationAsync(user.Id, "Password Reset", "A temporary password has been sent to your email.", "Warning");
         }
     }
 }

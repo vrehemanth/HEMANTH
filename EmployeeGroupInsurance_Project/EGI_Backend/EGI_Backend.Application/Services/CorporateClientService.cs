@@ -19,6 +19,7 @@ public class CorporateClientService : ICorporateClientService
     private readonly IDocumentStorageService _storage;
     private readonly IMapper _mapper;
     private readonly IAgentCustomerService _agentCustomerService;
+    private readonly INotificationService _notificationService;
     public CorporateClientService(
         ICorporateClientRepository clientRepo,
         ICorporateDocumentRepository docRepo,
@@ -27,7 +28,8 @@ public class CorporateClientService : ICorporateClientService
         IUnitOfWork unitOfWork,
         IDocumentStorageService storage,
         IMapper mapper,
-        IAgentCustomerService agentCustomerService)
+        IAgentCustomerService agentCustomerService,
+        INotificationService notificationService)
     {
         _clientRepo = clientRepo;
         _docRepo = docRepo;
@@ -37,6 +39,7 @@ public class CorporateClientService : ICorporateClientService
         _storage = storage;
         _mapper = mapper;
         _agentCustomerService = agentCustomerService;
+        _notificationService = notificationService;
     }
 
     public async Task CreateProfileAsync(Guid userId, CreateCorporateProfileDto dto)
@@ -113,6 +116,13 @@ public class CorporateClientService : ICorporateClientService
 
         await _unitOfWork.SaveChangesAsync();
 
+        // Notify Admins
+        var admins = await _userRepo.GetAllByRoleAsync(UserRole.Admin);
+        foreach (var admin in admins)
+        {
+            await _notificationService.CreateNotificationAsync(admin.Id, "Document Uploaded", $"New verification document {dto.DocumentType} uploaded by {client.CompanyName}.", "Info");
+        }
+
         return "Document uploaded successfully. Waiting for admin approval.";
     }
 
@@ -153,6 +163,9 @@ public class CorporateClientService : ICorporateClientService
 
             // AUTO-ASSIGNMENT LOGIC: Find the Least Loaded Agent ONLY if no agent is currently assigned
             await _agentCustomerService.AssignLeastLoadedAgentAsync(client.Id);
+
+            // Notify Customer
+            await _notificationService.CreateNotificationAsync(client.UserId, "Profile Approved", "Your corporate profile has been approved. You can now purchase policies.", "Success");
         }
         else
         {
@@ -167,6 +180,9 @@ public class CorporateClientService : ICorporateClientService
                 client.IsBlocked = true;
                 user.Status = UserStatus.Inactive; // Ensure blocked users can't login easily
                 await _emailService.SendBlockNotificationEmailAsync(user.Email);
+
+                // Notify Customer
+                await _notificationService.CreateNotificationAsync(client.UserId, "Account Blocked", "Your account has been permanently blocked due to multiple verification failures.", "Error");
             }
             else
             {
@@ -174,6 +190,9 @@ public class CorporateClientService : ICorporateClientService
                     user.Email,
                     dto.RejectionReason ?? "Documents did not meet verification requirements."
                 );
+
+                // Notify Customer
+                await _notificationService.CreateNotificationAsync(client.UserId, "Profile Rejected", $"Your profile was rejected. Reason: {dto.RejectionReason}", "Warning");
             }
             
             await _unitOfWork.SaveChangesAsync();

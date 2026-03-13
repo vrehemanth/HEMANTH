@@ -193,6 +193,9 @@ namespace EGI_Backend.Application.Services
                 await _claimRepo.AddAsync(claim);
                 await _unitOfWork.SaveChangesAsync();
 
+                // Notify Corporate Client
+                await _notificationService.CreateNotificationAsync(corporateClientUserId, "Claim Submitted", $"Claim {claim.ClaimNumber} for {claim.ClaimType} has been submitted successfully.", "Success");
+
                 return $"Claim submitted successfully. Claim Number: {claim.ClaimNumber}. Status: Pending Review.";
             }
             catch (Exception)

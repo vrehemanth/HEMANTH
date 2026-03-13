@@ -80,7 +80,7 @@
 
         <!-- App Bar -->
         <header
-            class="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm flex items-center justify-between px-4 md:px-6 z-10 transition-colors duration-300">
+            class="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm flex items-center justify-between px-4 md:px-6 z-40 transition-colors duration-300">
             <div class="flex items-center gap-3">
                 <!-- Hamburger Menu for mobile -->
                 <button (click)="isSidebarOpen.set(true)"
@@ -126,6 +126,12 @@
 
                 <!-- Notifications Bell -->
                 <div class="relative">
+                    @if (showNotifications()) {
+                    <div (click)="showNotifications.set(false)"
+                        class="fixed inset-0 bg-black/5 dark:bg-black/20 backdrop-blur-[2px] z-[999] animate-in fade-in duration-300">
+                    </div>
+                    }
+
                     @if (!authService.currentUser()?.requirePasswordChange) {
                     <button (click)="toggleNotifications()"
                         class="relative w-10 h-10 rounded-xl flex items-center justify-center text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all group">
@@ -149,7 +155,7 @@
                     <!-- Notification Dropdown -->
                     @if (showNotifications()) {
                     <div
-                        class="fixed md:absolute right-4 md:right-0 mt-2 w-[calc(100vw-32px)] md:w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 z-[60] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 max-h-[80vh] flex flex-col">
+                        class="fixed right-4 md:right-8 top-16 mt-2 w-[calc(100vw-32px)] md:w-96 bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 z-[1000] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 max-h-[80vh] flex flex-col">
                         <div
                             class="p-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between shrink-0">
                             <h3 class="font-bold text-gray-900 dark:text-white">Recent Activity</h3>

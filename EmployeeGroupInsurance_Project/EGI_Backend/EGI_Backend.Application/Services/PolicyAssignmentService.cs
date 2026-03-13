@@ -18,6 +18,7 @@ namespace EGI_Backend.Application.Services
         private readonly ICorporateClientRepository _clientRepo;
         private readonly IAgentCustomerRepository _agentCustomerRepo;
         private readonly IInvoiceService _invoiceService;
+        private readonly INotificationService _notificationService;
         private readonly IUnitOfWork _unitOfWork;
 
         public PolicyAssignmentService(
@@ -26,6 +27,7 @@ namespace EGI_Backend.Application.Services
             ICorporateClientRepository clientRepo,
             IAgentCustomerRepository agentCustomerRepo,
             IInvoiceService invoiceService,
+            INotificationService notificationService,
             IUnitOfWork unitOfWork)
         {
             _policyAssignmentRepo = policyAssignmentRepo;
@@ -33,6 +35,7 @@ namespace EGI_Backend.Application.Services
             _clientRepo = clientRepo;
             _agentCustomerRepo = agentCustomerRepo;
             _invoiceService = invoiceService;
+            _notificationService = notificationService;
             _unitOfWork = unitOfWork;
         }
 
@@ -213,6 +216,10 @@ namespace EGI_Backend.Application.Services
 
             // 7. Auto-generate first invoice immediately
             await _invoiceService.GenerateFirstInvoiceAsync(policyAssignment);
+
+            // 8. Notify Corporate Client and Agent
+            await _notificationService.CreateNotificationAsync(client.UserId, "Policy Created", $"Your policy {policyAssignment.PolicyNo} is now active. {membersMap.Count} members onboarded.", "Success");
+            await _notificationService.CreateNotificationAsync(agentAssignment.AgentId, "New Policy Assigned", $"A new policy {policyAssignment.PolicyNo} for {client.CompanyName} has been assigned to you.", "Info");
 
             return $"Successfully processed {membersMap.Count} members and generated Policy No: {policyAssignment.PolicyNo}. Total Annual Premium: ₹{totalAnnualPremium}";
         }
