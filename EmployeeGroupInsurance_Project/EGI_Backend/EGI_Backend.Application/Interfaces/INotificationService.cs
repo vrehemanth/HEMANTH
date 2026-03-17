@@ -1,4 +1,3 @@
-using EGI_Backend.Application.Interfaces;
 using EGI_Backend.Domain.Entities;
 using System;
 using System.Collections.Generic;
@@ -10,7 +9,7 @@ namespace EGI_Backend.Application.Interfaces
     {
         Task CreateNotificationAsync(Guid userId, string title, string message, string type);
         Task<List<Notification>> GetUserNotificationsAsync(Guid userId, int? take = null);
-        Task MarkAsReadAsync(Guid notificationId);
+        Task MarkAsReadAsync(Guid userId, Guid notificationId);
         Task MarkAllAsReadAsync(Guid userId);
         Task<int> GetUnreadCountAsync(Guid userId);
     }

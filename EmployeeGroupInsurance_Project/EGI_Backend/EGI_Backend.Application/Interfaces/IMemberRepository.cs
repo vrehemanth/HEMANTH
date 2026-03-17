@@ -14,5 +14,6 @@ namespace EGI_Backend.Application.Interfaces
         Task UpdateAsync(Member member);
         Task<int> CountByClientIdAsync(Guid clientId);
         Task<List<Member>> GetByClientIdAsync(Guid clientId);
+        Task<Member?> GetByEmployeeCodeAndClientAsync(string employeeCode, Guid clientId);
     }
 }

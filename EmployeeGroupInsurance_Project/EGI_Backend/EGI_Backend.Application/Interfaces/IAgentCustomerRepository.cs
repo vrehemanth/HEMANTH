@@ -11,5 +11,6 @@ namespace EGI_Backend.Application.Interfaces
         Task<bool> HasAssignedAgentAsync(Guid clientId);
         Task<AgentCustomer?> GetByCorporateClientIdAsync(Guid clientId);
         Task<List<AgentCustomer>> GetByAgentIdWithDetailsAsync(Guid agentId);
+        Task<Guid?> GetLeastLoadedAgentIdAsync();
     }
 }

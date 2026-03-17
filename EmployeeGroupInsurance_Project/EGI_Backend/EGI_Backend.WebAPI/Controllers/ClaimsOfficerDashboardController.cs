@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace EGI_Backend.WebAPI.Controllers
 {
-    [Authorize(Roles = "ClaimsOfficer")]
+    [Authorize(Roles = "ClaimsOfficer,Admin")]
     [Route("api/claims-officer/dashboard")]
     public class ClaimsOfficerDashboardController : BaseApiController
     {
@@ -33,7 +33,8 @@ namespace EGI_Backend.WebAPI.Controllers
         [HttpGet("invoices/policy/{policyAssignmentId}")]
         public async Task<IActionResult> GetInvoicesByPolicy(Guid policyAssignmentId)
         {
-            var invoices = await _invoiceService.GetInvoicesByPolicyAsync(policyAssignmentId);
+            var role = CurrentUserRole ?? "ClaimsOfficer";
+            var invoices = await _invoiceService.GetInvoicesByPolicyAsync(policyAssignmentId, CurrentUserId, role);
             return Ok(invoices);
         }
 
@@ -55,21 +56,22 @@ namespace EGI_Backend.WebAPI.Controllers
         [HttpGet("claims/policy/{policyAssignmentId}")]
         public async Task<IActionResult> GetClaimsByPolicy(Guid policyAssignmentId)
         {
-            var claims = await _claimService.GetClaimsByPolicyAsync(policyAssignmentId);
+            var claims = await _claimService.GetClaimsByPolicyAsync(policyAssignmentId, CurrentUserId, CurrentUserRole ?? "ClaimsOfficer");
             return Ok(claims);
         }
 
         [HttpGet("claims/member/{memberId}/history")]
         public async Task<IActionResult> GetClaimsByMember(Guid memberId)
         {
-            var claims = await _claimService.GetClaimsByMemberAsync(memberId);
+            var claims = await _claimService.GetClaimsByMemberAsync(memberId, CurrentUserId, CurrentUserRole ?? "ClaimsOfficer");
             return Ok(claims);
         }
 
         [HttpGet("claims/{claimId}/detail")]
         public async Task<IActionResult> GetClaimDetail(Guid claimId)
         {
-            var claim = await _claimService.GetClaimDetailAsync(claimId);
+            var role = User.FindFirstValue(ClaimTypes.Role) ?? "ClaimsOfficer";
+            var claim = await _claimService.GetClaimDetailAsync(claimId, CurrentUserId, role);
             return Ok(claim);
         }
 

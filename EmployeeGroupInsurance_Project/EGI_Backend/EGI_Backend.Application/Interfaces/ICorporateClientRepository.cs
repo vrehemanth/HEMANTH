@@ -1,4 +1,4 @@
-﻿using EGI_Backend.Domain.Entities;
+using EGI_Backend.Domain.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,6 +16,7 @@ namespace EGI_Backend.Application.Interfaces
         Task<int> CountPendingAsync();
         Task<List<CorporateClient>> GetAllAsync();
         Task<int> GetTotalLiveMembersCountAsync(Guid clientId);
+        Task<CorporateClientDocument?> GetDocumentByIdAsync(Guid id);
         Task SaveChangesAsync();
     }
 }

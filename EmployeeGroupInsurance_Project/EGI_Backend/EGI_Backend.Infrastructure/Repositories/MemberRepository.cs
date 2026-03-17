@@ -64,9 +64,16 @@ namespace EGI_Backend.Infrastructure.Repositories
             return await _context.Members
                 .Include(m => m.Dependents)
                 .Include(m => m.PolicyAssignment)
-                .Where(m => m.PolicyAssignment.CorporateClientId == clientId)
+                .Where(m => m.CorporateClientId == clientId)
                 .OrderBy(m => m.FullName)
                 .ToListAsync();
+        }
+
+        public async Task<Member?> GetByEmployeeCodeAndClientAsync(string employeeCode, Guid clientId)
+        {
+            return await _context.Members
+                .Include(m => m.Dependents)
+                .FirstOrDefaultAsync(m => m.EmployeeCode == employeeCode && m.CorporateClientId == clientId);
         }
     }
 }

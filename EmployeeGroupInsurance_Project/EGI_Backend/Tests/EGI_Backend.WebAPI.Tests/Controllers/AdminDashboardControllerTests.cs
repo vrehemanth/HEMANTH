@@ -18,13 +18,15 @@ namespace EGI_Backend.WebAPI.Tests.Controllers
         private readonly Mock<IClaimService> _claimSvc = new();
         private readonly Mock<IInvoiceService> _invoiceSvc = new();
         private readonly Mock<IPolicyEndorsementService> _endorSvc = new();
+        private readonly Mock<IPolicyAssignmentService> _policySvc = new();
         private readonly AdminDashboardController _controller;
 
         public AdminDashboardControllerTests()
         {
             _controller = new AdminDashboardController(
                 _dashboardSvc.Object, _planSvc.Object, _clientSvc.Object,
-                _claimSvc.Object, _invoiceSvc.Object, _endorSvc.Object);
+                _claimSvc.Object, _invoiceSvc.Object, _endorSvc.Object, 
+                _policySvc.Object);
         }
 
         [Fact]

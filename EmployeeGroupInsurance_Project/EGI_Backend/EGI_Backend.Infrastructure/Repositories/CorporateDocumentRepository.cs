@@ -1,4 +1,4 @@
-﻿using EGI_Backend.Application.Interfaces;
+using EGI_Backend.Application.Interfaces;
 using EGI_Backend.Domain.Entities;
 using EGI_Backend.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;

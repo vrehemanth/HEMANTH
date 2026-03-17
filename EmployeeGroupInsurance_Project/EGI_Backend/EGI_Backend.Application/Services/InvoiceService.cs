@@ -250,27 +250,27 @@ namespace EGI_Backend.Application.Services
             {
                 if (remainingCredit <= 0) break;
 
-                // Check if this invoice can swallow the whole credit or just part of it
-                if (targetInvoice.Amount <= remainingCredit)
+                decimal balance = targetInvoice.Amount - targetInvoice.TotalPaid;
+
+                if (balance <= remainingCredit)
                 {
-                    // Credit is larger than or equal to this invoice
-                    remainingCredit -= targetInvoice.Amount;
-                    targetInvoice.Amount = 0;
+                    // Balance can be fully wiped by credit
+                    remainingCredit -= balance;
+                    targetInvoice.Amount = targetInvoice.TotalPaid; // Set amount TO what was already paid to reach 0 balance
                     targetInvoice.Status = InvoiceStatus.Paid;
                 }
                 else
                 {
-                    // Credit is smaller than this invoice
+                    // Partial balance reduction
                     targetInvoice.Amount = Math.Round(targetInvoice.Amount - remainingCredit, 2);
                     remainingCredit = 0;
+                    // Status remains Partial/Overdue but with smaller balance
                 }
             }
 
             await _unitOfWork.SaveChangesAsync();
 
             // Notify Corporate Client
-            var client = await _clientRepo.GetByUserIdAsync(policyAssignmentId); // This might be wrong logic in existing code, but I'll stick to notifying if possible
-            // Actually, policyAssignmentId corresponds to CorporateClient. I should get the client.
             var policy = await _policyRepo.GetByIdWithDetailsAsync(policyAssignmentId);
             if (policy?.CorporateClient != null)
             {
@@ -351,6 +351,17 @@ namespace EGI_Backend.Application.Services
                     continue;
                 }
 
+                // Calculate standard amount
+                decimal invoiceAmount = CalculateInvoiceAmount(policy);
+
+                // PENNY TRUE-UP: If this is the final invoice of the term, adjust it to match TotalPremium exactly.
+                // This prevents rounding errors (e.g. 10000 / 12 = 833.33 * 12 = 9999.96)
+                if (nextPeriodTo >= policy.EndDate.Date)
+                {
+                    decimal amountPreviouslyBilled = alreadyExists.Sum(i => i.Amount);
+                    invoiceAmount = Math.Max(0, policy.TotalPremium - amountPreviouslyBilled);
+                }
+
                 var invoice = new Invoice
                 {
                     Id = Guid.NewGuid(),
@@ -359,7 +370,7 @@ namespace EGI_Backend.Application.Services
                     InvoiceDate = DateTime.UtcNow,
                     BillingPeriodFrom = nextPeriodFrom,
                     BillingPeriodTo = nextPeriodTo > policy.EndDate.Date ? policy.EndDate.Date : nextPeriodTo,
-                    Amount = CalculateInvoiceAmount(policy),
+                    Amount = invoiceAmount,
                     DueDate = DateTime.UtcNow.AddDays(EGI_Backend.Domain.Constants.BusinessRules.InvoiceDueGraceDays),
                     Status = InvoiceStatus.Pending,
                     CreatedAt = DateTime.UtcNow
@@ -443,7 +454,10 @@ namespace EGI_Backend.Application.Services
                 // 1. Initial Deadline Penalty (Applied on or after Day 7 from Invoice)
                 if (daysOverdue >= 0 && !inv.IsPenaltyApplied)
                 {
-                    var penaltyAmount = Math.Round(inv.Amount * 0.10m, 2);
+                    // FIXED: Calculate penalty on the ORIGINAL amount to prevent compounding 
+                    // if this logic ever runs twice on the same invoice.
+                    var originalBaseAmount = inv.Amount; 
+                    var penaltyAmount = Math.Round(originalBaseAmount * 0.10m, 2);
                     inv.Amount += penaltyAmount;
                     inv.IsPenaltyApplied = true;
 
@@ -566,9 +580,12 @@ namespace EGI_Backend.Application.Services
             {
                 decimal commissionPercentage = EGI_Backend.Domain.Constants.BusinessRules.GetCommissionRate(policy.BusinessCategory);
 
-                // Commission is earned on the CURRENT paid amount
-                decimal earnedCommission = Math.Round(dto.PaidAmount * commissionPercentage, 2);
-                invoice.CommissionEarned += earnedCommission; // Accumulate as they pay
+                // Flaw 15 Fix: Prevent Commission Drifting by calculating based on 
+                // TOTAL paid so far vs TOTAL commission already booked.
+                decimal totalCommissionExpectedOnPaid = Math.Round(invoice.TotalPaid * commissionPercentage, 2);
+                decimal earnedCommission = totalCommissionExpectedOnPaid - invoice.CommissionEarned;
+                
+                invoice.CommissionEarned = totalCommissionExpectedOnPaid;
                 policy.CommissionAmount += earnedCommission;
                 
                 await _policyRepo.UpdateAsync(policy);
@@ -576,7 +593,7 @@ namespace EGI_Backend.Application.Services
                 // AUDIT LOGGING: CommissionEvent for transparency
                 var agentName = policy.Agent?.Name ?? "Unknown Agent";
                 var ratePercent = (int)(commissionPercentage * 100);
-                var logMessage = $"Commission of ₹{earnedCommission} calculated for Agent {agentName} on Invoice #{invoice.InvoiceNo} (Amount: ₹{dto.PaidAmount}, Rate: {ratePercent}%)";
+                var logMessage = $"Commission adjustment of ₹{earnedCommission} (Total Earned for Invoice: ₹{totalCommissionExpectedOnPaid}) calculated for Agent {agentName} (Rate: {ratePercent}%)";
 
                 await _auditLogRepo.AddAsync(new AuditLog
                 {
@@ -607,23 +624,57 @@ namespace EGI_Backend.Application.Services
 
         // ─── Queries ──────────────────────────────────────────────
 
-        public async Task<List<InvoiceResponseDto>> GetInvoicesByPolicyAsync(Guid policyAssignmentId)
+        private bool IsHighAuthority(string? role)
         {
+            if (string.IsNullOrEmpty(role)) return false;
+            var norm = role.Trim().Replace(" ", "").Replace("_", "").ToLowerInvariant();
+            return norm == "admin" || norm == "claimsofficer" || norm == "officer";
+        }
+
+        private async Task ValidateInvoiceAccessAsync(Invoice invoice, Guid callerUserId, string role)
+        {
+            if (IsHighAuthority(role)) return;
+
+            var policy = invoice.PolicyAssignment ?? await _policyRepo.GetByIdWithDetailsAsync(invoice.PolicyAssignmentId);
+            if (policy == null) throw new NotFoundException("Associated policy not found.");
+
+            bool isAuthorized = (role.Equals("Customer", StringComparison.OrdinalIgnoreCase) && policy.CorporateClient?.UserId == callerUserId) ||
+                              (role.Equals("Agent", StringComparison.OrdinalIgnoreCase) && policy.AgentId == callerUserId);
+
+            if (!isAuthorized) throw new ForbiddenException("Security Access Denied: You do not have permission to view this invoice.");
+        }
+
+        public async Task<List<InvoiceResponseDto>> GetInvoicesByPolicyAsync(Guid policyAssignmentId, Guid callerUserId, string role)
+        {
+            var policy = await _policyRepo.GetByIdWithDetailsAsync(policyAssignmentId);
+            if (policy == null) throw new NotFoundException("Policy not found.");
+
+            bool isAuthorized = IsHighAuthority(role) || 
+                              (role.Equals("Customer", StringComparison.OrdinalIgnoreCase) && policy.CorporateClient?.UserId == callerUserId) ||
+                              (role.Equals("Agent", StringComparison.OrdinalIgnoreCase) && policy.AgentId == callerUserId);
+
+            if (!isAuthorized) throw new ForbiddenException("Security Access Denied.");
+
             var invoices = await _invoiceRepo.GetByPolicyAssignmentIdAsync(policyAssignmentId);
             return _mapper.Map<List<InvoiceResponseDto>>(invoices);
         }
 
-        public async Task<InvoiceResponseDto> GetInvoiceByIdAsync(Guid invoiceId)
+        public async Task<InvoiceResponseDto> GetInvoiceByIdAsync(Guid invoiceId, Guid callerUserId, string role)
         {
             var invoice = await _invoiceRepo.GetByIdAsync(invoiceId);
             if (invoice == null) throw new NotFoundException("Invoice not found.");
+
+            await ValidateInvoiceAccessAsync(invoice, callerUserId, role);
+
             return _mapper.Map<InvoiceResponseDto>(invoice);
         }
 
-        public async Task<List<PaymentResponseDto>> GetPaymentsByInvoiceAsync(Guid invoiceId)
+        public async Task<List<PaymentResponseDto>> GetPaymentsByInvoiceAsync(Guid invoiceId, Guid callerUserId, string role)
         {
             var invoice = await _invoiceRepo.GetByIdAsync(invoiceId);
             if (invoice == null) throw new NotFoundException("Invoice not found.");
+
+            await ValidateInvoiceAccessAsync(invoice, callerUserId, role);
 
             var payments = await _paymentRepo.GetByInvoiceIdAsync(invoiceId);
             return _mapper.Map<List<PaymentResponseDto>>(payments);

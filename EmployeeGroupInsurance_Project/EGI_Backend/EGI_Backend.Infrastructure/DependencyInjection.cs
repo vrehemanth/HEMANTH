@@ -38,6 +38,8 @@ namespace EGI_Backend.Infrastructure
             services.AddScoped<IDocumentStorageService, LocalFileStorageService>();
             services.AddScoped<IEmailService, EmailService>();
             services.AddScoped<INotificationService, NotificationService>();
+            services.AddScoped<IOCRService, OCRService>();
+            services.AddScoped<IFraudDetectionService, FraudDetectionService>();
             services.AddHostedService<EGI_Backend.Infrastructure.BackgroundServices.InsuranceAutomationWorker>();
 
             return services;

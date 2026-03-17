@@ -26,12 +26,25 @@
                             </div>
                         </td>
                         <td class="p-4 text-center">
-                            <span
-                                class="px-2 py-0.5 text-[10px] font-black uppercase rounded border transition-colors"
-                                [ngClass]="{
-                                    'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800': pol.status === 'Active',
-                                    'bg-red-50 text-red-700 border-red-100 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800': pol.status === 'Inactive' || pol.status === 'Expired'
-                                }">{{pol.status}}</span>
+                            <div class="flex items-center justify-center gap-2">
+                                <span
+                                    class="px-2 py-0.5 text-[10px] font-black uppercase rounded border transition-colors"
+                                    [ngClass]="{
+                                        'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800': pol.status === 'Active',
+                                        'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800': pol.status === 'Inactive',
+                                        'bg-red-50 text-red-700 border-red-100 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800': pol.status === 'Expired'
+                                    }">{{pol.status}}</span>
+                                @if (pol.canRenew) {
+                                <button (click)="$event.stopPropagation(); p.openRenewalModal(pol.id)"
+                                    class="px-2.5 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black rounded transition-all shadow-md shadow-emerald-500/20 active:scale-95 flex items-center gap-1">
+                                    <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3"
+                                            d="M4 4v5h.586m15.414 10l-4-4m0 0l-4 4m4-4V4"></path>
+                                    </svg>
+                                    RENEW
+                                </button>
+                                }
+                            </div>
                         </td>
                         <td class="p-4 relative">
                             <button
@@ -52,6 +65,13 @@
                                         class="w-full text-left px-4 py-2 text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center gap-2">
                                         Manage Context
                                     </button>
+                                    @if (pol.canRenew) {
+                                    <button (click)="p.openRenewalModal(pol.id); p.activeActionMenu.set(null)"
+                                        class="w-full text-left px-4 py-2 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/40 rounded-lg transition-colors flex items-center gap-2">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.586m15.414 10l-4-4m0 0l-4 4m4-4V4"></path></svg>
+                                        Renew Policy
+                                    </button>
+                                    }
                                 </div>
                             </div>
                             }
@@ -162,9 +182,21 @@
         <div class="flex justify-between items-start mb-8">
             <div>
                 <h3 class="text-2xl font-black dark:text-white tracking-tight">{{p.selectedPolicy()?.planName}}</h3>
-                <p class="text-sm text-gray-500">Assignment ID: <span
-                        class="font-mono text-[10px] bg-gray-100 p-1 rounded ml-1">{{p.selectedPolicy()?.id}}</span>
-                </p>
+                <div class="flex items-center gap-3 mt-1">
+                    <p class="text-sm text-gray-500">Assignment ID: <span
+                            class="font-mono text-[10px] bg-gray-100 p-1 rounded ml-1">{{p.selectedPolicy()?.id}}</span>
+                    </p>
+                    @if (p.selectedPolicy()?.canRenew) {
+                    <button (click)="p.openRenewalModal(p.selectedPolicy()?.id); p.selectedPolicy.set(null)"
+                        class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black rounded-xl transition-all shadow-xl shadow-emerald-500/20 active:scale-95 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.586m15.414 10l-4-4m0 0l-4 4m4-4V4"></path>
+                        </svg>
+                        RENEW NOW
+                    </button>
+                    }
+                </div>
             </div>
             <button (click)="p.selectedPolicy.set(null)"
                 class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition"><svg

@@ -29,6 +29,7 @@ namespace EGI_Backend.Application.Services
             return new string(Enumerable.Repeat(chars, 10)
                 .Select(s => s[random.Next(s.Length)]).ToArray());
         }
+
         public AuthService(IUserRepository repo, IJwtTokenGenerator jwt, IMapper mapper, IEmailService emailService, ICorporateClientRepository clientRepo, INotificationService notificationService)
         {
             _repo = repo;
@@ -38,6 +39,7 @@ namespace EGI_Backend.Application.Services
             _clientRepo = clientRepo;
             _notificationService = notificationService;
         }
+
         public async Task<AuthResponse> Register(RegisterRequest req)
         {
             var existingUser = await _repo.GetByEmailAsync(req.Email);
@@ -70,6 +72,12 @@ namespace EGI_Backend.Application.Services
             var validUser = BCrypt.Net.BCrypt.Verify(req.Password, user.PasswordHash);
             if (!validUser)
                 throw new UnauthorizedException("Invalid Credentials");
+
+            // Flaw 6 Fix: Check if user is Active
+            if (user.Status != UserStatus.Active)
+            {
+                throw new UnauthorizedException("Your account is currently inactive. Please contact your administrator for assistance.");
+            }
 
             user.LastLogin = DateTime.UtcNow;
             await _repo.UpdateAsync(user);
@@ -142,22 +150,38 @@ namespace EGI_Backend.Application.Services
         public async Task ForgotPassword(ForgotPasswordRequest req)
         {
             var user = await _repo.GetByEmailAsync(req.Email);
-            if (user == null) return;
+            if (user == null) return; // Don't reveal user existence
 
-            // Generate a secure temporary password
-            var tempPassword = GenerateTemporaryPassword();
+            // Generate a secure, time-bound reset token
+            var resetToken = Guid.NewGuid().ToString("N").ToUpper().Substring(0, 12);
 
-            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(tempPassword);
-            user.MustChangePassword = true; // Force them to change it on next login
+            user.ResetToken = resetToken;
+            user.ResetTokenExpires = DateTime.UtcNow.AddHours(24);
+
+            await _repo.UpdateAsync(user);
+
+            // Notify user with the token
+            await _emailService.SendCredentialsEmailAsync(user.Email, $"Your password reset token is: {resetToken}");
+
+            await _notificationService.CreateNotificationAsync(user.Id, "Password Reset Initiated", "A reset token has been sent to your registered email address.", "Info");
+        }
+
+        public async Task ResetPassword(ResetPasswordRequest req)
+        {
+            var user = await _repo.GetByEmailAsync(req.Email);
+            if (user == null || user.ResetToken != req.Token || user.ResetTokenExpires < DateTime.UtcNow)
+            {
+                throw new BadRequestException("Invalid or expired reset token.");
+            }
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
+            user.MustChangePassword = false;
             user.ResetToken = null;
             user.ResetTokenExpires = null;
 
             await _repo.UpdateAsync(user);
 
-            // Re-using the Credentials email logic as it sends a temporary password
-            await _emailService.SendCredentialsEmailAsync(user.Email, tempPassword);
-
-            await _notificationService.CreateNotificationAsync(user.Id, "Password Reset", "A temporary password has been sent to your email.", "Warning");
+            await _notificationService.CreateNotificationAsync(user.Id, "Password Reset Successful", "Your password has been reset using the security token.", "Success");
         }
     }
 }

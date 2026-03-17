@@ -23,6 +23,11 @@ namespace EGI_Backend.Infrastructure.Repositories
             await _context.PolicyAssignments.AddAsync(policyAssignment);
         }
 
+        public async Task<PolicyAssignment?> GetByIdAsync(Guid id)
+        {
+            return await _context.PolicyAssignments.FindAsync(id);
+        }
+
         public async Task<PolicyAssignment?> GetByIdWithDetailsAsync(Guid id)
         {
             return await _context.PolicyAssignments

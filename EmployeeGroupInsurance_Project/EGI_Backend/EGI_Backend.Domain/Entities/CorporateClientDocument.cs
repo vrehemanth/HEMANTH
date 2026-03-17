@@ -1,4 +1,4 @@
-﻿using EGI_Backend.Domain.Enums;
+using EGI_Backend.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -13,7 +13,12 @@ namespace EGI_Backend.Domain.Entities
     {
         [Key]
         public required Guid Id { get; set; }
+
         public required Guid CorporateClientId { get; set; }
+
+        [ForeignKey("CorporateClientId")]
+        public CorporateClient? CorporateClient { get; set; }
+
         public required DocumentType DocumentType { get; set; }
         public required string FileName { get; set; }
         public required string FilePath { get; set; }

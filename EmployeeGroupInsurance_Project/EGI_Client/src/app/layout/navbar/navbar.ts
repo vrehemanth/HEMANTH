@@ -116,6 +116,7 @@ export class AppLayoutComponent implements OnInit, OnDestroy {
           { path: '/admin/staff', label: 'Staff Management', icon: iconUsers },
           { path: '/admin/policies', label: 'Policies & Invoices', icon: iconFileText },
           { path: '/admin/claims', label: 'System Claims', icon: iconList },
+          { path: '/admin/approvals', label: 'Executive Approvals', icon: iconShield },
           { path: '/admin/logs', label: 'Audit Logs', icon: iconEdit3 },
           { path: '/notifications/history', label: 'Activity History', icon: iconBell }
         ];

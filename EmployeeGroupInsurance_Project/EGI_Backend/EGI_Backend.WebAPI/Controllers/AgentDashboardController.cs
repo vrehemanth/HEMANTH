@@ -44,21 +44,21 @@ namespace EGI_Backend.WebAPI.Controllers
         [HttpPost("review-endorsement/{id}")]
         public async Task<IActionResult> ReviewEndorsement(Guid id, [FromBody] ReviewEndorsementDto dto)
         {
-            var result = await _endorsementService.ReviewEndorsementAsync(CurrentUserId, id, dto);
+            var result = await _endorsementService.ReviewEndorsementAsync(CurrentUserId, "Agent", id, dto);
             return Ok(result);
         }
 
         [HttpGet("pending-endorsements")]
         public async Task<IActionResult> GetPendingEndorsements()
         {
-            var result = await _endorsementService.GetPendingEndorsementsAsync();
+            var result = await _endorsementService.GetPendingEndorsementsAsync(CurrentUserId, "Agent");
             return Ok(result);
         }
 
         [HttpGet("endorsements/policy/{policyId}")]
         public async Task<IActionResult> GetEndorsementsByPolicy(Guid policyId)
         {
-            var result = await _endorsementService.GetEndorsementsByPolicyAsync(policyId);
+            var result = await _endorsementService.GetEndorsementsByPolicyAsync(policyId, CurrentUserId, "Agent");
             return Ok(result);
         }
 
@@ -87,21 +87,21 @@ namespace EGI_Backend.WebAPI.Controllers
         [HttpGet("claims/policy/{policyAssignmentId}")]
         public async Task<IActionResult> GetClaimsByPolicy(Guid policyAssignmentId)
         {
-            var claims = await _claimService.GetClaimsByPolicyAsync(policyAssignmentId);
+            var claims = await _claimService.GetClaimsByPolicyAsync(policyAssignmentId, CurrentUserId, "Agent");
             return Ok(claims);
         }
 
         [HttpGet("invoices/{invoiceId}")]
         public async Task<IActionResult> GetInvoiceDetail(Guid invoiceId)
         {
-            var invoice = await _invoiceService.GetInvoiceByIdAsync(invoiceId);
+            var invoice = await _invoiceService.GetInvoiceByIdAsync(invoiceId, CurrentUserId, "Agent");
             return Ok(invoice);
         }
 
         [HttpGet("invoices/{invoiceId}/payments")]
         public async Task<IActionResult> GetPayments(Guid invoiceId)
         {
-            var payments = await _invoiceService.GetPaymentsByInvoiceAsync(invoiceId);
+            var payments = await _invoiceService.GetPaymentsByInvoiceAsync(invoiceId, CurrentUserId, "Agent");
             return Ok(payments);
         }
 

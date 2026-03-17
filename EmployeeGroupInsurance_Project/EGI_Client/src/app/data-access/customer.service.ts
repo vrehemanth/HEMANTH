@@ -23,6 +23,12 @@ export class CustomerService {
     submitClaim(formData: FormData): Observable<any> { return this.http.post(`${API_BASE}/customer/dashboard/submit-claim`, formData); }
     submitEndorsement(dto: any): Observable<any> { return this.http.post(`${API_BASE}/customer/dashboard/submit-endorsement`, dto); }
     uploadMembersExcel(formData: FormData): Observable<any> { return this.http.post(`${API_BASE}/customer/dashboard/upload-members`, formData); }
+    renewPolicy(policyId: string, years: number, billingFrequency: number): Observable<any> { 
+        return this.http.post(`${API_BASE}/customer/dashboard/renew-policy/${policyId}`, { years, billingFrequency }); 
+    }
+    getRenewalQuote(policyId: string, years: number, frequency: number): Observable<any> { 
+        return this.http.get(`${API_BASE}/customer/dashboard/renewal-quote/${policyId}?years=${years}&frequency=${frequency}`); 
+    }
 
     payInvoice(invoiceId: string, dto: any): Observable<any> { return this.http.post(`${API_BASE}/customer/dashboard/pay-invoice/${invoiceId}`, dto); }
     getAllPlans(): Observable<any[]> { return this.http.get<any[]>(`${API_BASE}/customer/dashboard/insurance-plans`); }

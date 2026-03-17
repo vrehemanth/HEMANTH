@@ -27,8 +27,10 @@ export class AdminService {
     toggleUserStatus(userId: string): Observable<any> { return this.http.post(`${API_BASE}/admin/dashboard/toggle-user-status/${userId}`, {}); }
 
     getPolicyAssignments(): Observable<PolicyAssignment[]> { return this.http.get<PolicyAssignment[]>(`${API_BASE}/admin/dashboard/policy-assignments`); }
+    togglePolicyStatus(policyId: string): Observable<any> { return this.http.post(`${API_BASE}/admin/dashboard/policies/${policyId}/toggle-status`, {}); }
     getClaims(): Observable<Claim[]> { return this.http.get<Claim[]>(`${API_BASE}/admin/dashboard/claims`); }
     getClaimDetail(claimId: string): Observable<any> { return this.http.get(`${API_BASE}/admin/dashboard/claims/${claimId}/detail`); }
+    reviewClaim(claimId: string, dto: any): Observable<any> { return this.http.post(`${API_BASE}/admin/dashboard/claims/${claimId}/review`, dto); }
     getPendingEndorsements(): Observable<any[]> { return this.http.get<any[]>(`${API_BASE}/admin/dashboard/endorsements/pending`); }
     getEndorsementsByPolicy(policyId: string): Observable<any[]> { return this.http.get<any[]>(`${API_BASE}/admin/dashboard/endorsements/policy/${policyId}`); }
 

@@ -75,10 +75,20 @@
                     <td class="px-6 py-4 text-sm dark:text-gray-300">{{ pol.planName }}</td>
                     <td class="px-6 py-4">
                         <span
-                            class="text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">{{
+                            class="text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider border"
+                            [ngClass]="{
+                                'bg-emerald-50 text-emerald-700 border-emerald-100': pol.status === 'Active',
+                                'bg-rose-50 text-rose-700 border-rose-100': pol.status === 'Inactive',
+                                'bg-gray-100 text-gray-500 border-gray-200': pol.status === 'Expired'
+                            }">{{
                             pol.status }}</span>
                     </td>
-                    <td class="px-6 py-4 text-right">
+                    <td class="px-6 py-4 text-right flex items-center justify-end gap-3">
+                        <button (click)="$event.stopPropagation(); p.togglePolicyStatus(pol.id)" 
+                            class="text-[10px] font-black uppercase tracking-widest hover:underline transition-all"
+                            [ngClass]="pol.status === 'Active' ? 'text-rose-600' : 'text-emerald-600'">
+                            {{ pol.status === 'Active' ? 'Deactivate' : 'Activate' }}
+                        </button>
                         <button class="text-primary-600 hover:text-primary-700 text-xs font-semibold">View History
                             &rarr;</button>
                     </td>

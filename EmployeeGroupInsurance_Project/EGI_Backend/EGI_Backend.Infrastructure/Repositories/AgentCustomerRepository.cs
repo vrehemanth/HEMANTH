@@ -43,5 +43,20 @@ namespace EGI_Backend.Infrastructure.Repositories
                 .Where(ac => ac.AgentId == agentId)
                 .ToListAsync();
         }
+
+        public async Task<Guid?> GetLeastLoadedAgentIdAsync()
+        {
+            // SQL optimization: Single query to find the active agent with the lowest customer count
+            return await _context.Users
+                .Where(u => u.Role == Domain.Enums.UserRole.Agent && u.Status == Domain.Enums.UserStatus.Active)
+                .Select(u => new 
+                { 
+                    u.Id, 
+                    Count = _context.AgentCustomers.Count(ac => ac.AgentId == u.Id) 
+                })
+                .OrderBy(x => x.Count)
+                .Select(x => (Guid?)x.Id)
+                .FirstOrDefaultAsync();
+        }
     }
 }

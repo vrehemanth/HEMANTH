@@ -71,7 +71,7 @@ namespace EGI_Backend.Application.Services
                 AverageProcessingTimeDays = avgTimeTask.Result
             };
 
-            _cache.Set(cacheKey, summary, TimeSpan.FromSeconds(5));
+            _cache.Set(cacheKey, summary, TimeSpan.FromMinutes(3));
             return summary;
         }
     }

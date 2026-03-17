@@ -153,11 +153,12 @@ public class CorporateClientService : ICorporateClientService
             client.ReSubmissionCount = 0; // reset on approval
             client.RejectionReason = null;
 
+            user.Status = UserStatus.Active;
+
             if (user.MustChangePassword)
             {
                 var tempPassword = PasswordHelper.GenerateTemporaryPassword();
                 user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(tempPassword);
-                user.Status = UserStatus.Active;
                 await _emailService.SendCredentialsEmailAsync(user.Email, tempPassword);
             }
 

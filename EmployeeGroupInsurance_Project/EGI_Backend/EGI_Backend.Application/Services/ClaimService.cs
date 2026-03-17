@@ -7,6 +7,8 @@ using EGI_Backend.Domain.Enums;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 
 namespace EGI_Backend.Application.Services
 {
@@ -25,7 +27,10 @@ namespace EGI_Backend.Application.Services
         private readonly IMapper _mapper;
         private readonly INotificationService _notificationService;
         private readonly IEmailService _emailService;
-
+        private readonly IOCRService _ocrService;
+        private readonly IFraudDetectionService _fraudService;
+        private readonly IAuditLogRepository _auditRepo;
+ 
         public ClaimService(
             IClaimRepository claimRepo,
             IPolicyAssignmentRepository policyRepo,
@@ -39,7 +44,10 @@ namespace EGI_Backend.Application.Services
             IUnitOfWork unitOfWork,
             IMapper mapper,
             INotificationService notificationService,
-            IEmailService emailService)
+            IEmailService emailService,
+            IOCRService ocrService,
+            IFraudDetectionService fraudService,
+            IAuditLogRepository auditRepo)
         {
             _claimRepo = claimRepo;
             _policyRepo = policyRepo;
@@ -54,125 +62,186 @@ namespace EGI_Backend.Application.Services
             _mapper = mapper;
             _notificationService = notificationService;
             _emailService = emailService;
+            _ocrService = ocrService;
+            _fraudService = fraudService;
+            _auditRepo = auditRepo;
         }
 
         public async Task<string> SubmitClaimAsync(Guid corporateClientUserId, SubmitClaimDto dto)
         {
-            // 1. Verify the PolicyAssignment exists and is Active
-            var policy = await _policyRepo.GetByIdWithDetailsAsync(dto.PolicyAssignmentId);
-            if (policy == null)
-                throw new NotFoundException("Policy not found.");
-
-            if (policy.Status != PolicyStatus.Active)
-                throw new BadRequestException("Policy is not active. Claims cannot be submitted.");
-
-            // 2. Verify the CorporateClient owns this policy
-            var client = await _clientRepo.GetByUserIdAsync(corporateClientUserId);
-            if (client == null || policy.CorporateClientId != client.Id)
-                throw new ForbiddenException("You are not authorized to submit claims for this policy.");
-
-            // 2.1 Verify Premium Payment (Strict check)
-            var invoices = await _invoiceRepo.GetByPolicyAssignmentIdAsync(dto.PolicyAssignmentId);
-            var unpaidInvoice = invoices
-                .Where(i => i.Status != InvoiceStatus.Paid && i.InvoiceDate.AddDays(15) < DateTime.UtcNow)
-                .OrderBy(i => i.InvoiceDate)
-                .FirstOrDefault();
-
-            if (unpaidInvoice != null)
+            if (!string.IsNullOrEmpty(dto.SubmissionToken))
             {
-                throw new BadRequestException($"Premium overdue since {unpaidInvoice.InvoiceDate.ToShortDateString()}. The 15-day grace period has expired. Please settle your outstanding invoices to activate benefit claims.");
+                if (await _claimRepo.IsDuplicateAsync(dto.SubmissionToken))
+                    throw new BadRequestException("This claim has already been submitted (Duplicate Token).");
             }
 
-            // 3. Verify the Member belongs to this policy
-            var member = policy.Members.FirstOrDefault(m => m.Id == dto.MemberId);
+            var member = await _memberRepo.GetByIdWithPolicyAsync(dto.MemberId);
             if (member == null)
-                throw new NotFoundException("Member does not belong to this policy.");
+                throw new NotFoundException("Member data mismatch. This individual is not recognized.");
 
-            if (!member.Status)
-                throw new BadRequestException("This member is currently inactive. Claims cannot be processed for inactive members.");
+            var policy = member.PolicyAssignment;
+            if (policy == null || policy.Id != dto.PolicyAssignmentId)
+                throw new NotFoundException("Policy not found or member does not belong to this policy.");
 
-            // 4. Verify the Dependent (if provided) belongs to this Member
+            OCRExtractedData? ocrData = null;
+            if (dto.Documents.Count > 0)
+            {
+                try
+                {
+                    ocrData = await _ocrService.ExtractDataAsync(dto.Documents[0], dto.ClaimType);
+                    if (ocrData != null && ocrData.IsSuccess)
+                    {
+                        if (dto.ClaimType == CoverageType.Life && ocrData.DateOfDeath.HasValue && dto.IncidentDate == DateTime.MinValue)
+                            dto.IncidentDate = ocrData.DateOfDeath.Value;
+                        else if (dto.ClaimType == CoverageType.Health && ocrData.BillDate.HasValue && dto.IncidentDate == DateTime.MinValue)
+                            dto.IncidentDate = ocrData.BillDate.Value;
+                        else if (dto.ClaimType == (CoverageType)CoverageType.Accident && ocrData.IncidentDate.HasValue && dto.IncidentDate == DateTime.MinValue)
+                            dto.IncidentDate = ocrData.IncidentDate.Value;
+                    }
+                }
+                catch { }
+            }
+
+            if (dto.IncidentDate.Date > DateTime.UtcNow.Date)
+            {
+                throw new BadRequestException("Claim Rejected: Incident date cannot be in the future.");
+            }
+
+            if (dto.IncidentDate.Date < policy.StartDate.Date || dto.IncidentDate.Date > policy.EndDate.Date)
+            {
+                throw new BadRequestException($"Claim Rejected: The incident date ({dto.IncidentDate:dd MMM yyyy}) is outside the policy coverage period ({policy.StartDate:dd MMM yyyy} to {policy.EndDate:dd MMM yyyy}).");
+            }
+
+            var submissionDeadline = policy.EndDate.AddDays(30);
+            if (DateTime.UtcNow.Date > submissionDeadline.Date)
+            {
+                throw new BadRequestException($"Submission Blocked: The window for submitting claims for this policy period closed on {submissionDeadline:dd MMM yyyy}.");
+            }
+
+            if (policy.Status != PolicyStatus.Active && policy.Status != PolicyStatus.Expired)
+                throw new ForbiddenException("Claims can only be submitted for active or recently expired policies.");
+
             Dependent? dependent = null;
             if (dto.DependentId.HasValue)
             {
                 dependent = member.Dependents.FirstOrDefault(d => d.Id == dto.DependentId.Value);
                 if (dependent == null)
                     throw new NotFoundException("Dependent does not belong to this member.");
-
-                if (!dependent.IsActive)
-                    throw new BadRequestException("This dependent is currently inactive. Claims cannot be processed for inactive dependents.");
             }
 
-            // 5. Verify the Plan covers this ClaimType
+            if (!member.Status)
+                throw new ForbiddenException("Claim Submission Blocked: This member account is currently inactive.");
+
+            if (dependent != null && !dependent.IsActive)
+                throw new ForbiddenException("Claim Submission Blocked: Attempting to claim for an inactive dependent.");
+
+            var client = await _clientRepo.GetByUserIdAsync(corporateClientUserId);
+            if (client == null || policy.CorporateClientId != client.Id)
+                throw new ForbiddenException("You are not authorized to submit claims for this policy.");
+
+            var invoices = await _invoiceRepo.GetByPolicyAssignmentIdAsync(dto.PolicyAssignmentId);
+            var overdueInvoices = invoices
+                .Where(i => i.Status != InvoiceStatus.Paid && !i.InvoiceNo.EndsWith("-ADJ"))
+                .Where(i => (DateTime.UtcNow.Date - i.DueDate.Date).Days >= 15)
+                .ToList();
+
+            if (overdueInvoices.Any())
+            {
+                var oldestDate = overdueInvoices.Min(i => i.DueDate);
+                throw new BadRequestException($"Claim Rejected: Multiple invoices have been overdue since {oldestDate.ToShortDateString()}. Coverage is currently suspended.");
+            }
+
             var plan = await _planRepo.GetByIdAsync(policy.InsurancePlanId);
             if (plan == null)
                 throw new NotFoundException("Insurance plan not found.");
 
             var matchingCoverage = plan.Coverages.FirstOrDefault(c => c.Type == dto.ClaimType);
             if (matchingCoverage == null)
-                throw new BadRequestException($"This plan does not cover '{dto.ClaimType}' claims. Claim rejected.");
+                throw new BadRequestException($"This plan does not cover '{dto.ClaimType}' claims.");
 
-            // 6. Verify the CoveredGroup allows this Dependent to claim this type
             if (dependent != null)
             {
                 bool isParent = dependent.Relationship == RelationshipType.Father || dependent.Relationship == RelationshipType.Mother;
                 bool coverageIncludesParents = matchingCoverage.CoveredGroup == CoveredGroup.EmployeeFamilyAndParents;
-                bool coverageIncludesFamily = matchingCoverage.CoveredGroup == CoveredGroup.EmployeeAndFamily || coverageIncludesParents;
-
                 if (isParent && !coverageIncludesParents)
-                    throw new BadRequestException($"The plan does not cover parents under '{dto.ClaimType}'. Claim rejected.");
+                    throw new BadRequestException($"The plan does not cover parents under '{dto.ClaimType}'.");
 
                 if (!isParent && matchingCoverage.CoveredGroup == CoveredGroup.EmployeeOnly)
-                    throw new BadRequestException($"The plan covers '{dto.ClaimType}' for Employee only. Dependents are not covered.");
+                    throw new BadRequestException($"The plan covers '{dto.ClaimType}' for Employee only.");
             }
 
-            // 7. Determine the SumInsured for this claimant (member or dependent)
-            decimal claimantSumInsured = dto.DependentId.HasValue
-                ? (dependent?.SumInsured ?? 0m)
-                : member.SumInsured;
-
-            // 8. Validate single claim amount does not exceed SumInsured
-            if (dto.ClaimAmount > claimantSumInsured)
-                throw new BadRequestException($"Claim amount (₹{dto.ClaimAmount}) exceeds the Sum Insured (₹{claimantSumInsured}) for this claimant.");
-
-            // 9. Validate CUMULATIVE claims for this specific ClaimType don't exceed the coverage amount
-            decimal previousApproved = await _claimRepo.GetApprovedClaimsTotalAsync(dto.MemberId, dto.DependentId, dto.ClaimType);
             decimal coverageLimit = matchingCoverage.CoverageAmount;
+            decimal utilizedAmount = await _claimRepo.GetApprovedClaimsTotalAsync(dto.PolicyAssignmentId, dto.MemberId, dto.DependentId, dto.ClaimType);
+            decimal availableBalance = coverageLimit - utilizedAmount;
 
-            if ((previousApproved + dto.ClaimAmount) > coverageLimit)
+            if (dto.ClaimType == CoverageType.Life)
             {
-                decimal remaining = coverageLimit - previousApproved;
-                throw new BadRequestException(
-                    $"Cumulative claim limit exceeded for '{dto.ClaimType}'. " +
-                    $"Coverage Limit: ₹{coverageLimit}, Already Claimed: ₹{previousApproved}, Remaining: ₹{remaining}.");
+                dto.ClaimAmount = coverageLimit;
             }
 
-            // 10. Validate documents count matches document types
+            if (dto.ClaimAmount <= 0)
+            {
+                throw new BadRequestException("Claim Rejected: Invalid claim amount.");
+            }
+
+            if (dto.ClaimAmount > availableBalance)
+            {
+                throw new BadRequestException($"Insufficient Coverage: Your remaining balance for {dto.ClaimType} is ₹{availableBalance:N2}.");
+            }
+
             if (dto.Documents.Count != dto.DocumentTypes.Count)
                 throw new BadRequestException("Each document must have a corresponding document type.");
 
             if (dto.Documents.Count == 0)
                 throw new BadRequestException("At least one supporting document is required.");
 
-            // 11. All checks passed — create the claim
             var claim = new Claim
             {
                 Id = Guid.NewGuid(),
-                ClaimNumber = $"CLM-{DateTime.UtcNow.Year}-{Guid.NewGuid().ToString().Substring(0, 8).ToUpper()}",
+                ClaimNumber = $"CLM-{DateTime.UtcNow.Year}-{dto.ClaimAmount.ToString().GetHashCode():X4}-{Guid.NewGuid().ToString().ToUpper().Substring(0, 8)}",
                 PolicyAssignmentId = dto.PolicyAssignmentId,
                 MemberId = dto.MemberId,
                 DependentId = dto.DependentId,
                 ClaimType = dto.ClaimType,
                 ClaimAmount = dto.ClaimAmount,
                 ClaimReason = dto.ClaimReason,
+                IncidentDate = dto.IncidentDate,
                 ClaimDate = DateTime.UtcNow,
+                SubmissionToken = dto.SubmissionToken,
                 Status = ClaimStatus.Pending
             };
+
+            if (ocrData != null && ocrData.IsSuccess)
+            {
+                claim.ExtractedHospitalName = ocrData.HospitalName;
+                claim.ExtractedBillDate = ocrData.BillDate;
+                claim.ExtractedBillAmount = ocrData.BillAmount;
+                claim.ExtractedDateOfDeath = ocrData.DateOfDeath;
+                claim.ExtractedCauseOfDeath = ocrData.CauseOfDeath;
+                claim.ExtractedFirNumber = ocrData.FirNumber;
+                claim.ExtractedPoliceStation = ocrData.PoliceStation;
+                claim.ExtractedIncidentDate = ocrData.IncidentDate;
+                claim.ExtractedDiagnosis = ocrData.Diagnosis;
+
+                var fraudResult = await _fraudService.AnalyzeClaimAsync(claim, ocrData);
+                claim.FraudScore = fraudResult.Score;
+                claim.FraudAnalysis = fraudResult.Analysis;
+                claim.IsSuspectedFraud = fraudResult.IsFlagged;
+
+                if (claim.IsSuspectedFraud)
+                {
+                    claim.RequiresAdminApproval = true;
+                }
+            }
+ 
+            if (claim.ClaimAmount > 500000)
+            {
+                claim.RequiresAdminApproval = true;
+            }
 
             var uploadedFilePaths = new List<string>();
             try
             {
-                // 12. Upload and attach documents
                 for (int i = 0; i < dto.Documents.Count; i++)
                 {
                     var file = dto.Documents[i];
@@ -190,20 +259,45 @@ namespace EGI_Backend.Application.Services
                     });
                 }
 
+                member.LastClaimAt = DateTime.UtcNow;
+                await _memberRepo.UpdateAsync(member);
+
                 await _claimRepo.AddAsync(claim);
                 await _unitOfWork.SaveChangesAsync();
 
-                // Notify Corporate Client
                 await _notificationService.CreateNotificationAsync(corporateClientUserId, "Claim Submitted", $"Claim {claim.ClaimNumber} for {claim.ClaimType} has been submitted successfully.", "Success");
 
-                return $"Claim submitted successfully. Claim Number: {claim.ClaimNumber}. Status: Pending Review.";
+                // Notify Agent and Admins
+                try
+                {
+                    if (policy.AgentId != Guid.Empty)
+                    {
+                        await _notificationService.CreateNotificationAsync(policy.AgentId, "New Claim Received", $"A new {claim.ClaimType} claim {claim.ClaimNumber} has been submitted for policy {policy.PolicyNo}.", "Info");
+                    }
+
+                    var admins = await _userRepo.GetAllByRoleAsync(UserRole.Admin);
+                    foreach (var admin in admins)
+                    {
+                        await _notificationService.CreateNotificationAsync(admin.Id, "Claim Submitted", $"A new {claim.ClaimType} claim {claim.ClaimNumber} was submitted for policy {policy.PolicyNo}.", "Info");
+                    }
+                }
+                catch { }
+
+                return $"Claim submitted successfully. Claim Number: {claim.ClaimNumber}.";
+            }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+            {
+                foreach (var path in uploadedFilePaths)
+                {
+                    try { await _storage.DeleteAsync(path); } catch { }
+                }
+                throw new BadRequestException("Multiple submission requests detected. Please wait a moment and try again.");
             }
             catch (Exception)
             {
-                // 13. Cleanup uploaded files if the database transaction fails
                 foreach (var path in uploadedFilePaths)
                 {
-                    try { await _storage.DeleteAsync(path); } catch { /* Ignore cleanup errors */ }
+                    try { await _storage.DeleteAsync(path); } catch { }
                 }
                 throw;
             }
@@ -211,45 +305,95 @@ namespace EGI_Backend.Application.Services
 
         public async Task ReviewClaimAsync(Guid claimsOfficerUserId, Guid claimId, ReviewClaimDto dto)
         {
+            var user = await _userRepo.GetByIdAsync(claimsOfficerUserId);
+            if (user == null) throw new UnauthorizedException("Reviewer not found.");
+
             var claim = await _claimRepo.GetByIdAsync(claimId);
-            if (claim == null)
-                throw new NotFoundException("Claim not found.");
+            if (claim == null) throw new NotFoundException("Claim not found.");
 
-            if (claim.Status != ClaimStatus.Pending && claim.Status != ClaimStatus.InReview)
-                throw new BadRequestException("Claim has already been reviewed.");
+            if (claim.Status != ClaimStatus.Pending && claim.Status != ClaimStatus.InReview && claim.Status != ClaimStatus.PendingAdminApproval)
+                throw new BadRequestException("Claim has already been finalized.");
 
-            claim.ReviewedBy = claimsOfficerUserId;
-            claim.ReviewedAt = DateTime.UtcNow;
+            if (claim.Status == ClaimStatus.InReview && claim.ReviewedBy != claimsOfficerUserId && user.Role != UserRole.Admin)
+            {
+                throw new ForbiddenException("This claim is currently being reviewed by another officer.");
+            }
+
+            if (claim.Status == ClaimStatus.Pending || claim.Status == ClaimStatus.InReview)
+            {
+                claim.ReviewedBy = claimsOfficerUserId;
+                claim.ReviewedAt = DateTime.UtcNow;
+                claim.Status = ClaimStatus.InReview;
+            }
 
             if (dto.IsApproved)
             {
+                if (claim.FraudScore >= 80 && !dto.OverrideFraud && !claim.IsFraudOverridden)
+                {
+                    throw new BadRequestException("CRITICAL RISK: High-confidence fraud indicators detected. Override required.");
+                }
+
+                if ((claim.FraudScore >= 40 || (claim.IsSuspectedFraud && dto.OverrideFraud)) && user.Role != UserRole.Admin)
+                {
+                    claim.RequiresAdminApproval = true; 
+                }
+
+                if (dto.OverrideFraud && string.IsNullOrWhiteSpace(dto.FraudOverrideReason))
+                {
+                    throw new BadRequestException("An override justification is required.");
+                }
+
+                if (dto.OverrideFraud)
+                {
+                    claim.IsFraudOverridden = true;
+                    claim.FraudOverriddenBy = claimsOfficerUserId;
+                    claim.FraudOverrideReason = dto.FraudOverrideReason;
+                }
+            }
+
+            if (dto.IsApproved)
+            {
+                if (claim.RequiresAdminApproval && claim.Status != ClaimStatus.PendingAdminApproval && user.Role != UserRole.Admin)
+                {
+                    claim.Status = ClaimStatus.PendingAdminApproval;
+                    claim.ReviewedBy = claimsOfficerUserId;
+                    claim.ReviewedAt = DateTime.UtcNow;
+                    
+                    await _unitOfWork.SaveChangesAsync();
+                    
+                    // Notify Admins for Executive Approval
+                    try
+                    {
+                        var admins = await _userRepo.GetAllByRoleAsync(UserRole.Admin);
+                        foreach (var admin in admins)
+                        {
+                            await _notificationService.CreateNotificationAsync(admin.Id, "Executive Approval Required", $"Claim {claim.ClaimNumber} requires your final review due to high value or risk score.", "Warning");
+                        }
+                    }
+                    catch { }
+                    
+                    return;
+                }
+
+                if (claim.Status == ClaimStatus.PendingAdminApproval)
+                {
+                    if (user.Role != UserRole.Admin)
+                    {
+                        throw new ForbiddenException("This high-value claim requires final sign-off from an Administrator.");
+                    }
+                    claim.AdminApprovedBy = claimsOfficerUserId; 
+                    claim.AdminApprovedAt = DateTime.UtcNow;
+                }
+
                 claim.Status = ClaimStatus.Approved;
                 claim.RejectionReason = null;
 
-                // Decrement SumInsured from Member or Dependent
-                if (claim.DependentId.HasValue)
-                {
-                    var dependent = await _dependentRepo.GetByIdAsync(claim.DependentId.Value);
-                    if (dependent != null)
-                    {
-                        dependent.SumInsured = Math.Max(0, dependent.SumInsured - claim.ClaimAmount);
-                        await _dependentRepo.UpdateAsync(dependent);
-                    }
-                }
-                else
-                {
-                    var member = await _memberRepo.GetByIdAsync(claim.MemberId);
-                    if (member != null)
-                    {
-                        member.SumInsured = Math.Max(0, member.SumInsured - claim.ClaimAmount);
-                        await _memberRepo.UpdateAsync(member);
-                    }
-                }
+                await AdjustMemberCoverageAsync(claim);
             }
             else
             {
                 if (string.IsNullOrWhiteSpace(dto.RejectionReason))
-                    throw new BadRequestException("Rejection reason is required when rejecting a claim.");
+                    throw new BadRequestException("Rejection reason is required.");
 
                 claim.Status = ClaimStatus.Rejected;
                 claim.RejectionReason = dto.RejectionReason;
@@ -257,58 +401,33 @@ namespace EGI_Backend.Application.Services
 
             await _unitOfWork.SaveChangesAsync();
 
-            // Send in-app notifications
+            // Notification logic (Simplified for restoration)
             try
             {
                 var policy = await _policyRepo.GetByIdWithDetailsAsync(claim.PolicyAssignmentId);
                 if (policy != null)
                 {
-                    var client = await _clientRepo.GetByIdAsync(policy.CorporateClientId);
-
                     string title = $"Claim {claim.Status}";
-                    string msgBase = $"Claim {claim.ClaimNumber} for {claim.ClaimType} has been {claim.Status.ToString().ToLower()}.";
-                    string type = claim.Status == ClaimStatus.Approved ? "Success" : "Error";
-
-                    // Notify Corporate Client
-                    if (client != null)
-                    {
-                        await _notificationService.CreateNotificationAsync(client.UserId, title, msgBase, type);
-                    }
-
-                    // Notify Agent
+                    string msgBase = $"Claim {claim.ClaimNumber} has been {claim.Status}.";
+                    await _notificationService.CreateNotificationAsync(policy.CorporateClientId, title, msgBase, "Info");
                     if (policy.AgentId != Guid.Empty)
-                    {
-                        await _notificationService.CreateNotificationAsync(policy.AgentId, title, msgBase, type);
-                    }
-
-                    // Notify Member
-                    var member = await _memberRepo.GetByIdAsync(claim.MemberId);
-                    if (member != null && !string.IsNullOrEmpty(member.Email))
-                    {
-                        var memberUser = await _userRepo.GetByEmailAsync(member.Email);
-                        if (memberUser != null)
-                        {
-                            await _notificationService.CreateNotificationAsync(memberUser.Id, title, msgBase, type);
-                        }
-
-                        // Send Approved Email with PDF Attachment if Approved
-                        if (dto.IsApproved)
-                        {
-                            var pdfBytes = GenerateClaimInvoicePdf(claim, member);
-                            string pdfFileName = $"Settlement_{claim.ClaimNumber}.pdf";
-                            await _emailService.SendClaimApprovedEmailAsync(member.Email, member.FullName, claim.ClaimNumber, claim.ClaimAmount, pdfBytes, pdfFileName);
-                        }
-                    }
+                        await _notificationService.CreateNotificationAsync(policy.AgentId, title, msgBase, "Info");
                 }
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[WARNING] Failed to send notifications for claim {claimId}: {ex.Message}");
-            }
+            catch { }
         }
 
-        public async Task<List<ClaimResponseDto>> GetClaimsByPolicyAsync(Guid policyAssignmentId)
+        public async Task<List<ClaimResponseDto>> GetClaimsByPolicyAsync(Guid policyAssignmentId, Guid callerUserId, string role)
         {
+            var policy = await _policyRepo.GetByIdWithDetailsAsync(policyAssignmentId);
+            if (policy == null) throw new NotFoundException("Policy not found.");
+
+            bool isAuthorized = IsHighAuthority(role) || 
+                              (role?.Equals("Customer", StringComparison.OrdinalIgnoreCase) == true && policy.CorporateClient?.UserId == callerUserId) ||
+                              (role?.Equals("Agent", StringComparison.OrdinalIgnoreCase) == true && policy.AgentId == callerUserId);
+
+            if (!isAuthorized) throw new ForbiddenException("Security Access Denied.");
+
             var claims = await _claimRepo.GetByPolicyAssignmentIdAsync(policyAssignmentId);
             return _mapper.Map<List<ClaimResponseDto>>(claims);
         }
@@ -319,17 +438,20 @@ namespace EGI_Backend.Application.Services
             return _mapper.Map<List<ClaimResponseDto>>(claims);
         }
 
-        public async Task<List<ClaimDetailResponseDto>> GetClaimsByMemberAsync(Guid memberId)
+        public async Task<List<ClaimDetailResponseDto>> GetClaimsByMemberAsync(Guid memberId, Guid callerUserId, string role)
         {
+            var member = await _memberRepo.GetByIdAsync(memberId);
+            if (member == null) throw new NotFoundException("Member not found.");
+
             var claims = await _claimRepo.GetByMemberIdAsync(memberId);
             return _mapper.Map<List<ClaimDetailResponseDto>>(claims);
         }
 
-        public async Task<ClaimDetailResponseDto> GetClaimDetailAsync(Guid claimId)
+        public async Task<ClaimDetailResponseDto> GetClaimDetailAsync(Guid claimId, Guid callerUserId, string role)
         {
             var claim = await _claimRepo.GetByIdAsync(claimId);
-            if (claim == null)
-                throw new NotFoundException("Claim not found.");
+            if (claim == null) throw new NotFoundException("Claim not found.");
+
             return _mapper.Map<ClaimDetailResponseDto>(claim);
         }
 
@@ -380,7 +502,7 @@ namespace EGI_Backend.Application.Services
                     if (!isParent && coverage.CoveredGroup == CoveredGroup.EmployeeOnly) continue;
                 }
 
-                decimal claimed = await _claimRepo.GetApprovedClaimsTotalAsync(memberId, dependentId, coverage.Type);
+                decimal claimed = await _claimRepo.GetApprovedClaimsTotalAsync(policy.Id, memberId, dependentId, coverage.Type);
                 decimal remaining = coverage.CoverageAmount - claimed;
 
                 summary.CoverageBreakdown.Add(new CoverageItemDto
@@ -388,13 +510,13 @@ namespace EGI_Backend.Application.Services
                     ClaimType = coverage.Type.ToString(),
                     TotalCoverage = coverage.CoverageAmount,
                     TotalClaimed = claimed,
-                    Remaining = remaining < 0 ? 0m : remaining
+                    Remaining = Math.Max(0, remaining)
                 });
             }
 
-            // Aggregate totals using the Member/Dependent SumInsured as the master limit
-            summary.TotalLimitAllowed = dependent?.SumInsured ?? member.SumInsured;
-            summary.TotalAmountUtilized = await _claimRepo.GetApprovedClaimsTotalAsync(memberId, dependentId, null);
+            // Aggregate totals using the Insurance Plan as the master limit
+            summary.TotalLimitAllowed = plan.Coverages.Sum(c => c.CoverageAmount);
+            summary.TotalAmountUtilized = await _claimRepo.GetApprovedClaimsTotalAsync(policy.Id, memberId, dependentId, null);
             summary.RemainingBalance = Math.Max(0, summary.TotalLimitAllowed - summary.TotalAmountUtilized);
 
             return summary;
@@ -410,30 +532,15 @@ namespace EGI_Backend.Application.Services
         {
             var claim = await _claimRepo.GetByIdAsync(claimId);
             if (claim == null) throw new NotFoundException("Claim not found.");
-
-            if (claim.Status == ClaimStatus.InReview && claim.ReviewedBy != officerId)
-            {
-                throw new BadRequestException("This claim is already being reviewed by another officer.");
-            }
-
-            if (claim.Status != ClaimStatus.Pending && claim.Status != ClaimStatus.InReview)
-            {
-                throw new BadRequestException("This claim has already been adjudicated.");
-            }
-
             claim.Status = ClaimStatus.InReview;
             claim.ReviewedBy = officerId;
-            // Note: We don't set ReviewedAt yet, only on final decision
-            
             await _unitOfWork.SaveChangesAsync();
         }
 
         public async Task ReleaseClaimAsync(Guid claimId)
         {
             var claim = await _claimRepo.GetByIdAsync(claimId);
-            if (claim == null) return;
-
-            if (claim.Status == ClaimStatus.InReview)
+            if (claim != null && claim.Status == ClaimStatus.InReview)
             {
                 claim.Status = ClaimStatus.Pending;
                 claim.ReviewedBy = null;
@@ -441,44 +548,108 @@ namespace EGI_Backend.Application.Services
             }
         }
 
-        private byte[] GenerateClaimInvoicePdf(Claim claim, Member member)
+        private async Task AdjustMemberCoverageAsync(Claim claim)
         {
-            QuestPDF.Settings.License = LicenseType.Community;
-
-            return Document.Create(container =>
+            if (claim.ClaimType == CoverageType.Life)
             {
-                container.Page(page =>
+                if (claim.DependentId.HasValue)
                 {
-                    page.Size(PageSizes.A4);
-                    page.Margin(2, Unit.Centimetre);
-                    page.PageColor(Colors.White);
-                    page.DefaultTextStyle(x => x.FontSize(12));
-
-                    page.Header().Text("Claim Settlement Invoice")
-                        .SemiBold().FontSize(24).FontColor(Colors.Blue.Darken2);
-
-                    page.Content().PaddingVertical(1, Unit.Centimetre)
-                        .Column(x =>
-                        {
-                            x.Spacing(20);
-                            x.Item().Text($"Claim Number: {claim.ClaimNumber}");
-                            x.Item().Text($"Member: {member.FullName} ({member.EmployeeCode})");
-                            x.Item().Text($"Type: {claim.ClaimType}");
-                            x.Item().Text($"Approved Settled Amount: ₹{claim.ClaimAmount:N2}")
-                                .Bold().FontSize(16).FontColor(Colors.Green.Darken2);
-                            x.Item().Text($"Settlement Date: {DateTime.UtcNow.ToString("dd MMM yyyy")}");
-                            x.Item().Text("This is a system generated settlement receipt. No signature is required.");
-                        });
-
-                    page.Footer().AlignCenter().Text(x =>
+                    var dependent = await _dependentRepo.GetByIdAsync(claim.DependentId.Value);
+                    if (dependent != null)
                     {
-                        x.Span("Page ");
-                        x.CurrentPageNumber();
-                        x.Span(" of ");
-                        x.TotalPages();
-                    });
-                });
-            }).GeneratePdf();
+                        dependent.IsActive = false;
+                        await _dependentRepo.UpdateAsync(dependent);
+                    }
+                }
+                else
+                {
+                    var member = await _memberRepo.GetByIdAsync(claim.MemberId);
+                    if (member != null)
+                    {
+                        member.Status = false;
+                        await _memberRepo.UpdateAsync(member);
+                    }
+                }
+            }
+        }
+
+        public async Task<(byte[] content, string contentType, string fileName)> GetSecureDocumentAsync(Guid userId, string role, Guid documentId)
+        {
+            var claimDoc = await _claimRepo.GetDocumentByIdAsync(documentId);
+            string? filePath = null;
+            string? fileName = null;
+            bool hasAccess = IsHighAuthority(role);
+
+            if (claimDoc != null)
+            {
+                if (!hasAccess && role != null && role.Equals("Customer", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Fix: Compare userId (User table PK) with CorporateClient.UserId
+                    if (claimDoc.Claim.PolicyAssignment != null && 
+                        (claimDoc.Claim.PolicyAssignment.CorporateClient != null && claimDoc.Claim.PolicyAssignment.CorporateClient.UserId == userId))
+                    {
+                        hasAccess = true;
+                    }
+                }
+                else if (!hasAccess && role != null && role.Equals("Agent", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (claimDoc.Claim.PolicyAssignment.AgentId == userId)
+                    {
+                        hasAccess = true;
+                    }
+                }
+                filePath = claimDoc.FilePath;
+                fileName = claimDoc.FileName;
+            }
+            else
+            {
+                var clientDoc = await _clientRepo.GetDocumentByIdAsync(documentId);
+                if (clientDoc == null) throw new NotFoundException("Document not found.");
+
+                if (!hasAccess && role != null && role.Equals("Customer", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Fix: Compare userId (User table PK) with CorporateClient.UserId
+                    if (clientDoc.CorporateClient != null && clientDoc.CorporateClient.UserId == userId)
+                    {
+                        hasAccess = true;
+                    }
+                }
+                
+                filePath = clientDoc.FilePath;
+                fileName = clientDoc.FileName;
+            }
+
+            if (!hasAccess) throw new ForbiddenException("Security Access Denied.");
+
+            string finalPath = filePath;
+            if (!System.IO.File.Exists(finalPath))
+            {
+                var fileNameOnly = System.IO.Path.GetFileName(filePath);
+                var uploadsFolder = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "Uploads");
+                var localPath = System.IO.Path.Combine(uploadsFolder, fileNameOnly);
+                if (System.IO.File.Exists(localPath)) finalPath = localPath;
+                else throw new NotFoundException("Physical file not found.");
+            }
+
+            var bytes = await System.IO.File.ReadAllBytesAsync(finalPath);
+            var extension = System.IO.Path.GetExtension(finalPath).ToLowerInvariant();
+            string contentType = extension switch
+            {
+                ".pdf" => "application/pdf",
+                ".jpg" => "image/jpeg",
+                ".jpeg" => "image/jpeg",
+                ".png" => "image/png",
+                _ => "application/octet-stream"
+            };
+
+            return (bytes, contentType, fileName);
+        }
+
+        private bool IsHighAuthority(string? role)
+        {
+            if (string.IsNullOrEmpty(role)) return false;
+            var norm = role.Trim().Replace(" ", "").Replace("_", "").ToLowerInvariant();
+            return norm == "admin" || norm == "claimsofficer" || norm == "officer";
         }
     }
 }

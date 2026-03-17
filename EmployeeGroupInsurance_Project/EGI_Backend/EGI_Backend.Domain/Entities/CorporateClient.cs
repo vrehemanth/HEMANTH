@@ -24,6 +24,7 @@ namespace EGI_Backend.Domain.Entities
         public int ReSubmissionCount { get; set; } = 0;
         public string? Phone { get; set; }
         public bool IsBlocked { get; set; } = false;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public ICollection<CorporateClientDocument> Documents { get; set; } = new List<CorporateClientDocument>();
     }
 }

@@ -7,10 +7,10 @@ using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using EGI_Backend.Domain.Enums;
 
 namespace EGI_Backend.WebAPI.Controllers
 {
-    [Authorize(Roles = "Customer")]
     [Authorize(Roles = "Customer")]
     [Route("api/customer/dashboard")]
     public class CustomerDashboardController : BaseApiController
@@ -61,6 +61,20 @@ namespace EGI_Backend.WebAPI.Controllers
             return Ok(plans);
         }
 
+        [HttpGet("renewal-quote/{policyId}")]
+        public async Task<IActionResult> GetRenewalQuote(Guid policyId, [FromQuery] int years = 1, [FromQuery] BillingFrequency frequency = BillingFrequency.Annual)
+        {
+            var quote = await _policyService.GetRenewalQuoteAsync(policyId, CurrentUserId, years, frequency);
+            return Ok(quote);
+        }
+
+        [HttpPost("renew-policy/{policyId}")]
+        public async Task<IActionResult> RenewPolicy(Guid policyId, [FromBody] ConfirmRenewalDto dto)
+        {
+            var result = await _policyService.RenewPolicyAsync(policyId, CurrentUserId, dto.Years, dto.BillingFrequency);
+            return Ok(new { message = result });
+        }
+
         [HttpGet("insurance-plans/{id}")]
         public async Task<IActionResult> GetInsurancePlanById(Guid id)
         {
@@ -81,7 +95,7 @@ namespace EGI_Backend.WebAPI.Controllers
         [HttpGet("endorsements/policy/{policyId}")]
         public async Task<IActionResult> GetEndorsementsByPolicy(Guid policyId)
         {
-            var result = await _endorsementService.GetEndorsementsByPolicyAsync(policyId);
+            var result = await _endorsementService.GetEndorsementsByPolicyAsync(policyId, CurrentUserId, "Customer");
             return Ok(result);
         }
 
@@ -123,14 +137,14 @@ namespace EGI_Backend.WebAPI.Controllers
         [HttpGet("invoices/{invoiceId}")]
         public async Task<IActionResult> GetInvoiceDetail(Guid invoiceId)
         {
-            var invoice = await _invoiceService.GetInvoiceByIdAsync(invoiceId);
+            var invoice = await _invoiceService.GetInvoiceByIdAsync(invoiceId, CurrentUserId, "Customer");
             return Ok(invoice);
         }
 
         [HttpGet("invoices/{invoiceId}/payments")]
         public async Task<IActionResult> GetPayments(Guid invoiceId)
         {
-            var payments = await _invoiceService.GetPaymentsByInvoiceAsync(invoiceId);
+            var payments = await _invoiceService.GetPaymentsByInvoiceAsync(invoiceId, CurrentUserId, "Customer");
             return Ok(payments);
         }
 
@@ -144,7 +158,7 @@ namespace EGI_Backend.WebAPI.Controllers
         [HttpGet("invoices/policy/{policyAssignmentId}")]
         public async Task<IActionResult> GetInvoicesByPolicy(Guid policyAssignmentId)
         {
-            var invoices = await _invoiceService.GetInvoicesByPolicyAsync(policyAssignmentId);
+            var invoices = await _invoiceService.GetInvoicesByPolicyAsync(policyAssignmentId, CurrentUserId, "Customer");
             return Ok(invoices);
         }
 
@@ -160,7 +174,7 @@ namespace EGI_Backend.WebAPI.Controllers
         [HttpGet("claims/policy/{policyAssignmentId}")]
         public async Task<IActionResult> GetClaimsByPolicy(Guid policyAssignmentId)
         {
-            var claims = await _claimService.GetClaimsByPolicyAsync(policyAssignmentId);
+            var claims = await _claimService.GetClaimsByPolicyAsync(policyAssignmentId, CurrentUserId, "Customer");
             return Ok(claims);
         }
 

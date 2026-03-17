@@ -36,21 +36,45 @@ namespace EGI_Backend.Application.Services
                 return cached;
             }
 
-            using var scope = _scopeFactory.CreateScope();
-            var agentCustRepo = scope.ServiceProvider.GetRequiredService<IAgentCustomerRepository>();
-            var policyRepo = scope.ServiceProvider.GetRequiredService<IPolicyAssignmentRepository>();
-            var claimRepo = scope.ServiceProvider.GetRequiredService<IClaimRepository>();
-            var invoiceRepo = scope.ServiceProvider.GetRequiredService<IInvoiceRepository>();
+            // Parallel Execution for Summary Metrics
+            var countTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IAgentCustomerRepository>().GetCustomerCountForAgentAsync(agentId);
+            });
+            var activePolTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IPolicyAssignmentRepository>().CountActiveForAgentAsync(agentId);
+            });
+            var premiumTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IPolicyAssignmentRepository>().GetTotalPremiumForAgentAsync(agentId);
+            });
+            var commissionTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IPolicyAssignmentRepository>().GetTotalCommissionForAgentAsync(agentId);
+            });
+            var pendingClaimTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IClaimRepository>().CountPendingForAgentCustomersAsync(agentId);
+            });
+
+            await Task.WhenAll(countTask, activePolTask, premiumTask, commissionTask, pendingClaimTask);
 
             var summary = new AgentDashboardSummaryDto
             {
-                TotalCustomers = await agentCustRepo.GetCustomerCountForAgentAsync(agentId),
-                ActivePolicies = await policyRepo.CountActiveForAgentAsync(agentId),
-                TotalPremiumHandled = await policyRepo.GetTotalPremiumForAgentAsync(agentId),
-                TotalCommissionEarned = await policyRepo.GetTotalCommissionForAgentAsync(agentId),
-                PendingClaimsForCustomers = await claimRepo.CountPendingForAgentCustomersAsync(agentId),
-                ProjectedCommission = (await policyRepo.GetTotalCommissionForAgentAsync(agentId)) * 1.12m
+                TotalCustomers = countTask.Result,
+                ActivePolicies = activePolTask.Result,
+                TotalPremiumHandled = premiumTask.Result,
+                TotalCommissionEarned = commissionTask.Result,
+                PendingClaimsForCustomers = pendingClaimTask.Result,
+                ProjectedCommission = commissionTask.Result * 1.12m
             };
+
+            using var scope2 = _scopeFactory.CreateScope();
+            var agentCustRepo = scope2.ServiceProvider.GetRequiredService<IAgentCustomerRepository>();
+            var invoiceRepo = scope2.ServiceProvider.GetRequiredService<IInvoiceRepository>();
+            var claimRepo = scope2.ServiceProvider.GetRequiredService<IClaimRepository>();
+            var policyRepo = scope2.ServiceProvider.GetRequiredService<IPolicyAssignmentRepository>();
 
             var customerIds = (await agentCustRepo.GetByAgentIdWithDetailsAsync(agentId)).Select(ac => ac.CorporateClientId).ToList();
             if (customerIds.Any())
@@ -67,7 +91,14 @@ namespace EGI_Backend.Application.Services
                     Amount = c.ClaimAmount,
                     Status = c.Status.ToString(),
                     Date = c.ClaimDate,
-                    Documents = new List<ClaimDocumentDto>()
+                    Documents = c.Documents.Select(doc => new ClaimDocumentDto
+                    {
+                        Id = doc.Id,
+                        DocumentType = doc.DocumentType.ToString(),
+                        FileName = doc.FileName,
+                        FilePath = doc.FilePath,
+                        UploadedAt = doc.UploadedAt
+                    }).ToList()
                 }).ToList();
             }
 
@@ -75,7 +106,7 @@ namespace EGI_Backend.Application.Services
             var policies = await policyRepo.GetByAgentIdAsync(agentId);
             summary.PoliciesSoldThisMonth = policies.Count(p => p.CreatedAt.Month == now.Month && p.CreatedAt.Year == now.Year);
 
-            _cache.Set(cacheKey, summary, TimeSpan.FromSeconds(5));
+            _cache.Set(cacheKey, summary, TimeSpan.FromMinutes(3));
             return summary;
         }
 

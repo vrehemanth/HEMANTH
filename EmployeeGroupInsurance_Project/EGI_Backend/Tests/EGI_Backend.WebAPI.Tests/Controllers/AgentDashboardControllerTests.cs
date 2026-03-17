@@ -47,8 +47,10 @@ namespace EGI_Backend.WebAPI.Tests.Controllers
         [Fact]
         public async Task GetPendingEndorsements_ValidRequest_ReturnsOkWithList()
         {
+            var agentId = Guid.NewGuid();
+            SetupUser(agentId);
             var expectedList = new List<EndorsementResponseDto> { new EndorsementResponseDto() };
-            _mockEndorseSvc.Setup(x => x.GetPendingEndorsementsAsync()).ReturnsAsync(expectedList);
+            _mockEndorseSvc.Setup(x => x.GetPendingEndorsementsAsync(It.IsAny<Guid>(), "Agent")).ReturnsAsync(expectedList);
 
             var result = await _controller.GetPendingEndorsements();
 
@@ -59,9 +61,11 @@ namespace EGI_Backend.WebAPI.Tests.Controllers
         [Fact]
         public async Task GetEndorsementsByPolicy_ValidId_ReturnsOkWithList()
         {
+            var agentId = Guid.NewGuid();
+            SetupUser(agentId);
             var policyId = Guid.NewGuid();
             var expectedList = new List<EndorsementResponseDto> { new EndorsementResponseDto() };
-            _mockEndorseSvc.Setup(x => x.GetEndorsementsByPolicyAsync(policyId)).ReturnsAsync(expectedList);
+            _mockEndorseSvc.Setup(x => x.GetEndorsementsByPolicyAsync(policyId, It.IsAny<Guid>(), "Agent")).ReturnsAsync(expectedList);
 
             var result = await _controller.GetEndorsementsByPolicy(policyId);
 
@@ -77,7 +81,7 @@ namespace EGI_Backend.WebAPI.Tests.Controllers
             SetupUser(agentId);
             var dto = new ReviewEndorsementDto();
             var response = new EndorsementResponseDto();
-            _mockEndorseSvc.Setup(x => x.ReviewEndorsementAsync(agentId, endorsementId, dto)).ReturnsAsync(response);
+            _mockEndorseSvc.Setup(x => x.ReviewEndorsementAsync(agentId, "Agent", endorsementId, dto)).ReturnsAsync(response);
 
             var result = await _controller.ReviewEndorsement(endorsementId, dto);
 

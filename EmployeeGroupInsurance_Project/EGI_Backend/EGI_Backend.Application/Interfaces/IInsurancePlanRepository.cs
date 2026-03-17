@@ -13,5 +13,7 @@ namespace EGI_Backend.Application.Interfaces
         Task AddAsync(InsurancePlan plan);
         void Update(InsurancePlan plan);
         void Delete(InsurancePlan plan);
+        Task<List<InsurancePlan>> GetActivePlansAsync();
+        Task<bool> IsPlanInUseAsync(Guid planId);
     }
 }

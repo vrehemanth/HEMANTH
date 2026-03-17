@@ -13,8 +13,10 @@ namespace EGI_Backend.Application.DTOs
         public decimal TotalPremium { get; set; }
         public decimal AnnualPremium { get; set; }
         public decimal CommissionAmount { get; set; }
+        public Guid InsurancePlanId { get; set; }
         public string BillingFrequency { get; set; } = string.Empty;
         public int BillingDay { get; set; }
         public string Status { get; set; } = string.Empty;
+        public bool CanRenew { get; set; }
     }
 }

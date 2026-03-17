@@ -25,9 +25,9 @@ namespace EGI_Backend.Application.Interfaces
         // Customer pays an invoice
         Task<PaymentResponseDto> PayInvoiceAsync(Guid invoiceId, Guid customerUserId, PayInvoiceDto dto);
 
-        // Queries
-        Task<List<InvoiceResponseDto>> GetInvoicesByPolicyAsync(Guid policyAssignmentId);
-        Task<InvoiceResponseDto> GetInvoiceByIdAsync(Guid invoiceId);
-        Task<List<PaymentResponseDto>> GetPaymentsByInvoiceAsync(Guid invoiceId);
+        // Queries (Security Hardened)
+        Task<List<InvoiceResponseDto>> GetInvoicesByPolicyAsync(Guid policyAssignmentId, Guid callerUserId, string role);
+        Task<InvoiceResponseDto> GetInvoiceByIdAsync(Guid invoiceId, Guid callerUserId, string role);
+        Task<List<PaymentResponseDto>> GetPaymentsByInvoiceAsync(Guid invoiceId, Guid callerUserId, string role);
     }
 }

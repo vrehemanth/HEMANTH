@@ -6,6 +6,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { filter, tap } from 'rxjs/operators';
 import { ToastService } from '../../../core/services/toast.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { Chart, registerables } from 'chart.js';
 import { OverviewTabComponent } from './tabs/overview/overview';
 import { CustomersTabComponent } from './tabs/customers/customers';
@@ -25,6 +26,7 @@ export class AgentDashboardComponent implements OnInit, OnDestroy {
   router = inject(Router);
   fb = inject(FormBuilder);
   toastService = inject(ToastService);
+  authService = inject(AuthService);
   private routerSub?: Subscription;
 
   private commissionChart?: Chart;
@@ -151,6 +153,12 @@ export class AgentDashboardComponent implements OnInit, OnDestroy {
   sortPolicies(column: string) { this.updateSort(this.policySortConfig, column); }
   sortEndorsements(column: string) { this.updateSort(this.endorsementSortConfig, column); }
   sortCommissions(column: string) { this.updateSort(this.commissionSortConfig, column); }
+
+  getDocumentUrl(docId: string): string {
+    const token = this.authService.currentUser()?.token;
+    if (!token) return '';
+    return `https://localhost:7146/api/Public/documents/${docId}?access_token=${token}`;
+  }
 
   selectedFile: File | null = null;
 

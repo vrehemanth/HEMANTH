@@ -1,10 +1,12 @@
 import { Component, inject, signal, OnInit, OnDestroy, computed, viewChild, ElementRef, effect } from '@angular/core';
+import Swal from 'sweetalert2';
 import { CommonModule } from '@angular/common';
 import { Router, NavigationEnd } from '@angular/router';
 import { ClaimsOfficerService } from '../../../data-access/claims-officer.service';
 import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 import { ToastService } from '../../../core/services/toast.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { Chart, registerables } from 'chart.js';
 import { OverviewTabComponent } from './tabs/overview/overview';
 import { QueueTabComponent } from './tabs/queue/queue';
@@ -21,6 +23,7 @@ export class ClaimsOfficerDashboardComponent implements OnInit, OnDestroy {
   officerService = inject(ClaimsOfficerService);
   router = inject(Router);
   toastService = inject(ToastService);
+  authService = inject(AuthService);
   private routerSub?: Subscription;
 
   private decisionChart?: Chart;
@@ -114,6 +117,12 @@ export class ClaimsOfficerDashboardComponent implements OnInit, OnDestroy {
   coverageSummary = signal<any>(null);
   memberHistory = signal<any[]>([]);
 
+  getDocumentUrl(docId: string): string {
+    const token = this.authService.currentUser()?.token;
+    if (!token) return '';
+    return `https://localhost:7146/api/Public/documents/${docId}?access_token=${token}`;
+  }
+
   private extractArray(payload: any): any[] {
     if (!payload) return [];
     if (Array.isArray(payload)) return payload;
@@ -167,11 +176,11 @@ export class ClaimsOfficerDashboardComponent implements OnInit, OnDestroy {
         next: res => {
           this.summary.set(res?.data || res);
           this.pendingReqs.delete('overview');
-          // Load history for analytics
-          this.lazyLoadTab('history');
         },
         error: () => this.pendingReqs.delete('overview')
       });
+      // Load history in parallel for analytics/charts
+      this.lazyLoadTab('history');
     } else if (tab === 'queue' && this.pendingClaims().length === 0) {
       this.loadPendingClaims();
     } else if (tab === 'history' && this.claimHistory().length === 0) {
@@ -245,27 +254,97 @@ export class ClaimsOfficerDashboardComponent implements OnInit, OnDestroy {
     this.memberHistory.set([]);
   }
 
-  adjudicate(claimId: string, isApproved: boolean) {
+  async adjudicate(claimId: string, isApproved: boolean) {
+    const claim = this.selectedClaim();
     let reason = '';
+    let overrideReason = '';
+    let overrideFraud = false;
+
+    // 1. Mandatory Rejection Reason
     if (!isApproved) {
-      reason = prompt("Please provide a reason for rejection:") || '';
+      const { value: text } = await Swal.fire({
+        title: 'Rejection Reason',
+        input: 'textarea',
+        inputLabel: 'Please provide a detailed justification for rejection:',
+        inputPlaceholder: 'Enter reason here...',
+        inputAttributes: {
+          'aria-label': 'Enter reason here'
+        },
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Confirm Rejection'
+      });
+
+      if (text === undefined) return; // Cancelled
+      reason = text || '';
+
       if (!reason.trim()) {
         this.toastService.warning("A rejection reason is mandatory.");
         return;
       }
     }
 
+    // 2. Fraud Logic: If approved but risky, ask for override
+    if (isApproved && claim?.isSuspectedFraud && !claim?.isFraudOverridden) {
+      const riskConfirm = await Swal.fire({
+        title: 'High AI Risk Alert',
+        html: `
+          <div class="text-left">
+            <p class="text-red-600 font-bold mb-2">Risk Score: ${claim.fraudScore}%</p>
+            <p class="text-gray-600 text-sm mb-4">Analysis: ${claim.fraudAnalysis}</p>
+            <p class="font-semibold text-gray-800">Do you wish to override this risk and proceed with approval?</p>
+          </div>
+        `,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#10b981',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Yes, I Justify Override',
+        cancelButtonText: 'Cancel'
+      });
+
+      if (!riskConfirm.isConfirmed) return;
+
+      const { value: text } = await Swal.fire({
+        title: 'Override Justification',
+        input: 'textarea',
+        inputLabel: 'CRITICAL: Provide professional justification for overriding AI Risk:',
+        inputPlaceholder: 'Evidence for override...',
+        showCancelButton: true,
+        confirmButtonColor: '#10b981',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Finalize Approval'
+      });
+
+      if (text === undefined) return; // Cancelled
+      overrideReason = text || '';
+
+      if (!overrideReason.trim()) {
+        this.toastService.warning("An override justification is mandatory for high-risk claims.");
+        return;
+      }
+      overrideFraud = true;
+    }
+
     const payload = {
       isApproved,
-      rejectionReason: isApproved ? null : reason
+      rejectionReason: isApproved ? null : reason,
+      overrideFraud: overrideFraud,
+      fraudOverrideReason: overrideReason || null
     };
 
-    this.officerService.reviewClaim(claimId, payload).subscribe(() => {
-      this.selectedClaim.set(null);
-      this.coverageSummary.set(null);
-      this.memberHistory.set([]);
-      this.toastService.success(`Claim marked as ${isApproved ? 'Approved' : 'Rejected'}.`);
-      this.refreshAll();
+    this.officerService.reviewClaim(claimId, payload).subscribe({
+      next: () => {
+        this.selectedClaim.set(null);
+        this.coverageSummary.set(null);
+        this.memberHistory.set([]);
+        this.toastService.success(`Claim marked as ${isApproved ? 'Approved' : 'Rejected'}.`);
+        this.refreshAll();
+      },
+      error: (err) => {
+        this.toastService.error(err.error?.message || "Failed to finalize claim.");
+      }
     });
   }
 

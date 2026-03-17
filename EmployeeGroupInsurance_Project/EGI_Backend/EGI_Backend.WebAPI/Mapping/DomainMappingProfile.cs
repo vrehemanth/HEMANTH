@@ -22,7 +22,9 @@ namespace EGI_Backend.WebAPI.Mapping
                 .ForMember(dest => dest.ClaimType, opt => opt.MapFrom(src => src.ClaimType.ToString()))
                 .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()))
                 .ForMember(dest => dest.ReviewedByName, opt => opt.MapFrom(src => src.ReviewedByUser != null && src.Status != ClaimStatus.InReview ? src.ReviewedByUser.Name : null))
-                .ForMember(dest => dest.InReviewByOfficerName, opt => opt.MapFrom(src => src.ReviewedByUser != null && src.Status == ClaimStatus.InReview ? src.ReviewedByUser.Name : null));
+                .ForMember(dest => dest.InReviewByOfficerName, opt => opt.MapFrom(src => src.ReviewedByUser != null && src.Status == ClaimStatus.InReview ? src.ReviewedByUser.Name : null))
+                .ForMember(dest => dest.IsAutoApproved, opt => opt.MapFrom(src => src.IsAutoApproved))
+                .ForMember(dest => dest.RequiresAdminApproval, opt => opt.MapFrom(src => src.RequiresAdminApproval));
 
             CreateMap<Claim, ClaimDetailResponseDto>()
                 .ForMember(dest => dest.PolicyNo, opt => opt.MapFrom(src => src.PolicyAssignment != null ? src.PolicyAssignment.PolicyNo : string.Empty))
@@ -32,11 +34,12 @@ namespace EGI_Backend.WebAPI.Mapping
                 .ForMember(dest => dest.DependentRelationship, opt => opt.MapFrom(src => src.Dependent != null ? src.Dependent.Relationship.ToString() : null))
                 .ForMember(dest => dest.ClaimType, opt => opt.MapFrom(src => src.ClaimType.ToString()))
                 .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()))
-                .ForMember(dest => dest.ReviewedByName, opt => opt.MapFrom(src => src.ReviewedByUser != null ? src.ReviewedByUser.Name : null));
+                .ForMember(dest => dest.ReviewedByName, opt => opt.MapFrom(src => src.ReviewedByUser != null ? src.ReviewedByUser.Name : null))
+                .ForMember(dest => dest.AdminApprovedByName, opt => opt.MapFrom(src => src.AdminApprovedByUser != null ? src.AdminApprovedByUser.Name : null));
 
             CreateMap<ClaimDocument, ClaimDocumentDto>()
                 .ForMember(dest => dest.DocumentType, opt => opt.MapFrom(src => src.DocumentType.ToString()))
-                .ForMember(dest => dest.FileUrl, opt => opt.MapFrom(src => "/uploads/" + System.IO.Path.GetFileName(src.FilePath)));
+                .ForMember(dest => dest.FileUrl, opt => opt.MapFrom(src => "/api/Public/documents/" + src.Id));
 
             // Invoice mappings
             CreateMap<Invoice, InvoiceResponseDto>()
@@ -55,7 +58,13 @@ namespace EGI_Backend.WebAPI.Mapping
                 .ForMember(dest => dest.PlanName, opt => opt.MapFrom(src => src.InsurancePlan.PlanName))
                 .ForMember(dest => dest.TotalPremium, opt => opt.MapFrom(src => src.TotalPremium))
                 .ForMember(dest => dest.BillingFrequency, opt => opt.MapFrom(src => src.BillingFrequency.ToString()))
-                .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()));
+                .ForMember(dest => dest.InsurancePlanId, opt => opt.MapFrom(src => src.InsurancePlanId))
+                .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()))
+                .ForMember(dest => dest.CanRenew, opt => opt.MapFrom(src => 
+                    (src.Status == PolicyStatus.Active || (src.Status == PolicyStatus.Inactive && DateTime.UtcNow > src.EndDate)) && 
+                    (src.InsurancePlan == null || src.InsurancePlan.Status) &&
+                    DateTime.UtcNow.Date >= src.EndDate.AddDays(-30).Date && 
+                    DateTime.UtcNow.Date <= src.EndDate.AddDays(30).Date));
 
             // Audit Log mappings
             CreateMap<AuditLog, AuditLogResponseDto>();

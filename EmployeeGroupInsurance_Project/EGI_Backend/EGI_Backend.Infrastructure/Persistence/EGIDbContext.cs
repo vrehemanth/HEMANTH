@@ -136,10 +136,18 @@ namespace EGI_Backend.Infrastructure.Persistence
                 .HasIndex(al => al.Timestamp);
 
             modelBuilder.Entity<Claim>()
+                .HasIndex(c => c.ClaimNumber)
+                .IsUnique();
+
+            modelBuilder.Entity<Claim>()
                 .HasIndex(c => c.Status);
 
             modelBuilder.Entity<Claim>()
                 .HasIndex(c => c.ClaimDate);
+
+            modelBuilder.Entity<PolicyAssignment>()
+                .HasIndex(pa => pa.PolicyNo)
+                .IsUnique();
 
             modelBuilder.Entity<PolicyAssignment>()
                 .HasIndex(pa => pa.Status);
@@ -151,10 +159,18 @@ namespace EGI_Backend.Infrastructure.Persistence
                 .HasIndex(pa => pa.AgentId);
 
             modelBuilder.Entity<Invoice>()
+                .HasIndex(i => i.InvoiceNo)
+                .IsUnique();
+
+            modelBuilder.Entity<Invoice>()
                 .HasIndex(i => i.Status);
 
             modelBuilder.Entity<Invoice>()
                 .HasIndex(i => i.PolicyAssignmentId);
+
+            modelBuilder.Entity<Member>()
+                .HasIndex(m => new { m.EmployeeCode, m.CorporateClientId })
+                .IsUnique();
 
             modelBuilder.Entity<Member>()
                 .HasIndex(m => m.PolicyAssignmentId);
@@ -243,7 +259,7 @@ namespace EGI_Backend.Infrastructure.Persistence
                 entity.Property(d => d.FilePath)
                       .IsRequired()
                       .HasMaxLength(500);
-                entity.HasOne<CorporateClient>()
+                entity.HasOne(d => d.CorporateClient)
                       .WithMany(c => c.Documents)
                       .HasForeignKey(d => d.CorporateClientId)
                       .OnDelete(DeleteBehavior.Restrict);
@@ -301,6 +317,11 @@ namespace EGI_Backend.Infrastructure.Persistence
                       .WithMany(pa => pa.Members)
                       .HasForeignKey(m => m.PolicyAssignmentId)
                       .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(m => m.CorporateClient)
+                      .WithMany()
+                      .HasForeignKey(m => m.CorporateClientId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<Dependent>(entity =>

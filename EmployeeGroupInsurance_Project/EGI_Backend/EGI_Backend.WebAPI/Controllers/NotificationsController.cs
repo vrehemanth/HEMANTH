@@ -20,11 +20,11 @@ namespace EGI_Backend.WebAPI.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetNotifications([FromQuery] bool all = false)
+        public async Task<IActionResult> GetNotifications([FromQuery] bool all = false, [FromQuery] int? take = null)
         {
             var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            var take = all ? (int?)null : 20;
-            var notifications = await _notificationService.GetUserNotificationsAsync(userId, take);
+            var resultLimit = all ? (int?)null : (take ?? 20);
+            var notifications = await _notificationService.GetUserNotificationsAsync(userId, resultLimit);
             return Ok(notifications);
         }
 
@@ -39,7 +39,8 @@ namespace EGI_Backend.WebAPI.Controllers
         [HttpPost("{id}/read")]
         public async Task<IActionResult> MarkAsRead(Guid id)
         {
-            await _notificationService.MarkAsReadAsync(id);
+            var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            await _notificationService.MarkAsReadAsync(userId, id);
             return Ok();
         }
 

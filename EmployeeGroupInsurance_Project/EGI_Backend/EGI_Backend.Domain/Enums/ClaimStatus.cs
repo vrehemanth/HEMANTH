@@ -5,6 +5,7 @@ namespace EGI_Backend.Domain.Enums
         Pending = 1,
         Approved = 2,
         Rejected = 3,
-        InReview = 4
+        InReview = 4,
+        PendingAdminApproval = 5
     }
 }

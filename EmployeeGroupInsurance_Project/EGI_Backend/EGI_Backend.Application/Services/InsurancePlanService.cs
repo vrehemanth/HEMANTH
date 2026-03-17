@@ -12,12 +12,24 @@ namespace EGI_Backend.Application.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly IInsurancePlanRepository _insurancePlanRepository;
         private readonly IMapper _mapper;
-
-        public InsurancePlanService(IUnitOfWork unitOfWork, IInsurancePlanRepository insurancePlanRepository, IMapper mapper)
+        private readonly IAuditLogRepository _auditRepo;
+        private readonly INotificationService _notificationService;
+        private readonly IUserRepository _userRepo;
+ 
+        public InsurancePlanService(
+            IUnitOfWork unitOfWork, 
+            IInsurancePlanRepository insurancePlanRepository, 
+            IMapper mapper, 
+            IAuditLogRepository auditRepo,
+            INotificationService notificationService,
+            IUserRepository userRepo)
         {
             _unitOfWork = unitOfWork;
             _insurancePlanRepository = insurancePlanRepository;
             _mapper = mapper;
+            _auditRepo = auditRepo;
+            _notificationService = notificationService;
+            _userRepo = userRepo;
         }
 
         public async Task<List<InsurancePlanDto>> GetAllPlansAsync()
@@ -28,8 +40,8 @@ namespace EGI_Backend.Application.Services
 
         public async Task<List<InsurancePlanDto>> GetActivePlansAsync()
         {
-            var plans = await _insurancePlanRepository.GetAllAsync();
-            var activePlans = plans.Where(p => p.Status).ToList();
+            // Flaw 11 Fix: Filter at DB level to avoid large memory footprint
+            var activePlans = await _insurancePlanRepository.GetActivePlansAsync();
             return _mapper.Map<List<InsurancePlanDto>>(activePlans);
         }
 
@@ -69,6 +81,17 @@ namespace EGI_Backend.Application.Services
 
             await _insurancePlanRepository.AddAsync(plan);
             await _unitOfWork.SaveChangesAsync();
+
+            // Notify Admins
+            try
+            {
+                var admins = await _userRepo.GetAllByRoleAsync(UserRole.Admin);
+                foreach (var admin in admins)
+                {
+                    await _notificationService.CreateNotificationAsync(admin.Id, "Product Launch", $"New Insurance Plan '{plan.PlanName}' ({plan.PlanCode}) has been created.", "Success");
+                }
+            }
+            catch { }
 
             return _mapper.Map<InsurancePlanDto>(plan);
         }
@@ -115,6 +138,17 @@ namespace EGI_Backend.Application.Services
             _insurancePlanRepository.Update(plan);
             await _unitOfWork.SaveChangesAsync();
 
+            // Notify Admins
+            try
+            {
+                var admins = await _userRepo.GetAllByRoleAsync(UserRole.Admin);
+                foreach (var admin in admins)
+                {
+                    await _notificationService.CreateNotificationAsync(admin.Id, "Product Deactivated", $"Insurance Plan '{plan.PlanName}' has been deactivated.", "Warning");
+                }
+            }
+            catch { }
+
             return true;
         }
 
@@ -123,8 +157,38 @@ namespace EGI_Backend.Application.Services
             var plan = await _insurancePlanRepository.GetByIdAsync(id);
             if (plan == null) return false;
 
+            // Flaw 10 Fix: Prevent deleting plans that are currently in use
+            bool inUse = await _insurancePlanRepository.IsPlanInUseAsync(id);
+            if (inUse)
+            {
+                throw new BadRequestException("This plan cannot be deleted because it is currently assigned to active company policies. Deactivate it instead.");
+            }
+
             _insurancePlanRepository.Delete(plan);
+            
+            // Flaw 16 Fix: Audit Plan Deletion
+            await _auditRepo.AddAsync(new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                Action = "DeletePlan",
+                EntityName = "InsurancePlan",
+                EntityId = id.ToString(),
+                NewValues = $"Plan {plan.PlanName} ({plan.PlanCode}) was permanently deleted.",
+                Timestamp = DateTime.UtcNow
+            });
+
             await _unitOfWork.SaveChangesAsync();
+
+            // Notify Admins
+            try
+            {
+                var admins = await _userRepo.GetAllByRoleAsync(UserRole.Admin);
+                foreach (var admin in admins)
+                {
+                    await _notificationService.CreateNotificationAsync(admin.Id, "Product Deleted", $"Insurance Plan '{plan.PlanName}' has been permanently deleted.", "Error");
+                }
+            }
+            catch { }
 
             return true;
         }

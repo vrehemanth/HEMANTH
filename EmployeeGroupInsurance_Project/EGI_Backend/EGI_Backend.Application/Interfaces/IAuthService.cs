@@ -12,5 +12,6 @@ namespace EGI_Backend.Application.Interfaces
         Task CreateStaffByAdmin(AdminCreateStaffRequest req);
         Task ChangePassword(Guid userId, string newPassword);
         Task ForgotPassword(ForgotPasswordRequest req);
+        Task ResetPassword(ResetPasswordRequest req);
     }
 }

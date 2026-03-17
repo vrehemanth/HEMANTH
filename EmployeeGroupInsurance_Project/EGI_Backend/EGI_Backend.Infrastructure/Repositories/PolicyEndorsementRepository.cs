@@ -64,5 +64,11 @@ namespace EGI_Backend.Infrastructure.Repositories
                 .OrderByDescending(pe => pe.CreatedAt)
                 .ToListAsync();
         }
+
+        public async Task<bool> IsDuplicateAsync(string submissionToken)
+        {
+            if (string.IsNullOrEmpty(submissionToken)) return false;
+            return await _context.PolicyEndorsements.AnyAsync(pe => pe.SubmissionToken == submissionToken);
+        }
     }
 }

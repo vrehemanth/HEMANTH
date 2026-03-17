@@ -86,7 +86,7 @@
                         <p class="text-[10px] text-gray-500">{{ doc.uploadedAt | date:'shortDate' }}</p>
                     </div>
                 </div>
-                <a [href]="'https://localhost:7146' + doc.fileUrl" target="_blank"
+                <a [href]="p.getDocumentUrl(doc.id)" target="_blank"
                     class="text-primary-600 hover:text-primary-700 p-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path

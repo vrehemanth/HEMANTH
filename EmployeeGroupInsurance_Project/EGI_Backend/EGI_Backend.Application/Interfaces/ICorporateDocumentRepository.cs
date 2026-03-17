@@ -1,4 +1,4 @@
-﻿using EGI_Backend.Domain.Entities;
+using EGI_Backend.Domain.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;

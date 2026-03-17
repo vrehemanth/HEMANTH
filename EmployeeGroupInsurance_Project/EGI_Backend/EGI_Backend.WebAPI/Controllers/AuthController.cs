@@ -25,6 +25,7 @@ namespace EGI_Backend.WebAPI.Controllers
             return Ok(result);
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpPost("admin/register")]
         public async Task<IActionResult> RegisterAdmin(AdminRegisterRequest request)
         {
@@ -64,7 +65,14 @@ namespace EGI_Backend.WebAPI.Controllers
         public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest req)
         {
             await _authService.ForgotPassword(req);
-            return Ok("If an account exists with this email, a temporary password has been sent.");
+            return Ok("If an account exists with this email, a reset token has been sent.");
+        }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword(ResetPasswordRequest req)
+        {
+            await _authService.ResetPassword(req);
+            return Ok("Password has been reset successfully.");
         }
     }
 }

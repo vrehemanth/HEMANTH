@@ -30,6 +30,7 @@ namespace EGI_Backend.Infrastructure.Repositories
                 .Include(c => c.Member)
                 .Include(c => c.Dependent)
                 .Include(c => c.PolicyAssignment)
+                    .ThenInclude(pa => pa.CorporateClient)
                 .Include(c => c.Documents)       // Include supporting documents
                 .Include(c => c.ReviewedByUser)
                 .FirstOrDefaultAsync(c => c.Id == id);
@@ -67,21 +68,31 @@ namespace EGI_Backend.Infrastructure.Repositories
                 .ToListAsync();
         }
 
-        // Cumulative approved claims for a specific member/dependent + optional claim type
-        public async Task<decimal> GetApprovedClaimsTotalAsync(Guid memberId, Guid? dependentId, CoverageType? claimType)
+        public async Task<bool> IsDuplicateAsync(string submissionToken)
+        {
+            if (string.IsNullOrEmpty(submissionToken)) return false;
+            return await _context.Claims.AnyAsync(c => c.SubmissionToken == submissionToken);
+        }
+
+        // Cumulative utilized claims (Approved, Pending, or InReview) within a specific policy period
+        public async Task<decimal> GetApprovedClaimsTotalAsync(Guid policyAssignmentId, Guid memberId, Guid? dependentId, CoverageType? claimType)
         {
             var query = _context.Claims.AsQueryable();
-
+ 
+            // We count Approved AND all pending states to prevent race condition "draining"
+            var activeStatuses = new[] { ClaimStatus.Approved, ClaimStatus.Pending, ClaimStatus.InReview, ClaimStatus.PendingAdminApproval };
+ 
             query = query.Where(c => 
+                c.PolicyAssignmentId == policyAssignmentId &&
                 c.MemberId == memberId && 
                 c.DependentId == dependentId && 
-                c.Status == ClaimStatus.Approved);
-
+                activeStatuses.Contains(c.Status));
+ 
             if (claimType.HasValue)
             {
                 query = query.Where(c => c.ClaimType == claimType.Value);
             }
-
+ 
             return await query.SumAsync(c => (decimal?)c.ClaimAmount) ?? 0m;
         }
 
@@ -185,6 +196,7 @@ namespace EGI_Backend.Infrastructure.Repositories
                     Total = g.Count(),
                     Approved = g.Count(c => c.Status == ClaimStatus.Approved)
                 })
+                .OrderBy(x => 1)
                 .FirstOrDefaultAsync();
 
             if (stats == null || stats.Total == 0) return 0;
@@ -229,6 +241,7 @@ namespace EGI_Backend.Infrastructure.Repositories
                     Total = g.Count(),
                     Approved = g.Count(c => c.Status == ClaimStatus.Approved)
                 })
+                .OrderBy(x => 1)
                 .FirstOrDefaultAsync();
 
             if (stats == null || stats.Total == 0) return 0;
@@ -246,6 +259,31 @@ namespace EGI_Backend.Infrastructure.Repositories
                 .OrderByDescending(c => c.ClaimDate)
                 .Take(count)
                 .ToListAsync();
+        }
+ 
+        public async Task<bool> IsDuplicateBillAsync(string hospitalName, decimal amount, DateTime billDate, Guid? currentClaimId = null)
+        {
+            if (string.IsNullOrEmpty(hospitalName) || amount <= 0) return false;
+ 
+            var normalizedName = hospitalName.Trim().ToUpper();
+
+            return await _context.Claims
+                .AnyAsync(c => c.ExtractedHospitalName != null && 
+                               c.ExtractedHospitalName.Trim().ToUpper() == normalizedName && 
+                               c.ExtractedBillAmount == amount && 
+                               c.ExtractedBillDate == billDate &&
+                               c.Id != currentClaimId);
+        }
+        public async Task<ClaimDocument?> GetDocumentByIdAsync(Guid id)
+        {
+            return await _context.ClaimDocuments
+                .Include(d => d.Claim)
+                    .ThenInclude(c => c.PolicyAssignment)
+                        .ThenInclude(pa => pa.CorporateClient)
+                .Include(d => d.Claim)
+                    .ThenInclude(c => c.Member)
+                        .ThenInclude(m => m.CorporateClient)
+                .FirstOrDefaultAsync(d => d.Id == id);
         }
     }
 }

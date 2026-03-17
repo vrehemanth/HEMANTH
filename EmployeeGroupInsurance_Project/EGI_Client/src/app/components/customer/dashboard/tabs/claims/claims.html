@@ -187,8 +187,12 @@
                             <span
                                 class="absolute left-4 top-1/2 -translate-y-1/2 font-black text-gray-400 text-lg">₹</span>
                             <input type="number" formControlName="claimAmount"
-                                class="w-full pl-10 pr-5 py-4 border-2 border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-700 dark:text-white font-black text-xl text-red-600 focus:ring-4 focus:ring-primary-500/10 outline-none">
+                                [placeholder]="p.claimForm.get('claimType')?.value === 'Life' ? 'Locking Full Coverage...' : '0.00'"
+                                class="w-full pl-10 pr-5 py-4 border-2 border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-700 dark:text-white font-black text-xl text-red-600 focus:ring-4 focus:ring-primary-500/10 outline-none disabled:opacity-75 disabled:cursor-not-allowed">
                         </div>
+                        @if (p.claimForm.get('claimType')?.value === 'Life') {
+                            <p class="text-[9px] text-primary-500 font-bold mt-2 uppercase tracking-tight italic"> mortality benefit is automatically set to 100% sum insured.</p>
+                        }
                     </div>
 
                     <div class="col-span-2">
@@ -399,6 +403,7 @@
                     </div>
                 </th>
                 <th class="p-4 dark:text-gray-300">Status</th>
+                <th class="p-4 dark:text-gray-300 text-right">Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -421,6 +426,12 @@
                   }">
                         {{cl.status}}
                     </span>
+                </td>
+                <td class="p-4 text-right">
+                    <button (click)="p.viewClaimDetail(cl)" 
+                        class="text-[10px] font-black uppercase tracking-widest text-primary-600 hover:underline">
+                        View Details
+                    </button>
                 </td>
             </tr>
             }

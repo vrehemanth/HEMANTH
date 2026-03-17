@@ -36,5 +36,7 @@ namespace EGI_Backend.Domain.Entities
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? ReviewedAt { get; set; }
+
+        public string? SubmissionToken { get; set; }
     }
 }

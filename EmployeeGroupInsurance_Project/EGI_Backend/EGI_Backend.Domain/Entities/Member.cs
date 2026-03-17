@@ -14,6 +14,9 @@ namespace EGI_Backend.Domain.Entities
         public Guid PolicyAssignmentId { get; set; }
         public PolicyAssignment PolicyAssignment { get; set; }
 
+        public Guid CorporateClientId { get; set; }
+        public CorporateClient CorporateClient { get; set; }
+
         [Required]
         public string EmployeeCode { get; set; } = string.Empty;
 
@@ -35,6 +38,7 @@ namespace EGI_Backend.Domain.Entities
         public bool Status { get; set; } = true;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? LastClaimAt { get; set; }
         
         [Timestamp]
         public byte[] RowVersion { get; set; }

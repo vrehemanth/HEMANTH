@@ -42,9 +42,11 @@ namespace EGI_Backend.WebAPI.Tests.Controllers
         [Fact]
         public async Task GetInvoicesByPolicy_ValidId_ReturnsOkWithList()
         {
+            var officerId = Guid.NewGuid();
+            SetupUser(officerId);
             var policyId = Guid.NewGuid();
             var expectedList = new List<InvoiceResponseDto> { new InvoiceResponseDto() };
-            _mockInvoiceSvc.Setup(x => x.GetInvoicesByPolicyAsync(policyId)).ReturnsAsync(expectedList);
+            _mockInvoiceSvc.Setup(x => x.GetInvoicesByPolicyAsync(policyId, It.IsAny<Guid>(), It.IsAny<string>())).ReturnsAsync(expectedList);
 
             var result = await _controller.GetInvoicesByPolicy(policyId);
 
@@ -55,9 +57,11 @@ namespace EGI_Backend.WebAPI.Tests.Controllers
         [Fact]
         public async Task GetClaimsByPolicy_ValidId_ReturnsOkWithList()
         {
+            var officerId = Guid.NewGuid();
+            SetupUser(officerId);
             var policyId = Guid.NewGuid();
             var expectedList = new List<ClaimResponseDto> { new ClaimResponseDto() };
-            _mockClaimSvc.Setup(x => x.GetClaimsByPolicyAsync(policyId)).ReturnsAsync(expectedList);
+            _mockClaimSvc.Setup(x => x.GetClaimsByPolicyAsync(policyId, It.IsAny<Guid>(), It.IsAny<string>())).ReturnsAsync(expectedList);
 
             var result = await _controller.GetClaimsByPolicy(policyId);
 

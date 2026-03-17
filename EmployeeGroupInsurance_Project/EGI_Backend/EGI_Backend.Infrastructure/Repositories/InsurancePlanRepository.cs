@@ -46,5 +46,19 @@ namespace EGI_Backend.Infrastructure.Repositories
         {
             _context.InsurancePlans.Remove(plan);
         }
+
+        public async Task<List<InsurancePlan>> GetActivePlansAsync()
+        {
+            return await _context.InsurancePlans
+                .AsNoTracking()
+                .Include(p => p.Coverages)
+                .Where(p => p.Status)
+                .ToListAsync();
+        }
+
+        public async Task<bool> IsPlanInUseAsync(Guid planId)
+        {
+            return await _context.PolicyAssignments.AnyAsync(pa => pa.InsurancePlanId == planId);
+        }
     }
 }

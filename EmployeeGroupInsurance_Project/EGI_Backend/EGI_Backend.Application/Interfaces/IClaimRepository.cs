@@ -13,9 +13,10 @@ namespace EGI_Backend.Application.Interfaces
         Task<List<Claim>> GetByPolicyAssignmentIdAsync(Guid policyAssignmentId);
         Task<List<Claim>> GetByMemberIdAsync(Guid memberId);
         Task<List<Claim>> GetPendingClaimsAsync();
+        Task<bool> IsDuplicateAsync(string submissionToken);
 
-        // Sum of all APPROVED claims for a member for a specific claim type (or all if null)
-        Task<decimal> GetApprovedClaimsTotalAsync(Guid memberId, Guid? dependentId, CoverageType? claimType);
+        // Sum of all UTILIZED claims (Approved + Pending) for a specific policy period
+        Task<decimal> GetApprovedClaimsTotalAsync(Guid policyAssignmentId, Guid memberId, Guid? dependentId, CoverageType? claimType);
 
         Task<List<Claim>> GetAllAsync();
         Task<int> CountAsync();
@@ -35,5 +36,9 @@ namespace EGI_Backend.Application.Interfaces
         Task<List<Claim>> GetReviewedByOfficerAsync(Guid officerId);
         Task<double> GetApprovalRateForClientsAsync(List<Guid> clientIds);
         Task<List<Claim>> GetTopClaimsForClientsAsync(List<Guid> clientIds, int count);
+ 
+        // Fraud Check: Check if this specific bill has been submitted before
+        Task<bool> IsDuplicateBillAsync(string hospitalName, decimal amount, DateTime billDate, Guid? currentClaimId = null);
+        Task<ClaimDocument?> GetDocumentByIdAsync(Guid id);
     }
 }

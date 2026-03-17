@@ -6,6 +6,7 @@ namespace EGI_Backend.Application.Interfaces
     public interface IPolicyAssignmentRepository
     {
         Task AddAsync(PolicyAssignment policyAssignment);
+        Task<PolicyAssignment?> GetByIdAsync(Guid id);
         Task<PolicyAssignment?> GetByIdWithDetailsAsync(Guid id);
         Task UpdateAsync(PolicyAssignment policyAssignment);
         Task<List<PolicyAssignment>> GetAllWithDetailsAsync();

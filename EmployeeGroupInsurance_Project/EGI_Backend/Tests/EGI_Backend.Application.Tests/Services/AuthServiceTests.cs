@@ -19,6 +19,7 @@ namespace EGI_Backend.Application.Tests.Services
         private readonly Mock<IJwtTokenGenerator> _mockJwt;
         private readonly Mock<IMapper> _mockMapper;
         private readonly Mock<IEmailService> _mockEmailSvc;
+        private readonly Mock<INotificationService> _mockNotificationSvc;
         private readonly AuthService _authService;
 
         public AuthServiceTests()
@@ -28,13 +29,15 @@ namespace EGI_Backend.Application.Tests.Services
             _mockJwt = new Mock<IJwtTokenGenerator>();
             _mockMapper = new Mock<IMapper>();
             _mockEmailSvc = new Mock<IEmailService>();
+            _mockNotificationSvc = new Mock<INotificationService>();
 
             _authService = new AuthService(
                 _mockUserRepo.Object,
                 _mockJwt.Object,
                 _mockMapper.Object,
                 _mockEmailSvc.Object,
-                _mockClientRepo.Object
+                _mockClientRepo.Object,
+                _mockNotificationSvc.Object
             );
         }
 

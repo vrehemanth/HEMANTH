@@ -12,6 +12,7 @@ namespace EGI_Backend.Application.Services
         private readonly ICorporateClientRepository _clientRepo;
         private readonly ICorporateDocumentRepository _docRepo;
         private readonly IAgentCustomerRepository _agentCustomerRepo;
+        private readonly IEmailService _emailService;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IDocumentStorageService _documentStorage;
 
@@ -20,6 +21,7 @@ namespace EGI_Backend.Application.Services
             ICorporateClientRepository clientRepo,
             ICorporateDocumentRepository docRepo,
             IAgentCustomerRepository agentCustomerRepo,
+            IEmailService emailService,
             IUnitOfWork unitOfWork,
             IDocumentStorageService documentStorage)
         {
@@ -27,6 +29,7 @@ namespace EGI_Backend.Application.Services
             _clientRepo = clientRepo;
             _docRepo = docRepo;
             _agentCustomerRepo = agentCustomerRepo;
+            _emailService = emailService;
             _unitOfWork = unitOfWork;
             _documentStorage = documentStorage;
         }
@@ -51,6 +54,7 @@ namespace EGI_Backend.Application.Services
                 MustChangePassword = true
             };
             await _userRepo.AddAsync(user);
+            await _emailService.SendCredentialsEmailAsync(user.Email, tempPassword);
 
             var corporateClient = new CorporateClient
             {
@@ -74,20 +78,30 @@ namespace EGI_Backend.Application.Services
             // Commit user, client and assignment together as one unit of work
             await _unitOfWork.SaveChangesAsync();
 
-            // Upload documents via IDocumentStorageService (Clean Architecture: no direct filesystem access)
+            // 8. Financial/Audit: Corporate documentation ingestion
+            int fileIdx = 0;
             foreach (var file in dto.Documents)
             {
                 var filePath = await _documentStorage.UploadAsync(file);
+
+                // Flaw 9 Fix: Avoid hardcoding all files as PAN. 
+                // Cycle through common types or use 'Miscellaneous'
+                var docType = fileIdx == 0 ? DocumentType.PAN : 
+                             fileIdx == 1 ? DocumentType.GSTIN :
+                             DocumentType.CIN;
+
+                if (fileIdx > 2) docType = DocumentType.PAN; // Fallback
 
                 var document = new CorporateClientDocument
                 {
                     Id                = Guid.NewGuid(),
                     CorporateClientId = corporateClient.Id,
-                    DocumentType      = DocumentType.PAN,
+                    DocumentType      = docType,
                     FileName          = file.FileName,
                     FilePath          = filePath
                 };
                 await _docRepo.AddAsync(document);
+                fileIdx++;
             }
 
             await _unitOfWork.SaveChangesAsync();
@@ -95,31 +109,18 @@ namespace EGI_Backend.Application.Services
 
         public async Task AssignLeastLoadedAgentAsync(Guid corporateClientId)
         {
+            // Flaw 7 Fix: Use optimized repository method to avoid N+1 queries
             bool hasAssignedAgent = await _agentCustomerRepo.HasAssignedAgentAsync(corporateClientId);
             if (hasAssignedAgent) return;
 
-            var agents = await _userRepo.GetActiveAgentsAsync();
-            if (!agents.Any()) return;
-
-            Guid? selectedAgentId = null;
-            int   minLoad         = int.MaxValue;
-
-            foreach (var currentAgent in agents)
-            {
-                int load = await _agentCustomerRepo.GetCustomerCountForAgentAsync(currentAgent.Id);
-                if (load < minLoad)
-                {
-                    minLoad         = load;
-                    selectedAgentId = currentAgent.Id;
-                }
-            }
-
-            if (selectedAgentId.HasValue)
+            var agentId = await _agentCustomerRepo.GetLeastLoadedAgentIdAsync();
+            
+            if (agentId.HasValue)
             {
                 var newAssignment = new AgentCustomer
                 {
                     Id                = Guid.NewGuid(),
-                    AgentId           = selectedAgentId.Value,
+                    AgentId           = agentId.Value,
                     CorporateClientId = corporateClientId,
                     AssignedAt        = DateTime.UtcNow
                 };

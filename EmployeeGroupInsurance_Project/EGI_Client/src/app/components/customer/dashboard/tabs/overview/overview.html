@@ -120,8 +120,8 @@
                     <tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                         <th class="p-4 w-1/3">Employee</th>
                         <th class="p-4 w-1/4">Amount</th>
-                        <th class="p-4 w-1/4">Status</th>
-                        <th class="p-4 w-1/6">Date</th>
+                        <th class="p-4 w-1/5">Status</th>
+                        <th class="p-4 w-1/4">Date</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
@@ -132,7 +132,7 @@
                                 }}</div>
                             <div class="text-[10px] text-gray-400 font-mono">{{ cl.claimType }}</div>
                         </td>
-                        <td class="p-4 font-black dark:text-white">₹{{ p.formatINR(cl.claimAmount) }}</td>
+                        <td class="p-4 font-black dark:text-white whitespace-nowrap">₹{{ p.formatINR(cl.claimAmount) }}</td>
                         <td class="p-4">
                             <span
                                 [class]="cl.status === 'Approved' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : (cl.status === 'Pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400')"
@@ -140,7 +140,17 @@
                                 {{ cl.status }}
                             </span>
                         </td>
-                        <td class="p-4 text-gray-500 font-medium">{{ cl.claimDate | date:'MMM dd' }}</td>
+                        <td class="p-4 text-gray-500 font-medium">
+                            <div class="flex items-center justify-between gap-2">
+                                <span>{{ cl.claimDate | date:'MMM dd' }}</span>
+                                <button (click)="p.viewClaimDetail(cl)" class="p-1.5 hover:bg-primary-100 dark:hover:bg-primary-900/30 text-primary-600 rounded-lg transition" title="Audit Detail">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </td>
                     </tr>
                     } @empty {
                     <tr>

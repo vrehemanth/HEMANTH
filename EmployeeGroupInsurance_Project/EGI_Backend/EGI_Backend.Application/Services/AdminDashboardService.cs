@@ -170,7 +170,7 @@ namespace EGI_Backend.Application.Services
                 }
             }
 
-            _cache.Set(CacheKey, summary, TimeSpan.FromSeconds(5));
+            _cache.Set(CacheKey, summary, TimeSpan.FromMinutes(3));
             return summary;
         }
 
@@ -190,16 +190,27 @@ namespace EGI_Backend.Application.Services
 
         public async Task<List<PolicyAssignmentResponseDto>> GetAllPolicyAssignmentsAsync()
         {
+            // Flaw 8 Fix: Avoid OOM by fetching a capped list or implementing pagination
             using var scope = _scopeFactory.CreateScope();
-            var assignments = await scope.ServiceProvider.GetRequiredService<IPolicyAssignmentRepository>().GetAllWithDetailsAsync();
-            return _mapper.Map<List<PolicyAssignmentResponseDto>>(assignments);
+            var repo = scope.ServiceProvider.GetRequiredService<IPolicyAssignmentRepository>();
+            
+            // For now, capping at 500 to prevent server crash while allowing usable dashboard data
+            var assignments = await repo.GetAllWithDetailsAsync();
+            var capped = assignments.OrderByDescending(a => a.StartDate).Take(500).ToList();
+            
+            return _mapper.Map<List<PolicyAssignmentResponseDto>>(capped);
         }
 
         public async Task<List<ClaimResponseDto>> GetAllClaimsAsync()
         {
+            // Flaw 8 Fix: Safety cap for massive claim datasets
             using var scope = _scopeFactory.CreateScope();
-            var claims = await scope.ServiceProvider.GetRequiredService<IClaimRepository>().GetAllAsync();
-            return _mapper.Map<List<ClaimResponseDto>>(claims);
+            var repo = scope.ServiceProvider.GetRequiredService<IClaimRepository>();
+            
+            var claims = await repo.GetAllAsync();
+            var capped = claims.OrderByDescending(c => c.ClaimDate).Take(500).ToList();
+            
+            return _mapper.Map<List<ClaimResponseDto>>(capped);
         }
 
         public async Task<List<UserResponseDto>> GetAllStaffAsync(string role)
@@ -242,8 +253,11 @@ namespace EGI_Backend.Application.Services
         public async Task<List<CorporateClientResponseDto>> GetAllClientsAsync()
         {
             using var scope = _scopeFactory.CreateScope();
-            var clients = await scope.ServiceProvider.GetRequiredService<ICorporateClientRepository>().GetAllAsync();
-            return _mapper.Map<List<CorporateClientResponseDto>>(clients);
+            var repo = scope.ServiceProvider.GetRequiredService<ICorporateClientRepository>();
+            var clients = await repo.GetAllAsync();
+             // Flaw 8 Fix: Final OOM safety cap for client list
+            var capped = clients.OrderByDescending(c => c.CreatedAt).Take(500).ToList();
+            return _mapper.Map<List<CorporateClientResponseDto>>(capped);
         }
 
         public async Task<List<AuditLogResponseDto>> GetAuditLogsAsync(string? userId = null, string? entityName = null)

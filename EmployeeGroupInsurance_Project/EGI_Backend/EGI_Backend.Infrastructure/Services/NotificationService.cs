@@ -49,11 +49,18 @@ namespace EGI_Backend.Infrastructure.Services
             return await query.ToListAsync();
         }
 
-        public async Task MarkAsReadAsync(Guid notificationId)
+        public async Task MarkAsReadAsync(Guid userId, Guid notificationId)
         {
             var notification = await _context.Notifications.FindAsync(notificationId);
             if (notification != null)
             {
+                if (notification.UserId != userId)
+                {
+                    // Silently fail or throw? Controller expects it to work.
+                    // For security, if they don't own it, we do nothing.
+                    return;
+                }
+
                 notification.IsRead = true;
                 await _context.SaveChangesAsync();
             }

@@ -21,6 +21,8 @@ namespace EGI_Backend.Application.Tests.Services
         private readonly Mock<IDependentRepository> _mockDependentRepo;
         private readonly Mock<IInvoiceService> _mockInvoiceService;
         private readonly Mock<ICorporateClientRepository> _mockClientRepo;
+        private readonly Mock<IUserRepository> _mockUserRepo;
+        private readonly Mock<INotificationService> _mockNotification;
         private readonly Mock<IUnitOfWork> _mockUoW;
         private readonly Mock<IMapper> _mockMapper;
         private readonly PolicyEndorsementService _service;
@@ -33,6 +35,8 @@ namespace EGI_Backend.Application.Tests.Services
             _mockDependentRepo = new Mock<IDependentRepository>();
             _mockInvoiceService = new Mock<IInvoiceService>();
             _mockClientRepo = new Mock<ICorporateClientRepository>();
+            _mockUserRepo = new Mock<IUserRepository>();
+            _mockNotification = new Mock<INotificationService>();
             _mockUoW = new Mock<IUnitOfWork>();
             _mockMapper = new Mock<IMapper>();
 
@@ -42,7 +46,9 @@ namespace EGI_Backend.Application.Tests.Services
                 _mockMemberRepo.Object,
                 _mockDependentRepo.Object,
                 _mockClientRepo.Object,
+                _mockUserRepo.Object,
                 _mockInvoiceService.Object,
+                _mockNotification.Object,
                 _mockUoW.Object,
                 _mockMapper.Object
             );
@@ -81,7 +87,7 @@ namespace EGI_Backend.Application.Tests.Services
 
             // Act & Assert
             await Assert.ThrowsAsync<NotFoundException>(() =>
-                _service.ReviewEndorsementAsync(Guid.NewGuid(), endorsementId, new ReviewEndorsementDto()));
+                _service.ReviewEndorsementAsync(Guid.NewGuid(), "Agent", endorsementId, new ReviewEndorsementDto()));
         }
 
         [Fact]
@@ -95,7 +101,7 @@ namespace EGI_Backend.Application.Tests.Services
 
             // Act & Assert
             await Assert.ThrowsAsync<BadRequestException>(() =>
-                _service.ReviewEndorsementAsync(Guid.NewGuid(), endorsementId, new ReviewEndorsementDto()));
+                _service.ReviewEndorsementAsync(Guid.NewGuid(), "Agent", endorsementId, new ReviewEndorsementDto()));
         }
 
         [Fact]
@@ -104,14 +110,19 @@ namespace EGI_Backend.Application.Tests.Services
             // Arrange
             var policyId = Guid.NewGuid();
             var endorsementsList = new List<PolicyEndorsement> { new PolicyEndorsement { Id = Guid.NewGuid() } };
+            var policy = new PolicyAssignment { Id = policyId, AgentId = Guid.NewGuid() };
             
+            _mockPolicyRepo.Setup(x => x.GetByIdAsync(policyId)).ReturnsAsync(policy);
             _mockEndorsementRepo.Setup(x => x.GetByPolicyIdAsync(policyId)).ReturnsAsync(endorsementsList);
             
             var dtoList = new List<EndorsementResponseDto> { new EndorsementResponseDto { Id = Guid.NewGuid() } };
             _mockMapper.Setup(x => x.Map<List<EndorsementResponseDto>>(endorsementsList)).Returns(dtoList);
-
+            
+            // Mock authority check if needed (IsHighAuthority helper is private)
+            // But we can pass "Admin" to bypass policy ownership check in GetEndorsementsByPolicyAsync
+ 
             // Act
-            var result = await _service.GetEndorsementsByPolicyAsync(policyId);
+            var result = await _service.GetEndorsementsByPolicyAsync(policyId, Guid.NewGuid(), "Admin");
 
             // Assert
             Assert.NotNull(result);

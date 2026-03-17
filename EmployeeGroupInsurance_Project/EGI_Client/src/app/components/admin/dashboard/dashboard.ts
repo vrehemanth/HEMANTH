@@ -1,10 +1,12 @@
 import { Component, inject, signal, OnInit, OnDestroy, computed, viewChild, ElementRef, effect } from '@angular/core';
+import Swal from 'sweetalert2';
 import { CommonModule } from '@angular/common';
 import { AdminService } from '../../../data-access/admin.service';
 import { FormsModule } from '@angular/forms';
 import { Router, NavigationEnd } from '@angular/router';
 import { filter, Subscription, forkJoin, of, catchError } from 'rxjs';
 import { ToastService } from '../../../core/services/toast.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { Chart, registerables } from 'chart.js';
 import { OverviewTabComponent } from './tabs/overview/overview';
 import { PlansTabComponent } from './tabs/plans/plans';
@@ -14,20 +16,23 @@ import { PoliciesTabComponent } from './tabs/policies/policies';
 import { ClaimsTabComponent } from './tabs/claims/claims';
 import { LogsTabComponent } from './tabs/logs/logs';
 
+import { ApprovalsTabComponent } from './tabs/approvals/approvals';
+
 Chart.register(...registerables);
 
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, OverviewTabComponent, PlansTabComponent, ClientsTabComponent, StaffTabComponent, PoliciesTabComponent, ClaimsTabComponent, LogsTabComponent],
+  imports: [CommonModule, FormsModule, OverviewTabComponent, PlansTabComponent, ClientsTabComponent, StaffTabComponent, PoliciesTabComponent, ClaimsTabComponent, LogsTabComponent, ApprovalsTabComponent],
   templateUrl: './dashboard.html'
 })
 export class AdminDashboardComponent implements OnInit, OnDestroy {
   private adminService = inject(AdminService);
   private router = inject(Router);
   private toastService = inject(ToastService);
+  authService = inject(AuthService);
 
-  activeTab = signal<'dashboard' | 'plans' | 'clients' | 'staff' | 'policies' | 'claims' | 'logs'>('dashboard');
+  activeTab = signal<'dashboard' | 'plans' | 'clients' | 'staff' | 'policies' | 'claims' | 'logs' | 'approvals'>('dashboard');
   routerSub: Subscription | undefined;
   isLoading = signal(false);
 
@@ -241,6 +246,12 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   policyEndorsements = signal<any[]>([]);
   selectedClaimDetail = signal<any>(null);
 
+  getDocumentUrl(docId: string): string {
+    const token = this.authService.currentUser()?.token;
+    if (!token) return '';
+    return `https://localhost:7146/api/Public/documents/${docId}?access_token=${token}`;
+  }
+
   agents = signal<any[]>([]);
   claimsOfficers = signal<any[]>([]);
   plans = signal<any[]>([]);
@@ -282,13 +293,14 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   }
 
   updateTab(url: string) {
-    let tab: 'dashboard' | 'plans' | 'clients' | 'staff' | 'policies' | 'claims' | 'logs' = 'dashboard';
+    let tab: 'dashboard' | 'plans' | 'clients' | 'staff' | 'policies' | 'claims' | 'logs' | 'approvals' = 'dashboard';
     if (url.includes('plans')) tab = 'plans';
     else if (url.includes('clients')) tab = 'clients';
     else if (url.includes('staff')) tab = 'staff';
     else if (url.includes('policies')) tab = 'policies';
     else if (url.includes('claims')) tab = 'claims';
     else if (url.includes('logs')) tab = 'logs';
+    else if (url.includes('approvals')) tab = 'approvals';
 
     this.activeTab.set(tab);
     this.lazyLoadTab(tab);
@@ -311,24 +323,27 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       if (this.allClaimsRegistry().length === 0) this.loadClaimsRegistry();
     } else if (tab === 'logs') {
       if (this.auditLogs().length === 0) this.loadAuditLogs();
+    } else if (tab === 'approvals') {
+      if (this.allClaimsRegistry().length === 0) this.loadClaimsRegistry();
     }
   }
 
   loadDashboardData() {
     if (this.pendingReqs.has('dashboard')) return;
     this.pendingReqs.add('dashboard');
+
+    // Parallel fetch for overview data
     this.adminService.getSummary().subscribe({
       next: (res: any) => {
         this.summary.set(res?.data || res);
-
-        // Trigger registry loads for charts
-        this.loadClaimsRegistry();
-        this.loadPoliciesData();
-
         this.pendingReqs.delete('dashboard');
       },
       error: () => this.pendingReqs.delete('dashboard')
     });
+
+    // These can run in parallel without blocking summary
+    this.loadClaimsRegistry();
+    this.loadPoliciesData();
   }
 
   destroyCharts() {
@@ -668,6 +683,13 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  togglePolicyStatus(id: string) {
+    this.adminService.togglePolicyStatus(id).subscribe(() => {
+      this.toastService.success('Policy status updated.');
+      this.loadPoliciesData();
+    });
+  }
+
   toggleNewStaffForm() {
     this.showNewStaffForm.update(v => !v);
     this.newStaff = { name: '', email: '', role: 'Agent' };
@@ -761,8 +783,18 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  deactivatePlan(id: string) {
-    if (confirm("Deactivate this plan? It will be marked Inactive and hidden from new assignments, but existing policies are preserved.")) {
+  async deactivatePlan(id: string) {
+    const result = await Swal.fire({
+      title: 'Deactivate Plan?',
+      text: "It will be marked Inactive and hidden from new assignments, but existing policies are preserved.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#f59e0b',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Yes, Deactivate'
+    });
+
+    if (result.isConfirmed) {
       this.adminService.deactivatePlan(id).subscribe(() => {
         this.toastService.success('Plan deactivated successfully.');
         this.loadPlansData();
@@ -770,8 +802,18 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  hardDeletePlan(id: string) {
-    if (confirm("⚠️ PERMANENT DELETE — This will permanently remove the plan from the database. This action CANNOT be undone. Are you absolutely sure?")) {
+  async hardDeletePlan(id: string) {
+    const result = await Swal.fire({
+      title: '⚠️ PERMANENT DELETE',
+      text: "This will permanently remove the plan from the database. This action CANNOT be undone. Are you absolutely sure?",
+      icon: 'error',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Yes, DELETE Permanently'
+    });
+
+    if (result.isConfirmed) {
       this.adminService.deletePlan(id).subscribe(() => {
         this.toastService.success('Plan permanently deleted.');
         this.loadPlansData();
@@ -801,6 +843,50 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     } catch {
       return json;
     }
+  }
+
+  async approveAdminClaim(claimId: string, isApproved: boolean) {
+    const claim = this.selectedClaimDetail();
+    if (!claim) return;
+
+    let reason = '';
+    if (!isApproved) {
+      const { value: text } = await Swal.fire({
+        title: 'Rejection Reason',
+        input: 'textarea',
+        inputLabel: 'Please provide a rejection reason:',
+        inputPlaceholder: 'Enter reason here...',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Confirm Rejection'
+      });
+
+      if (text === undefined) return;
+      reason = text || "";
+
+      if (!reason.trim()) {
+        this.toastService.warning("Rejection reason is mandatory for high-value claims.");
+        return;
+      }
+    }
+
+    const dto = {
+      isApproved: isApproved,
+      rejectionReason: reason
+    };
+
+    this.adminService.reviewClaim(claimId, dto).subscribe({
+      next: () => {
+        this.toastService.success(isApproved ? 'Claim approved and disbursed successfully.' : 'High-value claim rejected.');
+        this.selectedClaimDetail.set(null);
+        this.loadClaimsRegistry();
+        this.loadDashboardData();
+      },
+      error: (err) => {
+        this.toastService.error(err.error?.message || "Action failed.");
+      }
+    });
   }
 
   exportData() {

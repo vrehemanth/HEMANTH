@@ -15,11 +15,27 @@ namespace EGI_Backend.Application.DTOs
         public string ClaimType { get; set; } = string.Empty;
         public decimal ClaimAmount { get; set; }
         public string ClaimReason { get; set; } = string.Empty;
+        public DateTime IncidentDate { get; set; }
         public DateTime ClaimDate { get; set; }
         public string Status { get; set; } = string.Empty;
         public string? RejectionReason { get; set; }
         public DateTime? ReviewedAt { get; set; }
         public string? ReviewedByName { get; set; }
         public string? InReviewByOfficerName { get; set; }
+        public bool IsAutoApproved { get; set; }
+        public bool RequiresAdminApproval { get; set; }
+
+        public string? ExtractedHospitalName { get; set; }
+        public DateTime? ExtractedBillDate { get; set; }
+        public decimal? ExtractedBillAmount { get; set; }
+        public DateTime? ExtractedDateOfDeath { get; set; }
+        public string? ExtractedCauseOfDeath { get; set; }
+        public string? ExtractedFirNumber { get; set; }
+        public string? ExtractedPoliceStation { get; set; }
+        public DateTime? ExtractedIncidentDate { get; set; }
+        public string? ExtractedDiagnosis { get; set; }
+ 
+        public int FraudScore { get; set; }
+        public bool IsSuspectedFraud { get; set; }
     }
 }

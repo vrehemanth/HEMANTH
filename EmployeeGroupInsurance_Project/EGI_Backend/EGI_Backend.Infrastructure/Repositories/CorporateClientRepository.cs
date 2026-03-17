@@ -1,4 +1,4 @@
-﻿using EGI_Backend.Application.Interfaces;
+using EGI_Backend.Application.Interfaces;
 using EGI_Backend.Domain.Entities;
 using EGI_Backend.Domain.Enums;
 using EGI_Backend.Infrastructure.Persistence;
@@ -71,5 +71,10 @@ namespace EGI_Backend.Infrastructure.Repositories
             }
             return count;
         }
+
+        public async Task<CorporateClientDocument?> GetDocumentByIdAsync(Guid id)
+            => await _context.CorporateClientDocuments
+                .Include(c => c.CorporateClient)
+                .FirstOrDefaultAsync(d => d.Id == id);
     }
 }

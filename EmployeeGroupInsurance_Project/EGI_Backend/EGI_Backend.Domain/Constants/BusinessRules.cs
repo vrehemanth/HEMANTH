@@ -18,7 +18,7 @@ namespace EGI_Backend.Domain.Constants
         // ─── Pricing & Billing ───
         public const decimal AnnualBillingDiscount = 0.05m; // 5% Discount
         public const int InvoiceDueGraceDays = 7;
-        public const int ClaimInitialWaitingPeriodDays = 30; // Standard Fraud Prevention
+        public const int ClaimInitialWaitingPeriodDays = 0; // Waiting period removed per user request
 
         // ─── Helper Methods ─────────────────────────────────────────────
         

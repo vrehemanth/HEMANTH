@@ -17,6 +17,9 @@ namespace EGI_Backend.Application.Tests.Services
         private readonly Mock<IInsurancePlanRepository> _mockRepo;
         private readonly Mock<IMapper> _mockMapper;
         private readonly Mock<IUnitOfWork> _mockUoW;
+        private readonly Mock<IAuditLogRepository> _mockAudit;
+        private readonly Mock<INotificationService> _mockNotification;
+        private readonly Mock<IUserRepository> _mockUserRepo;
         private readonly InsurancePlanService _service;
 
         public InsurancePlanServiceTests()
@@ -24,8 +27,11 @@ namespace EGI_Backend.Application.Tests.Services
             _mockRepo = new Mock<IInsurancePlanRepository>();
             _mockMapper = new Mock<IMapper>();
             _mockUoW = new Mock<IUnitOfWork>();
-
-            _service = new InsurancePlanService(_mockUoW.Object, _mockRepo.Object, _mockMapper.Object);
+            _mockAudit = new Mock<IAuditLogRepository>();
+            _mockNotification = new Mock<INotificationService>();
+            _mockUserRepo = new Mock<IUserRepository>();
+ 
+            _service = new InsurancePlanService(_mockUoW.Object, _mockRepo.Object, _mockMapper.Object, _mockAudit.Object, _mockNotification.Object, _mockUserRepo.Object);
         }
 
         [Fact]

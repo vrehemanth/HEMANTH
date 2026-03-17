@@ -51,6 +51,21 @@ namespace EGI_Backend.WebAPI
                         // Tell ASP.NET Core which claim in the JWT holds the Role
                         RoleClaimType = System.Security.Claims.ClaimTypes.Role
                     };
+
+                    // NEW: Allow query string token for medical document viewing
+                    options.Events = new JwtBearerEvents
+                    {
+                        OnMessageReceived = context =>
+                        {
+                            var accessToken = context.Request.Query["access_token"];
+                            var path = context.HttpContext.Request.Path;
+                            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/api/Public/documents"))
+                            {
+                                context.Token = accessToken;
+                            }
+                            return Task.CompletedTask;
+                        }
+                    };
                 });
                 builder.Services.AddAuthorization();
             builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -131,12 +146,9 @@ namespace EGI_Backend.WebAPI
             app.UseAuthorization();
 
 
-            app.UseStaticFiles(new StaticFileOptions
-            {
-                FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(
-                    Path.Combine(Directory.GetCurrentDirectory(), "Uploads")),
-                RequestPath = "/uploads"
-            });
+            // Security Fix: Removed public static file access to /uploads. 
+            // All medical documents must now be accessed via the protected IClaimService endpoint.
+            // (Removed app.UseStaticFiles() to stop the warning about missing wwwroot)
 
             app.MapControllers();
 

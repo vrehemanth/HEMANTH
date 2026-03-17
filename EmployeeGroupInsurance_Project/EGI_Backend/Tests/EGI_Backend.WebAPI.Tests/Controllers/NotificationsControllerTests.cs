@@ -69,8 +69,10 @@ namespace EGI_Backend.WebAPI.Tests.Controllers
         [Fact]
         public async Task MarkAsRead_ValidId_ReturnsOk()
         {
+            var userId = Guid.NewGuid();
+            SetupUser(userId);
             var id = Guid.NewGuid();
-            _mockNotificationSvc.Setup(x => x.MarkAsReadAsync(id)).Returns(Task.CompletedTask);
+            _mockNotificationSvc.Setup(x => x.MarkAsReadAsync(userId, id)).Returns(Task.CompletedTask);
 
             var result = await _controller.MarkAsRead(id);
 

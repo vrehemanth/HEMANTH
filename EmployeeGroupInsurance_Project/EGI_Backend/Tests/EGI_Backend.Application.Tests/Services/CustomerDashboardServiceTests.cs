@@ -25,6 +25,8 @@ namespace EGI_Backend.Application.Tests.Services
         private readonly Mock<IMapper> _mockMapper;
         private readonly Mock<IMemoryCache> _mockCache;
         private readonly Mock<IInvoiceService> _mockInvoiceService;
+        private readonly Mock<IPolicyAssignmentService> _mockPolicyService;
+        private readonly Mock<IServiceScopeFactory> _mockScopeFactory;
         private readonly CustomerDashboardService _service;
 
         public CustomerDashboardServiceTests()
@@ -40,13 +42,16 @@ namespace EGI_Backend.Application.Tests.Services
             var mockCacheEntry = new Mock<ICacheEntry>();
             _mockCache.Setup(x => x.CreateEntry(It.IsAny<object>())).Returns(mockCacheEntry.Object);
 
-            // Setup Mock Invoice Service
+            // Setup Mock Invoice & Policy Services
             _mockInvoiceService = new Mock<IInvoiceService>();
-
+            _mockPolicyService = new Mock<IPolicyAssignmentService>();
+ 
             // Mock Cache TryGetValue to always return false (miss)
             object cacheEntry = null;
             _mockCache.Setup(x => x.TryGetValue(It.IsAny<object>(), out cacheEntry)).Returns(false);
-
+ 
+            _mockScopeFactory = new Mock<IServiceScopeFactory>();
+ 
             _service = new CustomerDashboardService(
                 _mockClientRepo.Object,
                 _mockPolicyRepo.Object,
@@ -55,8 +60,10 @@ namespace EGI_Backend.Application.Tests.Services
                 _mockInvoiceRepo.Object,
                 _mockEndorsementRepo.Object,
                 _mockInvoiceService.Object,
+                _mockPolicyService.Object,
                 _mockMapper.Object,
-                _mockCache.Object
+                _mockCache.Object,
+                _mockScopeFactory.Object
             );
         }
 
@@ -81,7 +88,7 @@ namespace EGI_Backend.Application.Tests.Services
         {
             var userId = Guid.NewGuid();
             _mockClientRepo.Setup(x => x.GetByUserIdAsync(userId)).ReturnsAsync((CorporateClient)null);
-
+                
             await Assert.ThrowsAsync<NotFoundException>(() => _service.GetProfileAsync(userId));
         }
 

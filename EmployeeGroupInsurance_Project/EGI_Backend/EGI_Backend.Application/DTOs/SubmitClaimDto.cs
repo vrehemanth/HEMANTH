@@ -25,6 +25,11 @@ namespace EGI_Backend.Application.DTOs
         public decimal ClaimAmount { get; set; }
 
         [Required]
+        public DateTime IncidentDate { get; set; }
+
+        public string? SubmissionToken { get; set; }
+
+        [Required]
         public string ClaimReason { get; set; } = string.Empty;
 
         // Supporting documents: each file maps to a document type by index

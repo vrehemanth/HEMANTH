@@ -22,8 +22,10 @@ namespace EGI_Backend.Application.Services
         private readonly IInvoiceRepository _invoiceRepo;
         private readonly IPolicyEndorsementRepository _endorsementRepo;
         private readonly IInvoiceService _invoiceService;
+        private readonly IPolicyAssignmentService _policyService;
         private readonly IMapper _mapper;
         private readonly IMemoryCache _cache;
+        private readonly IServiceScopeFactory _scopeFactory;
 
         public CustomerDashboardService(
             ICorporateClientRepository clientRepo,
@@ -33,8 +35,10 @@ namespace EGI_Backend.Application.Services
             IInvoiceRepository invoiceRepo,
             IPolicyEndorsementRepository endorsementRepo,
             IInvoiceService invoiceService,
+            IPolicyAssignmentService policyService,
             IMapper mapper,
-            IMemoryCache cache)
+            IMemoryCache cache,
+            IServiceScopeFactory scopeFactory)
         {
             _clientRepo = clientRepo;
             _policyRepo = policyRepo;
@@ -43,8 +47,10 @@ namespace EGI_Backend.Application.Services
             _invoiceRepo = invoiceRepo;
             _endorsementRepo = endorsementRepo;
             _invoiceService = invoiceService;
+            _policyService = policyService;
             _mapper = mapper;
             _cache = cache;
+            _scopeFactory = scopeFactory;
         }
 
         private async Task<Guid> GetClientIdAsync(Guid userId)
@@ -80,7 +86,7 @@ namespace EGI_Backend.Application.Services
                 TotalPremiumDue = await _invoiceRepo.GetTotalBalanceByClientAsync(clientId)
             };
 
-            _cache.Set(cacheKey, summary, TimeSpan.FromSeconds(5));
+            _cache.Set(cacheKey, summary, TimeSpan.FromMinutes(5));
             return summary;
         }
 
@@ -95,28 +101,45 @@ namespace EGI_Backend.Application.Services
             var clientId = await GetClientIdAsync(userId);
             var summary = await GetSummaryAsync(userId);
             
-            // One-time check for overdue invoices - only if we have unpaid ones
-            if (summary.UnpaidInvoices > 0)
-            {
-                await _invoiceService.MarkOverdueInvoicesForClientAsync(clientId);
-            }
+            // Background maintenance tasks
+            _ = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                var invSvc = scope.ServiceProvider.GetRequiredService<IInvoiceService>();
+                var polSvc = scope.ServiceProvider.GetRequiredService<IPolicyAssignmentService>();
+                await invSvc.MarkOverdueInvoicesForClientAsync(clientId);
+                await polSvc.UpdatePolicyStatusesAsync(clientId);
+            });
 
-            // Fetch only necessary data for dashboard sequentially because EF Core DbContext is not thread-safe
-            var policies = await _policyRepo.GetByClientIdAsync(clientId);
-            var claims = await _claimRepo.GetByClientIdAsync(clientId);
-            var invoices = await _invoiceRepo.GetByClientIdAsync(clientId);
-            var endorsements = await _endorsementRepo.GetByClientIdAsync(clientId);
+            // Parallel Execution Pattern
+            var polTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IPolicyAssignmentRepository>().GetByClientIdAsync(clientId);
+            });
+            var claimTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IClaimRepository>().GetByClientIdAsync(clientId);
+            });
+            var invTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IInvoiceRepository>().GetByClientIdAsync(clientId);
+            });
+            var endTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IPolicyEndorsementRepository>().GetByClientIdAsync(clientId);
+            });
+
+            await Task.WhenAll(polTask, claimTask, invTask, endTask);
 
             var overview = new CustomerDashboardOverviewDto
             {
                 Summary = summary,
-                RecentPolicies = _mapper.Map<List<PolicyAssignmentResponseDto>>(policies.OrderByDescending(p => p.StartDate).Take(5)),
-                RecentClaims = _mapper.Map<List<ClaimResponseDto>>(claims.OrderByDescending(c => c.ClaimDate).Take(5)),
-                RecentInvoices = _mapper.Map<List<InvoiceResponseDto>>(invoices.OrderByDescending(i => i.BillingPeriodFrom).Take(5)),
-                RecentEndorsements = _mapper.Map<List<EndorsementResponseDto>>(endorsements.OrderByDescending(e => e.CreatedAt).Take(5))
+                RecentPolicies = _mapper.Map<List<PolicyAssignmentResponseDto>>(polTask.Result.OrderByDescending(p => p.StartDate).Take(5)),
+                RecentClaims = _mapper.Map<List<ClaimResponseDto>>(claimTask.Result.OrderByDescending(c => c.ClaimDate).Take(5)),
+                RecentInvoices = _mapper.Map<List<InvoiceResponseDto>>(invTask.Result.OrderByDescending(i => i.BillingPeriodFrom).Take(5)),
+                RecentEndorsements = _mapper.Map<List<EndorsementResponseDto>>(endTask.Result.OrderByDescending(e => e.CreatedAt).Take(5))
             };
 
-            _cache.Set(cacheKey, overview, TimeSpan.FromSeconds(5));
+            _cache.Set(cacheKey, overview, TimeSpan.FromMinutes(5));
             return overview;
         }
 
@@ -124,6 +147,7 @@ namespace EGI_Backend.Application.Services
         {
             var clientId = await GetClientIdAsync(userId);
             await _invoiceService.MarkOverdueInvoicesForClientAsync(clientId);
+            await _policyService.UpdatePolicyStatusesAsync(clientId);
             var policies = await _policyRepo.GetByClientIdAsync(clientId);
             return _mapper.Map<List<PolicyAssignmentResponseDto>>(policies);
         }

@@ -61,19 +61,40 @@ namespace EGI_Backend.Infrastructure.BackgroundServices
         {
             var now = DateTime.UtcNow;
 
-            var expiredPolicies = await dbContext.PolicyAssignments
+            // 1. Mark as EXPIRED if past Grace Period (30 days)
+            // (Expired = Dead)
+            var deadPolicies = await dbContext.PolicyAssignments
+                .Where(p => (p.Status == PolicyStatus.Active || p.Status == PolicyStatus.Inactive) && p.EndDate.AddDays(30) <= now)
+                .ToListAsync();
+
+            if (deadPolicies.Any())
+            {
+                foreach (var policy in deadPolicies)
+                {
+                    policy.Status = PolicyStatus.Expired;
+                    _logger.LogInformation($"Policy {policy.PolicyNo} marked EXPIRED (Dead).");
+                }
+                dbContext.PolicyAssignments.UpdateRange(deadPolicies);
+            }
+
+            // 2. Mark as INACTIVE if past EndDate but within Grace Period
+            // (Inactive = Grace Period where they can still renew)
+            var gracePolicies = await dbContext.PolicyAssignments
                 .Where(p => p.Status == PolicyStatus.Active && p.EndDate <= now)
                 .ToListAsync();
 
-            if (expiredPolicies.Any())
+            if (gracePolicies.Any())
             {
-                foreach (var policy in expiredPolicies)
+                foreach (var policy in gracePolicies)
                 {
-                    policy.Status = PolicyStatus.Expired;
-                    _logger.LogInformation($"Policy {policy.PolicyNo} automatically expired.");
+                    policy.Status = PolicyStatus.Inactive;
+                    _logger.LogInformation($"Policy {policy.PolicyNo} set to INACTIVE (Grace Period Start).");
                 }
+                dbContext.PolicyAssignments.UpdateRange(gracePolicies);
+            }
 
-                dbContext.PolicyAssignments.UpdateRange(expiredPolicies);
+            if (deadPolicies.Any() || gracePolicies.Any())
+            {
                 await dbContext.SaveChangesAsync();
             }
         }

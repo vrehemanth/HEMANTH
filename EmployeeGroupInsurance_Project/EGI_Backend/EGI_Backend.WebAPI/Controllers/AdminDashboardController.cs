@@ -11,7 +11,6 @@ using System.Threading.Tasks;
 namespace EGI_Backend.WebAPI.Controllers
 {
     [Authorize(Roles = "Admin")]
-    [Authorize(Roles = "Admin")]
     [Route("api/admin/dashboard")]
     public class AdminDashboardController : BaseApiController
     {
@@ -21,6 +20,7 @@ namespace EGI_Backend.WebAPI.Controllers
         private readonly IClaimService _claimService;
         private readonly IInvoiceService _invoiceService;
         private readonly IPolicyEndorsementService _endorsementService;
+        private readonly IPolicyAssignmentService _policyAssignmentService;
 
         public AdminDashboardController(
             IAdminDashboardService dashboardService,
@@ -28,7 +28,8 @@ namespace EGI_Backend.WebAPI.Controllers
             ICorporateClientService corporateService,
             IClaimService claimService,
             IInvoiceService invoiceService,
-            IPolicyEndorsementService endorsementService)
+            IPolicyEndorsementService endorsementService,
+            IPolicyAssignmentService policyAssignmentService)
         {
             _dashboardService  = dashboardService;
             _planService       = planService;
@@ -36,47 +37,49 @@ namespace EGI_Backend.WebAPI.Controllers
             _claimService      = claimService;
             _invoiceService    = invoiceService;
             _endorsementService = endorsementService;
+            _policyAssignmentService = policyAssignmentService;
         }
 
         [HttpGet("claims/{claimId}/detail")]
         public async Task<IActionResult> GetClaimDetail(Guid claimId)
         {
-            var claim = await _claimService.GetClaimDetailAsync(claimId);
+            var role = User.FindFirstValue(ClaimTypes.Role) ?? "Admin";
+            var claim = await _claimService.GetClaimDetailAsync(claimId, CurrentUserId, role);
             return Ok(claim);
         }
 
         [HttpGet("invoices/{invoiceId}")]
         public async Task<IActionResult> GetInvoiceDetail(Guid invoiceId)
         {
-            var invoice = await _invoiceService.GetInvoiceByIdAsync(invoiceId);
+            var invoice = await _invoiceService.GetInvoiceByIdAsync(invoiceId, CurrentUserId, "Admin");
             return Ok(invoice);
         }
 
         [HttpGet("invoices/{invoiceId}/payments")]
         public async Task<IActionResult> GetPayments(Guid invoiceId)
         {
-            var payments = await _invoiceService.GetPaymentsByInvoiceAsync(invoiceId);
+            var payments = await _invoiceService.GetPaymentsByInvoiceAsync(invoiceId, CurrentUserId, "Admin");
             return Ok(payments);
         }
 
         [HttpGet("invoices/policy/{policyAssignmentId}")]
         public async Task<IActionResult> GetInvoicesByPolicy(Guid policyAssignmentId)
         {
-            var invoices = await _invoiceService.GetInvoicesByPolicyAsync(policyAssignmentId);
+            var invoices = await _invoiceService.GetInvoicesByPolicyAsync(policyAssignmentId, CurrentUserId, "Admin");
             return Ok(invoices);
         }
 
         [HttpGet("endorsements/pending")]
         public async Task<IActionResult> GetPendingEndorsements()
         {
-            var result = await _endorsementService.GetPendingEndorsementsAsync();
+            var result = await _endorsementService.GetPendingEndorsementsAsync(CurrentUserId, "Admin");
             return Ok(result);
         }
 
         [HttpGet("endorsements/policy/{policyId}")]
         public async Task<IActionResult> GetEndorsementsByPolicy(Guid policyId)
         {
-            var result = await _endorsementService.GetEndorsementsByPolicyAsync(policyId);
+            var result = await _endorsementService.GetEndorsementsByPolicyAsync(policyId, CurrentUserId, "Admin");
             return Ok(result);
         }
 
@@ -190,6 +193,20 @@ namespace EGI_Backend.WebAPI.Controllers
             var clients = await _dashboardService.GetAllClientsAsync();
             return Ok(clients);
         }
+        
+        [HttpPost("claims/{claimId}/review")]
+        public async Task<IActionResult> ReviewClaim(Guid claimId, [FromBody] ReviewClaimDto dto)
+        {
+            await _claimService.ReviewClaimAsync(CurrentUserId, claimId, dto);
+            return Ok(new { message = dto.IsApproved ? "Claim approved successfully." : "Claim rejected successfully." });
+        }
 
+        [HttpPost("policies/{policyId}/toggle-status")]
+        public async Task<IActionResult> TogglePolicyStatus(Guid policyId)
+        {
+            var result = await _policyAssignmentService.TogglePolicyStatusAsync(policyId);
+            if (!result) return NotFound("Policy not found.");
+            return Ok(new { message = "Policy status toggled successfully." });
+        }
     }
 }

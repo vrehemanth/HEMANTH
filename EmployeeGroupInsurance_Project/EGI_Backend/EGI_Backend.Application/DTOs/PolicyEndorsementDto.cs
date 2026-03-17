@@ -11,6 +11,8 @@ namespace EGI_Backend.Application.DTOs
 
         // Use object here so Swagger allows direct JSON entry instead of escaped string!
         public object EndorsementData { get; set; } = null!;
+
+        public string? SubmissionToken { get; set; }
     }
 
     public class ReviewEndorsementDto

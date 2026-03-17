@@ -6,6 +6,7 @@ import { Router, NavigationEnd } from '@angular/router';
 import { Subscription, forkJoin, of } from 'rxjs';
 import { filter, catchError } from 'rxjs/operators';
 import { ToastService } from '../../../core/services/toast.service';
+import { AuthService } from '../../../core/services/auth.service';
 import * as htmlToImage from 'html-to-image';
 import { jsPDF } from 'jspdf';
 
@@ -46,6 +47,7 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
   fb = inject(FormBuilder);
   router = inject(Router);
   toastService = inject(ToastService);
+  authService = inject(AuthService);
   private routerSub?: Subscription;
 
 
@@ -98,6 +100,16 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
   claimSearchTerm = signal('');
   claimStatusFilter = signal('All');
   claimSortConfig = signal<{ column: string, direction: 'asc' | 'desc' }>({ column: 'date', direction: 'desc' });
+  selectedClaimForView = signal<any | null>(null);
+  showClaimDetailModal = signal(false);
+  
+  // --- Renewal State ---
+  showRenewalModal = signal(false);
+  activeRenewalPolicyId = signal<string | null>(null);
+  renewalYears = signal(1);
+  renewalFrequency = signal<number>(BillingFrequency.Annually);
+  renewalQuote = signal<any>(null);
+  isFetchingQuote = signal(false);
 
   // --- Filtered and Sorted Computeds ---
   filteredClaims = computed(() => {
@@ -150,6 +162,75 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
     } else {
       this.claimSortConfig.set({ column, direction: 'asc' });
     }
+  }
+
+  getDocumentUrl(docId: string): string {
+    const token = this.authService.currentUser()?.token;
+    if (!token) return '';
+    return `https://localhost:7146/api/Public/documents/${docId}?access_token=${token}`;
+  }
+
+  viewClaimDetail(claim: any) {
+    this.selectedClaimForView.set(claim);
+    this.showClaimDetailModal.set(true);
+  }
+
+  openRenewalModal(policyId: string) {
+    this.activeRenewalPolicyId.set(policyId);
+    this.renewalYears.set(1);
+    this.renewalFrequency.set(BillingFrequency.Annually);
+    this.renewalQuote.set(null);
+    this.showRenewalModal.set(true);
+    this.fetchRenewalQuote();
+  }
+
+  fetchRenewalQuote() {
+    const id = this.activeRenewalPolicyId();
+    if (!id) return;
+    this.isFetchingQuote.set(true);
+    this.customerService.getRenewalQuote(id, this.renewalYears(), this.renewalFrequency()).subscribe({
+      next: (res) => {
+        const quote = res?.data || res;
+        this.renewalQuote.set(quote);
+        this.isFetchingQuote.set(false);
+      },
+      error: (err) => {
+        this.toastService.error(err.error?.message || 'Failed to fetch quote');
+        this.isFetchingQuote.set(false);
+      }
+    });
+  }
+
+  updateRenewalYears(years: number) {
+    this.renewalYears.set(years);
+    this.fetchRenewalQuote();
+  }
+
+  updateRenewalFrequency(freq: number) {
+    this.renewalFrequency.set(freq);
+    this.fetchRenewalQuote();
+  }
+
+  confirmRenewal() {
+    const id = this.activeRenewalPolicyId();
+    if (!id) return;
+    
+    this.isLoading.set(true);
+    this.customerService.renewPolicy(id, this.renewalYears(), this.renewalFrequency()).subscribe({
+      next: (res) => {
+        this.showRenewalModal.set(false);
+        this.customerService.getMyPolicies().subscribe(p => {
+          this.policies.set(this.extractArray(p));
+          this.refreshSummary();
+          this.isLoading.set(false);
+          this.toastService.success(res.message);
+        });
+      },
+      error: (err) => {
+        this.toastService.error(err.error?.message || 'Failed to renew policy');
+        this.isLoading.set(false);
+      }
+    });
   }
 
   // --- Grid Filters & Sorting State for Members ---
@@ -296,10 +377,18 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
       return;
     }
     if (step === 4 && (this.claimForm.get('claimType')?.invalid || this.claimForm.get('claimAmount')?.invalid)) {
+      if (this.claimForm.get('claimType')?.value === 'Life') {
+        this.autoFillLifeClaimAmount();
+      }
       this.toastService.warning('Please specify claim classification and value.');
       return;
     }
     this.claimSubmissionStep.set(step);
+
+    // If moving to step 3 and it's life, ensure amount is filled
+    if (step === 3 && this.claimForm.get('claimType')?.value === 'Life') {
+      this.autoFillLifeClaimAmount();
+    }
   }
 
   // Drilldown states
@@ -317,6 +406,40 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
     this.showClaimForm.set(!this.showClaimForm());
     if (this.showClaimForm()) {
       this.claimSubmissionStep.set(1);
+    } else {
+      this.claimForm.reset();
+      this.claimForm.get('claimAmount')?.enable();
+    }
+  }
+
+  autoFillLifeClaimAmount() {
+    const member = this.selectedClaimMember();
+    if (!member) return;
+
+    const policyId = this.claimForm.get('policyAssignmentId')?.value;
+    const policy = this.policies().find(p => p.id === policyId);
+    if (!policy) return;
+
+    // Find the plan to get the specific "Life" coverage amount
+    const plan = this.plans().find(pl => pl.id === policy.insurancePlanId || pl.planName === policy.planName);
+    
+    let lifeCoverageAmount = 0;
+    if (plan) {
+      const lifeCoverage = plan.coverages?.find((c: any) => c.type === 'Life');
+      if (lifeCoverage) {
+        lifeCoverageAmount = lifeCoverage.coverageAmount;
+      }
+    }
+
+    // Fallback if specific plan coverage not found, but we really want the Plan's Life amount
+    if (lifeCoverageAmount > 0) {
+      this.claimForm.get('claimAmount')?.setValue(lifeCoverageAmount.toString());
+      this.claimForm.get('claimAmount')?.disable();
+      this.toastService.info(`Life Settlement auto-filled: ₹${this.formatINR(lifeCoverageAmount)}. Standard protocol enforced.`);
+    } else {
+      // If we can't find specific Life coverage, don't use the aggregate sumInsured as it includes Health/Accident
+      this.claimForm.get('claimAmount')?.enable(); 
+      this.toastService.warning("Specific Life coverage amount not found in plan. Please enter manually.");
     }
   }
   showPolicyForm = signal(false);
@@ -335,6 +458,9 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
     { id: ClaimDocumentType.HospitalDischargeReport.toString(), name: 'Hospital Discharge' },
     { id: ClaimDocumentType.DoctorPrescription.toString(), name: 'Prescription' },
     { id: ClaimDocumentType.FIR.toString(), name: 'FIR (Accident)' },
+    { id: ClaimDocumentType.AccidentReport.toString(), name: 'Accident Report' },
+    { id: ClaimDocumentType.DeathCertificate.toString(), name: 'Death Certificate' },
+    { id: ClaimDocumentType.PostMortemReport.toString(), name: 'Post Mortem Report' },
     { id: ClaimDocumentType.DiagnosisReport.toString(), name: 'Diagnosis Report' },
     { id: ClaimDocumentType.Other.toString(), name: 'Other' }
   ];
@@ -428,6 +554,20 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
       this.claimForm.patchValue({ memberId: '', employeeCode: '', dependentId: '' });
       this.selectedClaimMember.set(null);
       this.claimForm.get('dependentId')?.disable();
+    });
+
+    this.claimForm.get('claimType')?.valueChanges.subscribe(type => {
+      if (type === 'Life') {
+        this.autoFillLifeClaimAmount();
+      } else {
+        this.claimForm.get('claimAmount')?.enable();
+      }
+    });
+
+    this.claimForm.get('dependentId')?.valueChanges.subscribe(() => {
+      if (this.claimForm.get('claimType')?.value === 'Life') {
+        this.autoFillLifeClaimAmount();
+      }
     });
   }
 
@@ -931,7 +1071,7 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
     if (this.claimForm.invalid) return;
     this.isLoading.set(true);
     const fd = new FormData();
-    const val = this.claimForm.value as any;
+    const val = this.claimForm.getRawValue() as any;
 
     fd.append('PolicyAssignmentId', val.policyAssignmentId);
     fd.append('MemberId', val.memberId);
