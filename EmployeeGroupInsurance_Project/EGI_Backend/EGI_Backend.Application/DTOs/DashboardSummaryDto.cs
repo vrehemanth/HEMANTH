@@ -14,7 +14,9 @@ namespace EGI_Backend.Application.DTOs
         public decimal TotalRevenue { get; set; }
         public decimal TotalPayouts { get; set; }
         public decimal TotalCommissionPayouts { get; set; }
-        public decimal NetProfit => TotalRevenue - TotalPayouts - TotalCommissionPayouts;
+        public decimal TotalSalaryPayouts { get; set; }
+        public decimal NetProfit => TotalRevenue - TotalPayouts - TotalCommissionPayouts - TotalSalaryPayouts;
+
         
         // Extended Analytical Data
         public int RecentActivitiesCount { get; set; }

@@ -4,6 +4,7 @@ using EGI_Backend.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EGI_Backend.Infrastructure.Migrations
 {
     [DbContext(typeof(EGIDbContext))]
-    partial class EGIDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260318070307_KYBADocumentIntelligence")]
+    partial class KYBADocumentIntelligence
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -431,7 +434,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         {
                             Id = new Guid("11111111-1111-1111-1111-111111111111"),
                             BasePremium = 2000m,
-                            CreatedAt = new DateTime(2026, 3, 18, 10, 9, 32, 742, DateTimeKind.Utc).AddTicks(1795),
+                            CreatedAt = new DateTime(2026, 3, 18, 7, 3, 5, 959, DateTimeKind.Utc).AddTicks(8569),
                             Description = "Health: ₹2L | Covers: Employee Only | No Life | No Accident",
                             PlanCode = "S-Level 1",
                             PlanName = "Health Basic",
@@ -441,7 +444,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         {
                             Id = new Guid("11111111-1111-1111-1111-111111111112"),
                             BasePremium = 4000m,
-                            CreatedAt = new DateTime(2026, 3, 18, 10, 9, 32, 742, DateTimeKind.Utc).AddTicks(1814),
+                            CreatedAt = new DateTime(2026, 3, 18, 7, 3, 5, 959, DateTimeKind.Utc).AddTicks(8609),
                             Description = "Health: ₹3L | Covers: Employee + Spouse + 2 Children | No Life | No Accident",
                             PlanCode = "S-Level 2",
                             PlanName = "Health Family",
@@ -451,7 +454,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         {
                             Id = new Guid("11111111-1111-1111-1111-111111111113"),
                             BasePremium = 6000m,
-                            CreatedAt = new DateTime(2026, 3, 18, 10, 9, 32, 742, DateTimeKind.Utc).AddTicks(1819),
+                            CreatedAt = new DateTime(2026, 3, 18, 7, 3, 5, 959, DateTimeKind.Utc).AddTicks(8615),
                             Description = "Health: ₹3L (Family) | Life: ₹5L | No Accident | Parents Not Included",
                             PlanCode = "S-Level 3",
                             PlanName = "Health + Life",
@@ -461,7 +464,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         {
                             Id = new Guid("22222222-2222-2222-2222-222222222221"),
                             BasePremium = 2500m,
-                            CreatedAt = new DateTime(2026, 3, 18, 10, 9, 32, 742, DateTimeKind.Utc).AddTicks(1823),
+                            CreatedAt = new DateTime(2026, 3, 18, 7, 3, 5, 959, DateTimeKind.Utc).AddTicks(8620),
                             Description = "Health: ₹3L | Covers: Employee Only",
                             PlanCode = "M-Level 1",
                             PlanName = "Health Basic",
@@ -471,7 +474,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         {
                             Id = new Guid("22222222-2222-2222-2222-222222222222"),
                             BasePremium = 5000m,
-                            CreatedAt = new DateTime(2026, 3, 18, 10, 9, 32, 742, DateTimeKind.Utc).AddTicks(1827),
+                            CreatedAt = new DateTime(2026, 3, 18, 7, 3, 5, 959, DateTimeKind.Utc).AddTicks(8625),
                             Description = "Health: ₹5L | Covers: Employee + Spouse + 2 Children",
                             PlanCode = "M-Level 2",
                             PlanName = "Health Family",
@@ -481,7 +484,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         {
                             Id = new Guid("22222222-2222-2222-2222-222222222223"),
                             BasePremium = 8000m,
-                            CreatedAt = new DateTime(2026, 3, 18, 10, 9, 32, 742, DateTimeKind.Utc).AddTicks(1839),
+                            CreatedAt = new DateTime(2026, 3, 18, 7, 3, 5, 959, DateTimeKind.Utc).AddTicks(8629),
                             Description = "Health: ₹5L (Family) | Life: ₹10L | Parents Not Included",
                             PlanCode = "M-Level 3",
                             PlanName = "Health + Life",
@@ -491,7 +494,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         {
                             Id = new Guid("22222222-2222-2222-2222-222222222224"),
                             BasePremium = 10000m,
-                            CreatedAt = new DateTime(2026, 3, 18, 10, 9, 32, 742, DateTimeKind.Utc).AddTicks(1843),
+                            CreatedAt = new DateTime(2026, 3, 18, 7, 3, 5, 959, DateTimeKind.Utc).AddTicks(8632),
                             Description = "Health: ₹7L (Family) | Life: ₹15L | Accident: ₹10L | Parents Optional Add-on",
                             PlanCode = "M-Level 4",
                             PlanName = "Health + Life + Accident",
@@ -501,7 +504,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         {
                             Id = new Guid("33333333-3333-3333-3333-333333333331"),
                             BasePremium = 4000m,
-                            CreatedAt = new DateTime(2026, 3, 18, 10, 9, 32, 742, DateTimeKind.Utc).AddTicks(1847),
+                            CreatedAt = new DateTime(2026, 3, 18, 7, 3, 5, 959, DateTimeKind.Utc).AddTicks(8635),
                             Description = "Health: ₹5L | Covers: Employee Only",
                             PlanCode = "L-Level 1",
                             PlanName = "Health Basic",
@@ -511,7 +514,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         {
                             Id = new Guid("33333333-3333-3333-3333-333333333332"),
                             BasePremium = 7000m,
-                            CreatedAt = new DateTime(2026, 3, 18, 10, 9, 32, 742, DateTimeKind.Utc).AddTicks(1851),
+                            CreatedAt = new DateTime(2026, 3, 18, 7, 3, 5, 959, DateTimeKind.Utc).AddTicks(8643),
                             Description = "Health: ₹7L | Covers: Employee + Spouse + 2 Children",
                             PlanCode = "L-Level 2",
                             PlanName = "Health Family",
@@ -521,7 +524,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         {
                             Id = new Guid("33333333-3333-3333-3333-333333333333"),
                             BasePremium = 12000m,
-                            CreatedAt = new DateTime(2026, 3, 18, 10, 9, 32, 742, DateTimeKind.Utc).AddTicks(1854),
+                            CreatedAt = new DateTime(2026, 3, 18, 7, 3, 5, 959, DateTimeKind.Utc).AddTicks(8649),
                             Description = "Health: ₹7L (Family) | Life: ₹20L",
                             PlanCode = "L-Level 3",
                             PlanName = "Health + Life",
@@ -531,7 +534,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         {
                             Id = new Guid("33333333-3333-3333-3333-333333333334"),
                             BasePremium = 16000m,
-                            CreatedAt = new DateTime(2026, 3, 18, 10, 9, 32, 742, DateTimeKind.Utc).AddTicks(1857),
+                            CreatedAt = new DateTime(2026, 3, 18, 7, 3, 5, 959, DateTimeKind.Utc).AddTicks(8653),
                             Description = "Health: ₹10L (Family) | Life: ₹30L | Accident: ₹20L",
                             PlanCode = "L-Level 4",
                             PlanName = "Health + Life + Accident",
@@ -541,7 +544,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         {
                             Id = new Guid("33333333-3333-3333-3333-333333333335"),
                             BasePremium = 25000m,
-                            CreatedAt = new DateTime(2026, 3, 18, 10, 9, 32, 742, DateTimeKind.Utc).AddTicks(1893),
+                            CreatedAt = new DateTime(2026, 3, 18, 7, 3, 5, 959, DateTimeKind.Utc).AddTicks(8656),
                             Description = "Health: ₹15L (Employee + Spouse + 2 Children + Parents) | Life: ₹40L | Accident: ₹30L | Critical Illness Included",
                             PlanCode = "L-Level 5",
                             PlanName = "Comprehensive Plus",
@@ -551,7 +554,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         {
                             Id = new Guid("44444444-4444-4444-4444-444444444441"),
                             BasePremium = 6000m,
-                            CreatedAt = new DateTime(2026, 3, 18, 10, 9, 32, 742, DateTimeKind.Utc).AddTicks(1897),
+                            CreatedAt = new DateTime(2026, 3, 18, 7, 3, 5, 959, DateTimeKind.Utc).AddTicks(8660),
                             Description = "Health: ₹7L | Covers: Employee + Spouse + 2 Children",
                             PlanCode = "E-Level 1",
                             PlanName = "Health Family",
@@ -561,7 +564,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         {
                             Id = new Guid("44444444-4444-4444-4444-444444444442"),
                             BasePremium = 14000m,
-                            CreatedAt = new DateTime(2026, 3, 18, 10, 9, 32, 742, DateTimeKind.Utc).AddTicks(1904),
+                            CreatedAt = new DateTime(2026, 3, 18, 7, 3, 5, 959, DateTimeKind.Utc).AddTicks(8663),
                             Description = "Health: ₹10L (Employee + Spouse + 2 Children) | Life: ₹30L",
                             PlanCode = "E-Level 2",
                             PlanName = "Health + Life",
@@ -571,7 +574,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         {
                             Id = new Guid("44444444-4444-4444-4444-444444444443"),
                             BasePremium = 30000m,
-                            CreatedAt = new DateTime(2026, 3, 18, 10, 9, 32, 742, DateTimeKind.Utc).AddTicks(1907),
+                            CreatedAt = new DateTime(2026, 3, 18, 7, 3, 5, 959, DateTimeKind.Utc).AddTicks(8666),
                             Description = "Health: ₹20L (Employee + Spouse + 2 Children + Parents) | Life: ₹50L | Accident: ₹40L | Global Coverage Option | Dedicated Claim Officer",
                             PlanCode = "E-Level 3",
                             PlanName = "Full Corporate Shield",
@@ -811,7 +814,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                     b.HasData(
                         new
                         {
-                            Id = new Guid("9aab3169-d331-4052-98f9-4879e60703f5"),
+                            Id = new Guid("d85d7c10-1336-43f8-89c7-7835b5abcb32"),
                             CoverageAmount = 200000m,
                             CoveredGroup = 0,
                             InsurancePlanId = new Guid("11111111-1111-1111-1111-111111111111"),
@@ -820,7 +823,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("04665df4-41af-4aeb-ab6c-7160dc480de6"),
+                            Id = new Guid("341df229-2f98-4577-ace1-ab544ccc9c4c"),
                             CoverageAmount = 300000m,
                             CoveredGroup = 1,
                             InsurancePlanId = new Guid("11111111-1111-1111-1111-111111111112"),
@@ -829,7 +832,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("a221664a-5396-457e-9435-3cd6dd860128"),
+                            Id = new Guid("49218bad-876d-4126-8cd3-3c3c41bfaa47"),
                             CoverageAmount = 300000m,
                             CoveredGroup = 1,
                             InsurancePlanId = new Guid("11111111-1111-1111-1111-111111111113"),
@@ -838,7 +841,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("517ee7eb-3446-4f52-a32c-3e8cd3dee296"),
+                            Id = new Guid("a5c64fb8-e997-4453-b532-f2600fed129c"),
                             CoverageAmount = 500000m,
                             CoveredGroup = 0,
                             InsurancePlanId = new Guid("11111111-1111-1111-1111-111111111113"),
@@ -847,7 +850,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("9000f8e4-4560-473d-bace-1ce14f321316"),
+                            Id = new Guid("29d52c82-cf21-46ed-8e50-68ebf0a9e173"),
                             CoverageAmount = 300000m,
                             CoveredGroup = 0,
                             InsurancePlanId = new Guid("22222222-2222-2222-2222-222222222221"),
@@ -856,7 +859,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("734c3ce2-2852-40ba-9a04-d66007ea14e9"),
+                            Id = new Guid("7315b736-422b-4151-8b12-5a4108198620"),
                             CoverageAmount = 500000m,
                             CoveredGroup = 1,
                             InsurancePlanId = new Guid("22222222-2222-2222-2222-222222222222"),
@@ -865,7 +868,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("16dde89d-9b4d-41dc-b48f-d71d2e3725b3"),
+                            Id = new Guid("6f7550f2-b8e2-4921-a5db-101889560921"),
                             CoverageAmount = 500000m,
                             CoveredGroup = 1,
                             InsurancePlanId = new Guid("22222222-2222-2222-2222-222222222223"),
@@ -874,7 +877,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("8905b2bd-fdcb-4027-9ad2-efd3f8544f4a"),
+                            Id = new Guid("c45207d8-7dbf-4e53-8c3f-8d27ff1a873f"),
                             CoverageAmount = 1000000m,
                             CoveredGroup = 0,
                             InsurancePlanId = new Guid("22222222-2222-2222-2222-222222222223"),
@@ -883,7 +886,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("049eb84c-0092-40f5-ada9-106f08eb7b11"),
+                            Id = new Guid("736590a1-8b98-4949-86f0-378199248adb"),
                             CoverageAmount = 700000m,
                             CoveredGroup = 1,
                             InsurancePlanId = new Guid("22222222-2222-2222-2222-222222222224"),
@@ -892,7 +895,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("b9776d20-397f-4631-bca0-a868e9c1bc39"),
+                            Id = new Guid("7ea31348-6c9c-4a3d-b81e-406e285d6c39"),
                             CoverageAmount = 1500000m,
                             CoveredGroup = 0,
                             InsurancePlanId = new Guid("22222222-2222-2222-2222-222222222224"),
@@ -901,7 +904,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("15234747-159d-4701-b482-631e5a38374d"),
+                            Id = new Guid("b69a0ef0-bec4-474f-a3f4-d1397e610a5d"),
                             CoverageAmount = 1000000m,
                             CoveredGroup = 0,
                             InsurancePlanId = new Guid("22222222-2222-2222-2222-222222222224"),
@@ -910,7 +913,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("9d2a8ac3-d065-4773-af80-a6dc2c860053"),
+                            Id = new Guid("dd0724f8-6fd2-47f2-bd20-54b3b96697ce"),
                             CoverageAmount = 500000m,
                             CoveredGroup = 0,
                             InsurancePlanId = new Guid("33333333-3333-3333-3333-333333333331"),
@@ -919,7 +922,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("d58184df-7c49-4631-b9c2-fe106322c5fc"),
+                            Id = new Guid("d55b9795-63c7-4822-bed8-5bbeb6985a94"),
                             CoverageAmount = 700000m,
                             CoveredGroup = 1,
                             InsurancePlanId = new Guid("33333333-3333-3333-3333-333333333332"),
@@ -928,7 +931,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("f7517ca2-7294-4aa1-9117-3ba5cb58a632"),
+                            Id = new Guid("253f887d-2690-4ba8-a9b7-aff21774dc83"),
                             CoverageAmount = 700000m,
                             CoveredGroup = 1,
                             InsurancePlanId = new Guid("33333333-3333-3333-3333-333333333333"),
@@ -937,7 +940,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("7747e54d-f4c8-4c0d-8d84-ec903a48e961"),
+                            Id = new Guid("63127d9d-2ac1-491e-9c37-59e77cf53617"),
                             CoverageAmount = 2000000m,
                             CoveredGroup = 0,
                             InsurancePlanId = new Guid("33333333-3333-3333-3333-333333333333"),
@@ -946,7 +949,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("3b75a9d3-1b06-404f-95cc-9f6b2d322d16"),
+                            Id = new Guid("a7dcfac4-f506-459c-aa85-fb5e5065c967"),
                             CoverageAmount = 1000000m,
                             CoveredGroup = 1,
                             InsurancePlanId = new Guid("33333333-3333-3333-3333-333333333334"),
@@ -955,7 +958,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("cb877d04-f90f-4329-b7ca-08f57ab5a30f"),
+                            Id = new Guid("497fca62-ed1d-47a7-ae46-165e228b2b0f"),
                             CoverageAmount = 3000000m,
                             CoveredGroup = 0,
                             InsurancePlanId = new Guid("33333333-3333-3333-3333-333333333334"),
@@ -964,7 +967,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("a7118dbe-a072-4f58-820a-bd8f170da9a7"),
+                            Id = new Guid("06d5f53b-c0c4-4a6d-a3c7-e71dad4b1b74"),
                             CoverageAmount = 2000000m,
                             CoveredGroup = 0,
                             InsurancePlanId = new Guid("33333333-3333-3333-3333-333333333334"),
@@ -973,7 +976,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("0ce1f1c1-f466-43d8-b149-adf84d05d8b7"),
+                            Id = new Guid("354b1172-9276-4a12-949e-8e0ead8c9a93"),
                             CoverageAmount = 1500000m,
                             CoveredGroup = 2,
                             InsurancePlanId = new Guid("33333333-3333-3333-3333-333333333335"),
@@ -982,7 +985,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("e7840206-3add-49f2-8035-839e6e1760fe"),
+                            Id = new Guid("21cd815f-1d32-4aad-927b-dd6401e9618c"),
                             CoverageAmount = 4000000m,
                             CoveredGroup = 0,
                             InsurancePlanId = new Guid("33333333-3333-3333-3333-333333333335"),
@@ -991,7 +994,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("0ecf1cb4-fa48-4509-b538-4970d4667023"),
+                            Id = new Guid("06a1d1f5-5c5c-403d-884c-684f3683b23e"),
                             CoverageAmount = 3000000m,
                             CoveredGroup = 0,
                             InsurancePlanId = new Guid("33333333-3333-3333-3333-333333333335"),
@@ -1000,7 +1003,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("fd6cf5bc-8ec0-42a9-a725-41394d004e04"),
+                            Id = new Guid("5d6b0c44-e583-4317-a5d4-0d61d4d45839"),
                             CoverageAmount = 500000m,
                             CoveredGroup = 0,
                             InsurancePlanId = new Guid("33333333-3333-3333-3333-333333333335"),
@@ -1009,7 +1012,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("ab42482f-47ad-41c0-95ed-cc8f571d8343"),
+                            Id = new Guid("513c7f7e-ef44-488b-8485-7b7dbdbbbaea"),
                             CoverageAmount = 700000m,
                             CoveredGroup = 1,
                             InsurancePlanId = new Guid("44444444-4444-4444-4444-444444444441"),
@@ -1018,7 +1021,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("fdc1bfa8-a236-4acc-9c10-87bd5bed1ced"),
+                            Id = new Guid("8e33f5cd-eeaf-42a7-9659-702fbac104d7"),
                             CoverageAmount = 1000000m,
                             CoveredGroup = 1,
                             InsurancePlanId = new Guid("44444444-4444-4444-4444-444444444442"),
@@ -1027,7 +1030,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("e5bdd39a-697c-452f-b38d-3bbeae137cd9"),
+                            Id = new Guid("eba419c8-c8c7-4ab4-b454-2618bd7cfd0c"),
                             CoverageAmount = 3000000m,
                             CoveredGroup = 0,
                             InsurancePlanId = new Guid("44444444-4444-4444-4444-444444444442"),
@@ -1036,7 +1039,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("c98955c4-0fe0-4722-876e-745577a9e217"),
+                            Id = new Guid("52b08082-53fa-4692-bd70-52630e25289e"),
                             CoverageAmount = 2000000m,
                             CoveredGroup = 2,
                             InsurancePlanId = new Guid("44444444-4444-4444-4444-444444444443"),
@@ -1045,7 +1048,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("af240586-b2a4-4984-aea8-953c7fa60988"),
+                            Id = new Guid("656864df-a5a2-4ec2-91b9-9343b9c16c5c"),
                             CoverageAmount = 5000000m,
                             CoveredGroup = 0,
                             InsurancePlanId = new Guid("44444444-4444-4444-4444-444444444443"),
@@ -1054,7 +1057,7 @@ namespace EGI_Backend.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = new Guid("15cab820-a954-4e54-81ce-5d8ce55ab212"),
+                            Id = new Guid("872aa3bb-2274-455a-a977-29bc2a460ec2"),
                             CoverageAmount = 4000000m,
                             CoveredGroup = 0,
                             InsurancePlanId = new Guid("44444444-4444-4444-4444-444444444443"),
@@ -1218,10 +1221,6 @@ namespace EGI_Backend.Infrastructure.Migrations
 
                     b.Property<int>("Role")
                         .HasColumnType("int");
-
-                    b.Property<decimal?>("SalaryLPA")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");

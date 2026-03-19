@@ -17,6 +17,7 @@ namespace EGI_Backend.Domain.Entities
         public string CompanyName { get; set; }
         public string Address { get; set; }
         public BusinessCategory BusinessCategory { get; set; } = BusinessCategory.Small;
+        public IndustryType IndustryType { get; set; } = IndustryType.Others;
         public VerificationStatus Status { get; set; } = VerificationStatus.Draft;
         public Guid ReviewedBy { get; set; }
         public DateTime? ReviewedAt { get; set; }
@@ -24,6 +25,8 @@ namespace EGI_Backend.Domain.Entities
         public int ReSubmissionCount { get; set; } = 0;
         public string? Phone { get; set; }
         public bool IsBlocked { get; set; } = false;
+        public string? KybAiAnalysis { get; set; }
+        public int KybAiConfidenceScore { get; set; } = 0;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public ICollection<CorporateClientDocument> Documents { get; set; } = new List<CorporateClientDocument>();
     }

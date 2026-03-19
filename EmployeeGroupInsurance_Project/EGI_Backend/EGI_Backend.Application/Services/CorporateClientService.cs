@@ -20,6 +20,8 @@ public class CorporateClientService : ICorporateClientService
     private readonly IMapper _mapper;
     private readonly IAgentCustomerService _agentCustomerService;
     private readonly INotificationService _notificationService;
+    private readonly IAIAdjudicationService _aiAdjudicationService;
+
     public CorporateClientService(
         ICorporateClientRepository clientRepo,
         ICorporateDocumentRepository docRepo,
@@ -29,7 +31,8 @@ public class CorporateClientService : ICorporateClientService
         IDocumentStorageService storage,
         IMapper mapper,
         IAgentCustomerService agentCustomerService,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IAIAdjudicationService aiAdjudicationService)
     {
         _clientRepo = clientRepo;
         _docRepo = docRepo;
@@ -40,6 +43,7 @@ public class CorporateClientService : ICorporateClientService
         _mapper = mapper;
         _agentCustomerService = agentCustomerService;
         _notificationService = notificationService;
+        _aiAdjudicationService = aiAdjudicationService;
     }
 
     public async Task CreateProfileAsync(Guid userId, CreateCorporateProfileDto dto)
@@ -54,6 +58,7 @@ public class CorporateClientService : ICorporateClientService
             existing.CompanyName = dto.CompanyName;
             existing.Address = dto.Address;
             existing.Phone = dto.Phone;
+            existing.IndustryType = dto.IndustryType;
             // Keep status as Draft or Rejected until documents are uploaded via UploadDocumentAsync
         }
         else
@@ -65,6 +70,7 @@ public class CorporateClientService : ICorporateClientService
                 CompanyName = dto.CompanyName,
                 Address = dto.Address,
                 Phone = dto.Phone,
+                IndustryType = dto.IndustryType,
                 Status = VerificationStatus.Draft
             };
             await _clientRepo.AddAsync(client);
@@ -95,6 +101,11 @@ public class CorporateClientService : ICorporateClientService
             client.ReviewedBy = Guid.Empty;
             client.ReviewedAt = null;
         }
+        if (dto.IndustryType.HasValue)
+        {
+            client.IndustryType = dto.IndustryType.Value;
+        }
+
         var filePath = await _storage.UploadAsync(dto.File);
 
         var document = new CorporateClientDocument
@@ -107,6 +118,21 @@ public class CorporateClientService : ICorporateClientService
         };
 
         await _docRepo.AddAsync(document);
+
+        // Run KYB Document Intelligence
+        var (aiAnalysis, score) = await _aiAdjudicationService.AnalyzeKYBDocumentsAsync(client, document);
+
+        if (string.IsNullOrEmpty(client.KybAiAnalysis))
+        {
+            client.KybAiAnalysis = $"[DOCUMENT: {document.DocumentType}]\n{aiAnalysis}";
+            client.KybAiConfidenceScore = score;
+        }
+        else
+        {
+            client.KybAiAnalysis += $"\n\n[DOCUMENT: {document.DocumentType}]\n{aiAnalysis}";
+            // Average out the confidence score for multiple documents
+            client.KybAiConfidenceScore = (client.KybAiConfidenceScore + score) / 2;
+        }
 
         // REAL FIX: Move from Draft to Pending only after at least one document is uploaded!
         if (client.Status == VerificationStatus.Draft)
@@ -146,6 +172,11 @@ public class CorporateClientService : ICorporateClientService
 
         if (user == null)
             throw new NotFoundException("Associated user not found.");
+
+        if (dto.IndustryType.HasValue)
+        {
+            client.IndustryType = dto.IndustryType.Value;
+        }
 
         if (dto.IsApproved)
         {

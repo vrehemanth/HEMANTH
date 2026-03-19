@@ -130,5 +130,12 @@ namespace EGI_Backend.WebAPI.Controllers
             await _claimService.ReleaseClaimAsync(id);
             return Ok(new { message = "Claim released back to queue." });
         }
+
+        [HttpPost("claims/{id}/run-ai")]
+        public async Task<IActionResult> RunAI(Guid id)
+        {
+            var result = await _claimService.RunAIAdjudicationAsync(id);
+            return Ok(result);
+        }
     }
 }

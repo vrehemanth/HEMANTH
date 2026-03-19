@@ -8,7 +8,7 @@ namespace EGI_Backend.Application.Interfaces
 {
     public interface IEmailService
     {
-        Task SendCredentialsEmailAsync(string Email, string tempPassword);
+        Task SendCredentialsEmailAsync(string email, string tempPassword, decimal? salaryLPA = null);
         Task SendRejectionEmailAsync(string email, string reason);
         Task SendPasswordResetEmailAsync(string email, string token);
         Task SendBlockNotificationEmailAsync(string email);

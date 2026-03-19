@@ -13,6 +13,7 @@
                     <tr>
                         <th class="px-6 py-4">Company Profile</th>
                         <th class="px-6 py-4">Submitted Documents</th>
+                        <th class="px-6 py-4">AI Pre-Screening</th>
                         <th class="px-6 py-4 text-right">Actions</th>
                     </tr>
                 </thead>
@@ -54,21 +55,42 @@
                             <span class="text-xs text-gray-400 italic">No documents uploaded</span>
                             }
                         </td>
+                        
+                        <td class="px-6 py-4">
+                            @if (client.kybAiAnalysis || client.KybAiAnalysis) {
+                                <div class="flex flex-col gap-2">
+                                    <div class="flex items-center gap-1.5">
+                                        <div class="h-1.5 w-12 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                                            <div class="h-full bg-indigo-500" [style.width.%]="client.kybAiConfidenceScore || client.KybAiConfidenceScore"></div>
+                                        </div>
+                                        <span class="text-[10px] font-black text-indigo-600 dark:text-indigo-400">{{client.kybAiConfidenceScore || client.KybAiConfidenceScore}}%</span>
+                                    </div>
+                                    <button (click)="p.selectedClientForAi.set(client)" 
+                                        class="group flex items-center gap-2 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 rounded-lg text-[10px] font-black uppercase tracking-wider border border-indigo-100 dark:border-indigo-900/50 hover:bg-indigo-600 hover:text-white transition-all active:scale-95 shadow-sm">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                                        Review Scan
+                                    </button>
+                                </div>
+                            } @else {
+                                <div class="flex items-center gap-2 text-gray-400 dark:text-gray-600 px-2">
+                                    <div class="animate-pulse w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-700"></div>
+                                    <span class="text-[10px] font-bold uppercase tracking-tight">AI Analyzing...</span>
+                                </div>
+                            }
+                        </td>
 
                         <td class="px-6 py-4">
                             <div class="flex items-center justify-end gap-3">
-                                <!-- Category Select -->
+                                <!-- Industry Select -->
                                 <div class="flex flex-col gap-1 items-start">
-                                    <label
-                                        class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Tier</label>
-                                    <select [(ngModel)]="p.approvalCategory[client.id]"
+                                    <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Industry</label>
+                                    <select [(ngModel)]="p.approvalIndustry[client.id]"
                                         class="text-xs bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-lg px-2 py-2 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium text-gray-700 dark:text-gray-300">
-                                        <option value="Small">Small (8%)</option>
-                                        <option value="Medium">Medium (6%)</option>
-                                        <option value="Large">Large (4%)</option>
-                                        <option value="Enterprise">Enterprise (2%)</option>
+                                        <option *ngFor="let ind of p.industryTypesList" [value]="ind.id">{{ ind.name }}</option>
                                     </select>
                                 </div>
+
+
 
                                 <div class="flex items-center gap-2 mt-4">
                                     <button (click)="p.reviewClient(client.id, true)"
@@ -96,7 +118,7 @@
                     </tr>
                     } @empty {
                     <tr>
-                        <td colspan="3" class="px-6 py-8 text-center text-gray-500 text-sm">No pending client
+                        <td colspan="4" class="px-6 py-8 text-center text-gray-500 text-sm">No pending client
                             approvals
                             at the moment.</td>
                     </tr>
@@ -146,6 +168,7 @@
                                     </path>
                                 </svg>}</div>
                         </th>
+                        <th class="px-6 py-4">Industry</th>
                         <th class="px-6 py-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition"
                             (click)="p.sortClients('status')">
                             <div class="flex items-center gap-1">Status @if(p.clientSortConfig().column === 'status')
@@ -164,6 +187,9 @@
                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                         <td class="px-6 py-4 font-medium dark:text-gray-200">{{ c.companyName }}</td>
                         <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{ c.address }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                            <span class="px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-[10px] font-bold uppercase">{{ p.getIndustryName(c.industryType) }}</span>
+                        </td>
                         <td class="px-6 py-4">
                             <span class="text-xs px-2 py-1 rounded shadow-sm font-medium" [ngClass]="{
                         'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800': c.status === 'Approved',

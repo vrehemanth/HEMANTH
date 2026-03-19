@@ -92,6 +92,7 @@ namespace EGI_Backend.Application.Services
             var memberSheet = memberWorkbook.Worksheet(1);
             var memberRows = memberSheet.RowsUsed().Skip(1).ToList(); // skip header
 
+            decimal industryMultiplier = EGI_Backend.Domain.Constants.BusinessRules.GetIndustryMultiplier(client.IndustryType);
             int rowIdx = 2; // Starting from row 2 (row 1 is header)
             foreach (var row in memberRows)
             {
@@ -111,20 +112,12 @@ namespace EGI_Backend.Application.Services
                             throw new BadRequestException($"Row {rowIdx}: Invalid Date of Birth format.");
                     }
 
-                    // 4A.1 Check if member already exists for this client to prevent duplicates
-                    var existingMember = await _memberRepo.GetByEmployeeCodeAndClientAsync(empCode, dto.CorporateClientId);
-                    if (existingMember != null)
-                    {
-                        // Update existing member's sum insured and status
-                        existingMember.SumInsured = employeeSumInsured;
-                        existingMember.Status = true;
-                        membersMap.Add(empCode, existingMember);
-                        totalAnnualPremium += basePremium;
-                        policyAssignment.Members.Add(existingMember);
-                        continue;
-                    }
+                    // 4A.1 Logic Update: To allow one person to have multiple policies, 
+                    // we create a NEW Member record for this specific policy, even if they already exist for the client.
+                    if (membersMap.ContainsKey(empCode)) continue; 
 
-                    if (membersMap.ContainsKey(empCode)) continue; // Flaw 13 Fix: Skip internal duplicates in the Excel file
+                    decimal ageMultiplier = EGI_Backend.Domain.Constants.BusinessRules.GetAgeMultiplier(dob);
+                    decimal rowEmployeePremium = basePremium * industryMultiplier * ageMultiplier;
 
                     var member = new Member
                     {
@@ -137,11 +130,12 @@ namespace EGI_Backend.Application.Services
                         Gender = Enum.TryParse<Gender>(row.Cell(6).GetString(), true, out var g) ? g : Gender.Male,
                         SumInsured = employeeSumInsured,
                         Status = true,
-                        CorporateClientId = dto.CorporateClientId // Ensure FK is set
+                        CorporateClientId = dto.CorporateClientId,
+                        PolicyAssignmentId = policyAssignment.Id // Link to specific policy
                     };
 
                     membersMap.Add(empCode, member);
-                    totalAnnualPremium += basePremium; // 1.0x multiplier
+                    totalAnnualPremium += rowEmployeePremium;
                     policyAssignment.Members.Add(member);
                 }
                 catch (Exception ex) when (!(ex is BaseException))
@@ -207,10 +201,9 @@ namespace EGI_Backend.Application.Services
 
                         membersMap[empCode].Dependents.Add(dependent);
 
-                        // Multipliers
-                        if (relationship == RelationshipType.Spouse) totalAnnualPremium += basePremium * 0.8m;
-                        else if (relationship == RelationshipType.Father || relationship == RelationshipType.Mother) totalAnnualPremium += basePremium * 1.2m;
-                        else totalAnnualPremium += basePremium * 0.5m; // Children or others
+                        // Unified Age-Based Multiplier for Dependents
+                        decimal depAgeMultiplier = EGI_Backend.Domain.Constants.BusinessRules.GetAgeMultiplier(depDob);
+                        totalAnnualPremium += basePremium * depAgeMultiplier;
                     }
                     catch (Exception ex) when (!(ex is BaseException))
                     {
@@ -296,14 +289,16 @@ namespace EGI_Backend.Application.Services
             }
             else
             {
+                decimal industryMultiplier = EGI_Backend.Domain.Constants.BusinessRules.GetIndustryMultiplier(policy.CorporateClient?.IndustryType ?? IndustryType.Others);
                 foreach (var member in policy.Members)
                 {
-                    calculatedAnnual += currentBasePremium;
+                    decimal ageMultiplier = EGI_Backend.Domain.Constants.BusinessRules.GetAgeMultiplier(member.DateOfBirth);
+                    calculatedAnnual += currentBasePremium * industryMultiplier * ageMultiplier;
+
                     foreach (var dep in member.Dependents)
                     {
-                        if (dep.Relationship == RelationshipType.Spouse) calculatedAnnual += currentBasePremium * 0.8m;
-                        else if (dep.Relationship == RelationshipType.Father || dep.Relationship == RelationshipType.Mother) calculatedAnnual += currentBasePremium * 1.2m;
-                        else calculatedAnnual += currentBasePremium * 0.5m;
+                        decimal depAgeMultiplier = EGI_Backend.Domain.Constants.BusinessRules.GetAgeMultiplier(dep.DateOfBirth);
+                        calculatedAnnual += currentBasePremium * depAgeMultiplier;
                     }
                 }
             }

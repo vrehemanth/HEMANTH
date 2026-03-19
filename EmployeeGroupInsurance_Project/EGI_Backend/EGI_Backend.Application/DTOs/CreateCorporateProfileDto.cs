@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,5 +11,6 @@ namespace EGI_Backend.Application.DTOs
         public string CompanyName { get; set; } = string.Empty;
         public string Address { get; set; } = string.Empty;
         public string Phone { get; set; } = string.Empty;
+        public EGI_Backend.Domain.Enums.IndustryType IndustryType { get; set; }
     }
 }

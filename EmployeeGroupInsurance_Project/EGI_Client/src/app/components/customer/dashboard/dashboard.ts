@@ -24,7 +24,8 @@ import {
   BillingFrequency,
   EndorsementType,
   PaymentMethod,
-  Gender
+  Gender,
+  IndustryType
 } from '../../../core/models/models';
 
 @Component({
@@ -102,6 +103,8 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
   claimSortConfig = signal<{ column: string, direction: 'asc' | 'desc' }>({ column: 'date', direction: 'desc' });
   selectedClaimForView = signal<any | null>(null);
   showClaimDetailModal = signal(false);
+  rejectionExplanation = signal<string | null>(null);
+  isFetchingRejectionExplanation = signal(false);
   
   // --- Renewal State ---
   showRenewalModal = signal(false);
@@ -110,6 +113,10 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
   renewalFrequency = signal<number>(BillingFrequency.Annually);
   renewalQuote = signal<any>(null);
   isFetchingQuote = signal(false);
+  
+  // --- Endorsement Preview State ---
+  isCalculatingEndorsement = signal(false);
+  endorsementPreview = signal<any>(null);
 
   // --- Filtered and Sorted Computeds ---
   filteredClaims = computed(() => {
@@ -172,7 +179,25 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
 
   viewClaimDetail(claim: any) {
     this.selectedClaimForView.set(claim);
+    this.rejectionExplanation.set(null);
     this.showClaimDetailModal.set(true);
+
+    if (claim.status === 'Rejected') {
+      this.isFetchingRejectionExplanation.set(true);
+      this.customerService.getClaimRejectionExplanation(claim.id).subscribe({
+        next: (res) => {
+          // Unwrap the data from the API response filter
+          const raw = res?.data?.explanation || res.explanation;
+          this.rejectionExplanation.set(raw);
+          this.isFetchingRejectionExplanation.set(false);
+        },
+        error: (err) => {
+          console.error("Failed to fetch claim rejection explanation:", err);
+          this.isFetchingRejectionExplanation.set(false);
+          this.toastService.error("Could not retrieve AI explanation. Check console for details.");
+        }
+      });
+    }
   }
 
   openRenewalModal(policyId: string) {
@@ -448,6 +473,16 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
   selectedPlanForOnboarding = signal<any>(null);
 
   selectedProfileDoc: File | null = null;
+  selectedProfileDocType = signal<string>(DocumentType.GSTIN.toString());
+
+  profileDocTypes = [
+    { id: DocumentType.GSTIN.toString(), name: 'GSTIN Certificate' },
+    { id: DocumentType.PAN.toString(), name: 'Company PAN' },
+    { id: DocumentType.CIN.toString(), name: 'CIN (Certificate of Incorp)' },
+    { id: DocumentType.AddressProof.toString(), name: 'Address Proof' },
+    { id: DocumentType.Other.toString(), name: 'Other Document' }
+  ];
+
 
   // Track selected files along with their document types
   selectedClaimFiles: { file: File, type: string }[] = [];
@@ -473,13 +508,30 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
   EnumGender = Gender;
   EnumDocType = DocumentType;
   EnumClaimDocType = ClaimDocumentType;
+  EnumIndustry = IndustryType;
+
+  industryTypesList = [
+    { id: IndustryType.IT, name: 'IT' },
+    { id: IndustryType.Banking, name: 'Banking' },
+    { id: IndustryType.Education, name: 'Education' },
+    { id: IndustryType.Retail, name: 'Retail' },
+    { id: IndustryType.Healthcare, name: 'Healthcare' },
+    { id: IndustryType.Hospitality, name: 'Hospitality' },
+    { id: IndustryType.Logistics, name: 'Logistics' },
+    { id: IndustryType.Manufacturing, name: 'Manufacturing' },
+    { id: IndustryType.Construction, name: 'Construction' },
+    { id: IndustryType.OilGas, name: 'Oil & Gas' },
+    { id: IndustryType.Mining, name: 'Mining' },
+    { id: IndustryType.Others, name: 'Others' }
+  ];
   membersFile: File | null = null;
   dependentsFile: File | null = null;
 
   profileForm = this.fb.group({
     companyName: ['', Validators.required],
     address: ['', Validators.required],
-    phone: ['', Validators.required]
+    phone: ['', Validators.required],
+    industryType: [IndustryType.IT, Validators.required]
   });
 
   claimForm = this.fb.group({
@@ -569,6 +621,10 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
         this.autoFillLifeClaimAmount();
       }
     });
+
+    this.endorsementForm.valueChanges.subscribe(() => {
+      this.fetchEndorsementPreview();
+    });
   }
 
 
@@ -644,7 +700,8 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
       this.profileForm.patchValue({
         companyName: data.companyName,
         address: data.address,
-        phone: data.phone
+        phone: data.phone,
+        industryType: data.industryType !== undefined ? data.industryType : IndustryType.IT
       });
 
       // Force navigation to profile if not approved OR blocked
@@ -941,6 +998,43 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  fetchEndorsementPreview() {
+    const val = this.endorsementForm.value;
+    const policyId = val.policyAssignmentId;
+    if (!policyId || !val.type) {
+      this.endorsementPreview.set(null);
+      return;
+    }
+
+    const type = parseInt(val.type || '0', 10);
+    let endData: any = {};
+    if (type === EndorsementType.AddMember) {
+      endData = { FirstName: val.firstName || 'New', LastName: val.lastName || 'Member', DateOfBirth: val.dateOfBirth || '1990-01-01' };
+    } else if (type === EndorsementType.RemoveMember) {
+      endData = { MemberId: val.memberId };
+    } else if (type === EndorsementType.AddDependent) {
+      endData = { Relationship: parseInt(val.relationship || '1', 10), DateOfBirth: val.dateOfBirth || '1990-01-01' };
+    }
+
+    const payload = {
+      PolicyAssignmentId: policyId,
+      Type: type,
+      Description: val.description || 'Preview request',
+      EndorsementData: endData
+    };
+
+    this.isCalculatingEndorsement.set(true);
+    this.customerService.getEndorsementPreview(payload).subscribe({
+      next: (res) => {
+        this.endorsementPreview.set(res?.data || res);
+        this.isCalculatingEndorsement.set(false);
+      },
+      error: () => {
+        this.isCalculatingEndorsement.set(false);
+      }
+    });
+  }
+
   completeProfile() {
     if (this.profileForm.invalid) return;
     this.isLoading.set(true);
@@ -967,7 +1061,7 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
     if (!this.selectedProfileDoc) return;
     this.isLoading.set(true);
     const fd = new FormData();
-    fd.append('documentType', DocumentType.Other.toString()); // Other
+    fd.append('documentType', this.selectedProfileDocType()); 
     fd.append('file', this.selectedProfileDoc);
     this.customerService.uploadDocument(fd).subscribe({
       next: () => {
@@ -1294,5 +1388,28 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
         this.toastService.error('Error: ' + (err?.error?.message || err?.message));
       }
     });
+  }
+
+  downloadMemberTemplate() {
+    const csvContent = "EmployeeCode,FullName,Email,PhoneNo,DateOfBirth,Gender\nEMP001,John Doe,john@example.com,9876543210,1990-05-15,Male\nEMP002,Jane Smith,jane@example.com,9887766554,1988-10-20,Female";
+    this.downloadFile(csvContent, 'EGI_Member_Template.csv');
+  }
+
+  downloadDependentTemplate() {
+    const csvContent = "MemberEmployeeCode,FullName,Relationship,DateOfBirth,Gender\nEMP001,Sarah Doe,Spouse,1992-12-10,Female\nEMP001,Tommy Doe,Child,2015-03-25,Male";
+    this.downloadFile(csvContent, 'EGI_Dependent_Template.csv');
+  }
+
+  private downloadFile(content: string, filename: string) {
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    this.toastService.info(`Downloaded ${filename}. Please ensure to save as Excel (.xlsx) if required.`);
   }
 }

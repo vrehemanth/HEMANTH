@@ -24,6 +24,7 @@ namespace EGI_Backend.Application.Services
         private readonly INotificationService _notificationService;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
+        private readonly IAIAdjudicationService _aiService;
 
         public PolicyEndorsementService(
             IPolicyEndorsementRepository endorsementRepo,
@@ -35,7 +36,8 @@ namespace EGI_Backend.Application.Services
             IInvoiceService invoiceService,
             INotificationService notificationService,
             IUnitOfWork unitOfWork,
-            IMapper mapper)
+            IMapper mapper,
+            IAIAdjudicationService aiService)
         {
             _endorsementRepo = endorsementRepo;
             _policyRepo = policyRepo;
@@ -47,6 +49,7 @@ namespace EGI_Backend.Application.Services
             _notificationService = notificationService;
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _aiService = aiService;
         }
 
         public async Task<EndorsementResponseDto> SubmitEndorsementAsync(Guid customerId, SubmitEndorsementDto dto)
@@ -88,7 +91,7 @@ namespace EGI_Backend.Application.Services
             }
 
             // Calculate estimated premium adjustment (Flaw 5: Anchor to submission time)
-            decimal adjustment = CalculateProratedAdjustment(policy, dto.Type, jsonData, DateTime.UtcNow);
+            decimal adjustment = await CalculateProratedAdjustmentAsync(policy, dto.Type, jsonData, DateTime.UtcNow);
 
             var endorsement = new PolicyEndorsement
             {
@@ -155,7 +158,7 @@ namespace EGI_Backend.Application.Services
             if (dto.Status == EndorsementStatus.Approved)
             {
                 // 1. Calculate the FULL annual rate impact (un-prorated)
-                decimal fullAnnualImpact = CalculateFullAnnualRate(policy, endorsement.Type, endorsement.EndorsementData);
+                decimal fullAnnualImpact = await CalculateFullAnnualRateAsync(policy, endorsement.Type, endorsement.EndorsementData);
 
                 // 2. Apply the physical changes (Add member/dependent, soft-delete removed ones)
                 await ApplyEndorsementChanges(policy, endorsement);
@@ -177,7 +180,7 @@ namespace EGI_Backend.Application.Services
                 decimal commissionPercentage = EGI_Backend.Domain.Constants.BusinessRules.GetCommissionRate(policy.BusinessCategory);
                 
                 // Recalculate adjustment based on the original submission date to avoid "Approval Drift" (Flaw 5)
-                endorsement.PremiumAdjustment = CalculateProratedAdjustment(policy, endorsement.Type, endorsement.EndorsementData, endorsement.CreatedAt);
+                endorsement.PremiumAdjustment = await CalculateProratedAdjustmentAsync(policy, endorsement.Type, endorsement.EndorsementData, endorsement.CreatedAt);
                 
                 // Flaw 2: Commission calculation
                 // Note: InvoiceService handles EARNED commission on PAYMENT. 
@@ -279,6 +282,68 @@ namespace EGI_Backend.Application.Services
             return _mapper.Map<List<EndorsementResponseDto>>(endorsements);
         }
 
+        public async Task<EndorsementPreviewDto> GetEndorsementPreviewAsync(Guid customerId, SubmitEndorsementDto dto)
+        {
+            var policy = await _policyRepo.GetByIdWithDetailsAsync(dto.PolicyAssignmentId);
+            if (policy == null) throw new NotFoundException("Policy not found.");
+
+            string jsonData = JsonSerializer.Serialize(dto.EndorsementData);
+            DateTime anchorDate = DateTime.UtcNow;
+
+            // 1. Calculate Adjustment (Prorated for current cycle)
+            decimal adjustment = await CalculateProratedAdjustmentAsync(policy, dto.Type, jsonData, anchorDate);
+            
+            // 2. Calculate Recurring Impact
+            decimal fullAnnualDelta = await CalculateFullAnnualRateAsync(policy, dto.Type, jsonData);
+            
+            decimal recurringChange;
+            decimal nextRecurringTotal;
+            string freqLabel;
+            int remainingDaysInCycle;
+
+            if (policy.BillingFrequency == BillingFrequency.Monthly)
+            {
+                freqLabel = "Monthly";
+                recurringChange = Math.Round(fullAnnualDelta / 12m, 2);
+                nextRecurringTotal = Math.Round((policy.AnnualPremium + fullAnnualDelta) / 12m, 2);
+                
+                // Calculate remaining days in current month cycle
+                var cycleStart = policy.StartDate.Date;
+                while (cycleStart.AddMonths(1) <= anchorDate.Date) cycleStart = cycleStart.AddMonths(1);
+                var cycleEnd = cycleStart.AddMonths(1).AddDays(-1);
+                remainingDaysInCycle = (int)(cycleEnd - anchorDate.Date).TotalDays;
+            }
+            else
+            {
+                freqLabel = "Annual";
+                recurringChange = Math.Round(fullAnnualDelta, 2);
+                nextRecurringTotal = Math.Round(policy.AnnualPremium + fullAnnualDelta, 2);
+                remainingDaysInCycle = (int)(policy.EndDate.Date - anchorDate.Date).TotalDays;
+            }
+
+            if (remainingDaysInCycle < 0) remainingDaysInCycle = 0;
+
+            // 3. Get AI Explanation
+            string explanation = await _aiService.GetEndorsementExplanationAsync(
+                adjustment, 
+                remainingDaysInCycle, 
+                dto.Type.ToString(), 
+                dto.Description,
+                freqLabel,
+                recurringChange,
+                nextRecurringTotal);
+
+            return new EndorsementPreviewDto
+            {
+                PremiumAdjustment = adjustment,
+                RemainingDaysToNextCycle = remainingDaysInCycle,
+                AIExplanation = explanation,
+                NewRecurringPremium = nextRecurringTotal,
+                PremiumChange = recurringChange,
+                BillingFrequency = freqLabel
+            };
+        }
+
         private bool IsHighAuthority(string? role)
         {
             if (string.IsNullOrEmpty(role)) return false;
@@ -304,6 +369,7 @@ namespace EGI_Backend.Application.Services
                     {
                         Id               = Guid.NewGuid(),
                         PolicyAssignmentId = policy.Id,
+                        CorporateClientId = policy.CorporateClientId,
                         EmployeeCode     = root.TryGetProperty("EmployeeCode", out var ec)  ? ec.GetString()  ?? "" : "",
                         FullName         = fullName,
                         Email            = root.TryGetProperty("Email",        out var em)  ? em.GetString()  ?? "" : "",
@@ -432,30 +498,74 @@ namespace EGI_Backend.Application.Services
             return coverage?.CoverageAmount ?? 0;
         }
 
-        private decimal CalculateFullAnnualRate(PolicyAssignment policy, EndorsementType type, string jsonStr)
+        private async Task<decimal> CalculateFullAnnualRateAsync(PolicyAssignment policy, EndorsementType type, string jsonStr)
         {
             if (policy.InsurancePlan == null) return 0;
+            decimal basePremium = policy.InsurancePlan.BasePremium;
+            decimal industryMultiplier = EGI_Backend.Domain.Constants.BusinessRules.GetIndustryMultiplier(policy.CorporateClient?.IndustryType ?? IndustryType.Others);
 
-            decimal cost = policy.InsurancePlan.BasePremium * GetMultiplier(type, jsonStr);
+            decimal totalAnnualCost = 0;
+            using var doc = JsonDocument.Parse(jsonStr);
+            var root = doc.RootElement;
 
-            if (type == EndorsementType.RemoveMember || type == EndorsementType.RemoveDependent)
-                cost *= -1m;
+            switch (type)
+            {
+                case EndorsementType.AddMember:
+                    if (DateTime.TryParse(root.TryGetProperty("DateOfBirth", out var dob) ? dob.GetString() : null, out var parsedDob))
+                    {
+                        totalAnnualCost = basePremium * industryMultiplier * EGI_Backend.Domain.Constants.BusinessRules.GetAgeMultiplier(parsedDob);
+                    }
+                    else totalAnnualCost = basePremium * industryMultiplier;
+                    break;
 
-            return Math.Round(cost, 2);
+                case EndorsementType.AddDependent:
+                    if (DateTime.TryParse(root.TryGetProperty("DateOfBirth", out var ddob) ? ddob.GetString() : null, out var parsedDdob))
+                    {
+                        totalAnnualCost = basePremium * industryMultiplier * EGI_Backend.Domain.Constants.BusinessRules.GetAgeMultiplier(parsedDdob);
+                    }
+                    else totalAnnualCost = basePremium * industryMultiplier;
+                    break;
+
+                case EndorsementType.RemoveMember:
+                    if (root.TryGetProperty("MemberId", out var midP) && Guid.TryParse(midP.GetString(), out var mid))
+                    {
+                        var m = await _memberRepo.GetByIdWithPolicyAsync(mid);
+                        if (m != null)
+                        {
+                            totalAnnualCost = basePremium * industryMultiplier * EGI_Backend.Domain.Constants.BusinessRules.GetAgeMultiplier(m.DateOfBirth);
+                            foreach (var dep in m.Dependents.Where(d => d.IsActive))
+                            {
+                                totalAnnualCost += basePremium * industryMultiplier * EGI_Backend.Domain.Constants.BusinessRules.GetAgeMultiplier(dep.DateOfBirth);
+                            }
+                        }
+                    }
+                    totalAnnualCost *= -1m;
+                    break;
+
+                case EndorsementType.RemoveDependent:
+                    if (root.TryGetProperty("DependentId", out var didP) && Guid.TryParse(didP.GetString(), out var did))
+                    {
+                        var dep = await _dependentRepo.GetByIdAsync(did);
+                        if (dep != null)
+                        {
+                            totalAnnualCost = basePremium * industryMultiplier * EGI_Backend.Domain.Constants.BusinessRules.GetAgeMultiplier(dep.DateOfBirth);
+                        }
+                    }
+                    totalAnnualCost *= -1m;
+                    break;
+            }
+
+            return Math.Round(totalAnnualCost, 2);
         }
 
-        private decimal CalculateProratedAdjustment(PolicyAssignment policy, EndorsementType type, string jsonStr, DateTime anchorDate)
+        private async Task<decimal> CalculateProratedAdjustmentAsync(PolicyAssignment policy, EndorsementType type, string jsonStr, DateTime anchorDate)
         {
-            var annualRate = CalculateFullAnnualRate(policy, type, jsonStr);
+            var annualRate = await CalculateFullAnnualRateAsync(policy, type, jsonStr);
             if (annualRate == 0) return 0;
 
             var calculationDate = anchorDate.Date;
             if (calculationDate >= policy.EndDate.Date) return 0;
 
-            // Determine the "Reference End Date" for the adjustment invoice
-            // For Annual payers: Charge/Credit until the end of the policy year.
-            // For Monthly payers: Charge/Credit ONLY for the remaining days of the CURRENT month.
-            // This is because future months will automatically use the updated monthly rate.
             DateTime referenceEndDate;
             if (policy.BillingFrequency == BillingFrequency.Monthly)
             {
@@ -466,7 +576,6 @@ namespace EGI_Backend.Application.Services
                 }
                 referenceEndDate = cycleStart.AddMonths(1).AddDays(-1);
 
-                // Boundary check
                 if (referenceEndDate > policy.EndDate.Date)
                     referenceEndDate = policy.EndDate.Date;
             }
@@ -478,41 +587,9 @@ namespace EGI_Backend.Application.Services
             const decimal daysInYear = 365m;
             var daysInAdjustmentPeriod = (decimal)(referenceEndDate - calculationDate).TotalDays;
 
-            // Ensure non-negative or at least partial-day credit handling if needed
             if (daysInAdjustmentPeriod < 0) daysInAdjustmentPeriod = 0;
 
             return Math.Round(annualRate * (daysInAdjustmentPeriod / daysInYear), 2);
-        }
-
-        private static decimal GetMultiplier(EndorsementType type, string jsonStr)
-        {
-            if (type == EndorsementType.AddMember || type == EndorsementType.RemoveMember)
-                return 1.0m;
-
-            if (type == EndorsementType.AddDependent || type == EndorsementType.RemoveDependent)
-            {
-                try
-                {
-                    using var doc = JsonDocument.Parse(jsonStr);
-                    if (doc.RootElement.TryGetProperty("Relationship", out var relProp) && 
-                        (relProp.ValueKind == JsonValueKind.Number || 
-                        (relProp.ValueKind == JsonValueKind.String && int.TryParse(relProp.GetString(), out _))))
-                    {
-                        var relValue = (RelationshipType)ParseEnum<RelationshipType>(relProp);
-                        
-                        return relValue switch
-                        {
-                            RelationshipType.Spouse => 0.8m,
-                            RelationshipType.Child  => 0.5m, // FIXED: Unified with PolicyAssignmentService
-                            RelationshipType.Father or RelationshipType.Mother => 1.2m,
-                            _ => 1.0m
-                        };
-                    }
-                }
-                catch { /* malformed JSON — fall through to default */ }
-            }
-
-            return 1.0m;
         }
     }
 }

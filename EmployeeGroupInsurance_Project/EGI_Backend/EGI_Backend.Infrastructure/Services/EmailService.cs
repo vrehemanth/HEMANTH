@@ -16,7 +16,7 @@ namespace EGI_Backend.Infrastructure.Services
             _configuration = configuration;
         }
 
-        public async Task SendCredentialsEmailAsync(string email, string tempPassword)
+        public async Task SendCredentialsEmailAsync(string email, string tempPassword, decimal? salaryLPA = null)
         {
             var subject = "Welcome to Employee Group Insurance - Your Credentials";
             var body = $@"
@@ -24,7 +24,9 @@ namespace EGI_Backend.Infrastructure.Services
                 <p>An account has been created for you. Here are your temporary credentials:</p>
                 <p><b>Username:</b> {email}</p>
                 <p><b>Temporary Password:</b> {tempPassword}</p>
+                {(salaryLPA.HasValue ? $"<p><b>Annual Compensation:</b> ₹{salaryLPA.Value:N2} LPA</p>" : "")}
                 <p>Please log in and reset your password immediately for security.</p>";
+
 
             // Safety check: log confirmation BEFORE sending email (password intentionally masked for security)
             Console.WriteLine("---------------------------------------------");

@@ -11,6 +11,8 @@ namespace EGI_Backend.Application.DTOs
         public string Role { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public decimal? CommissionEarned { get; set; }
+        public decimal? SalaryLPA { get; set; }
         public DateTime CreatedAt { get; set; }
+
     }
 }

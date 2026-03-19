@@ -1,4 +1,4 @@
-﻿using EGI_Backend.Domain.Enums;
+using EGI_Backend.Domain.Enums;
 using Microsoft.AspNetCore.Http;
 using System;
 using System.Collections.Generic;
@@ -12,5 +12,6 @@ namespace EGI_Backend.Application.DTOs
     {
         public DocumentType DocumentType { get; set; }
         public IFormFile File { get; set; }
+        public IndustryType? IndustryType { get; set; }
     }
 }

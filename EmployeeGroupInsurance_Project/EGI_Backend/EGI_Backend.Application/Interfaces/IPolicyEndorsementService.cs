@@ -11,5 +11,6 @@ namespace EGI_Backend.Application.Interfaces
         Task<EndorsementResponseDto> ReviewEndorsementAsync(Guid userId, string role, Guid endorsementId, ReviewEndorsementDto dto);
         Task<List<EndorsementResponseDto>> GetEndorsementsByPolicyAsync(Guid policyAssignmentId, Guid userId, string role);
         Task<List<EndorsementResponseDto>> GetPendingEndorsementsAsync(Guid userId, string role);
+        Task<EndorsementPreviewDto> GetEndorsementPreviewAsync(Guid customerId, SubmitEndorsementDto dto);
     }
 }

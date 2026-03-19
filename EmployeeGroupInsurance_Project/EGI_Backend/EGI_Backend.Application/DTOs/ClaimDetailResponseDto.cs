@@ -56,6 +56,10 @@ namespace EGI_Backend.Application.DTOs
         public bool IsSuspectedFraud { get; set; }
         public bool IsFraudOverridden { get; set; }
         public string? FraudOverrideReason { get; set; }
+
+        public int AIConfidenceScore { get; set; }
+        public string? AIAdjudicationReasoning { get; set; }
+        public bool IsAIApproved { get; set; }
  
         public List<ClaimDocumentDto> Documents { get; set; } = new();
     }

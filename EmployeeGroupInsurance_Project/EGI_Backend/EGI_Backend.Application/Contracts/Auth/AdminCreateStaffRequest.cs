@@ -1,4 +1,4 @@
-﻿using EGI_Backend.Domain.Enums;
+using EGI_Backend.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,5 +12,7 @@ namespace EGI_Backend.Application.Contracts.Auth
         public string Name { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
         public UserRole Role { get; set; }
+        public decimal? SalaryLPA { get; set; }
+
     }
 }

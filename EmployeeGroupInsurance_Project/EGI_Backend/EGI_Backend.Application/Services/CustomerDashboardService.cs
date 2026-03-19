@@ -69,12 +69,6 @@ namespace EGI_Backend.Application.Services
 
         public async Task<CustomerDashboardSummaryDto> GetSummaryAsync(Guid userId)
         {
-            string cacheKey = $"CustomerSummary_{userId}";
-            if (_cache.TryGetValue(cacheKey, out CustomerDashboardSummaryDto cached))
-            {
-                return cached;
-            }
-
             var clientId = await GetClientIdAsync(userId);
 
             var summary = new CustomerDashboardSummaryDto
@@ -86,18 +80,11 @@ namespace EGI_Backend.Application.Services
                 TotalPremiumDue = await _invoiceRepo.GetTotalBalanceByClientAsync(clientId)
             };
 
-            _cache.Set(cacheKey, summary, TimeSpan.FromMinutes(5));
             return summary;
         }
 
         public async Task<CustomerDashboardOverviewDto> GetOverviewAsync(Guid userId)
         {
-            string cacheKey = $"CustomerOverview_{userId}";
-            if (_cache.TryGetValue(cacheKey, out CustomerDashboardOverviewDto cached))
-            {
-                return cached;
-            }
-
             var clientId = await GetClientIdAsync(userId);
             var summary = await GetSummaryAsync(userId);
             
@@ -139,7 +126,6 @@ namespace EGI_Backend.Application.Services
                 RecentEndorsements = _mapper.Map<List<EndorsementResponseDto>>(endTask.Result.OrderByDescending(e => e.CreatedAt).Take(5))
             };
 
-            _cache.Set(cacheKey, overview, TimeSpan.FromMinutes(5));
             return overview;
         }
 

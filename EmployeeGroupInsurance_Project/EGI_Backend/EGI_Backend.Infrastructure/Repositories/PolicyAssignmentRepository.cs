@@ -40,9 +40,20 @@ namespace EGI_Backend.Infrastructure.Repositories
                 .FirstOrDefaultAsync(pa => pa.Id == id);
         }
 
+        public async Task<PolicyAssignment?> GetByIdMinimalAsync(Guid id)
+        {
+            return await _context.PolicyAssignments
+                .Include(pa => pa.CorporateClient)
+                .FirstOrDefaultAsync(pa => pa.Id == id);
+        }
+
         public async Task UpdateAsync(PolicyAssignment policyAssignment)
         {
-            _context.PolicyAssignments.Update(policyAssignment);
+            var entry = _context.Entry(policyAssignment);
+            if (entry.State == EntityState.Detached)
+            {
+                _context.PolicyAssignments.Update(policyAssignment);
+            }
             await _context.SaveChangesAsync();
         }
 

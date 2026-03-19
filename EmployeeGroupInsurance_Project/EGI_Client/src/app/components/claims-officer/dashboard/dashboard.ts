@@ -254,6 +254,20 @@ export class ClaimsOfficerDashboardComponent implements OnInit, OnDestroy {
     this.memberHistory.set([]);
   }
 
+  runAIAnalysis(claimId: string) {
+    this.toastService.info("AI Analysis started in background...");
+    this.officerService.runAI(claimId).subscribe({
+      next: (res: any) => {
+        const updatedClaim = res?.data || res;
+        this.selectedClaim.set(updatedClaim);
+        this.toastService.success("AI Analysis completed.");
+      },
+      error: (err) => {
+        this.toastService.error(err.error?.message || "AI Analysis failed to connect.");
+      }
+    });
+  }
+
   async adjudicate(claimId: string, isApproved: boolean) {
     const claim = this.selectedClaim();
     let reason = '';

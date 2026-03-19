@@ -9,6 +9,8 @@ using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using System.IO;
+using UglyToad.PdfPig;
 
 namespace EGI_Backend.Application.Services
 {
@@ -29,6 +31,7 @@ namespace EGI_Backend.Application.Services
         private readonly IEmailService _emailService;
         private readonly IOCRService _ocrService;
         private readonly IFraudDetectionService _fraudService;
+        private readonly IAIAdjudicationService _aiService;
         private readonly IAuditLogRepository _auditRepo;
  
         public ClaimService(
@@ -47,6 +50,7 @@ namespace EGI_Backend.Application.Services
             IEmailService emailService,
             IOCRService ocrService,
             IFraudDetectionService fraudService,
+            IAIAdjudicationService aiService,
             IAuditLogRepository auditRepo)
         {
             _claimRepo = claimRepo;
@@ -64,6 +68,7 @@ namespace EGI_Backend.Application.Services
             _emailService = emailService;
             _ocrService = ocrService;
             _fraudService = fraudService;
+            _aiService = aiService;
             _auditRepo = auditRepo;
         }
 
@@ -231,6 +236,23 @@ namespace EGI_Backend.Application.Services
                 if (claim.IsSuspectedFraud)
                 {
                     claim.RequiresAdminApproval = true;
+                }
+
+                // AI ADJUDICATION PIPELINE (Llama-3.3-70b Integration)
+                if (!string.IsNullOrEmpty(ocrData.RawText))
+                {
+                    var aiResult = await _aiService.AdjudicateClaimAsync(claim, ocrData.RawText);
+                    claim.AIConfidenceScore = aiResult.ConfidenceScore;
+                    claim.AIAdjudicationReasoning = aiResult.Reasoning;
+                    claim.IsAIApproved = aiResult.IsApprovedRecommendation;
+
+                    // Autonomous Adjudication Rule: 
+                    // If AI confidence is > 90% and it approves, we can mark it as 'Auto-Approved Option' 
+                    // for the human reviewer to one-click confirm.
+                    if (claim.IsAIApproved && claim.AIConfidenceScore >= 90 && claim.ClaimAmount < 50000)
+                    {
+                        claim.IsAutoApproved = true; 
+                    }
                 }
             }
  
@@ -401,7 +423,7 @@ namespace EGI_Backend.Application.Services
 
             await _unitOfWork.SaveChangesAsync();
 
-            // Notification logic (Simplified for restoration)
+            // Notification logic
             try
             {
                 var policy = await _policyRepo.GetByIdWithDetailsAsync(claim.PolicyAssignmentId);
@@ -409,12 +431,20 @@ namespace EGI_Backend.Application.Services
                 {
                     string title = $"Claim {claim.Status}";
                     string msgBase = $"Claim {claim.ClaimNumber} has been {claim.Status}.";
-                    await _notificationService.CreateNotificationAsync(policy.CorporateClientId, title, msgBase, "Info");
+                    
+                    // CRITICAL FIX: Use UserId from CorporateClient profile, NOT the profile PK
+                    if (policy.CorporateClient != null)
+                    {
+                        await _notificationService.CreateNotificationAsync(policy.CorporateClient.UserId, title, msgBase, "Info");
+                    }
+
                     if (policy.AgentId != Guid.Empty)
+                    {
                         await _notificationService.CreateNotificationAsync(policy.AgentId, title, msgBase, "Info");
+                    }
                 }
             }
-            catch { }
+            catch { /* Notifications should not block the main transaction */ }
         }
 
         public async Task<List<ClaimResponseDto>> GetClaimsByPolicyAsync(Guid policyAssignmentId, Guid callerUserId, string role)
@@ -573,6 +603,54 @@ namespace EGI_Backend.Application.Services
             }
         }
 
+        public async Task<ClaimDetailResponseDto> RunAIAdjudicationAsync(Guid claimId)
+        {
+            var claim = await _claimRepo.GetByIdAsync(claimId);
+            if (claim == null) throw new NotFoundException("Claim not found.");
+
+            // We need a PDF document for OCR
+            var pdfDoc = claim.Documents.FirstOrDefault(d => d.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase));
+            if (pdfDoc == null) throw new BadRequestException("No PDF document found in claim for AI analysis.");
+
+            // 1. RE-RUN OCR
+            // For simplicity, we bypass the IFormFile and read directly if physical file exists
+            if (!System.IO.File.Exists(pdfDoc.FilePath)) throw new NotFoundException("Physical file not found for OCR.");
+
+            // Mocking IFormFile for the OCR service might be complex, 
+            // but OCRService just needs a way to read the stream.
+            // Let's modify OCRService to accept a stream too, or just extract here for the test.
+            
+            // Actually, let's keep it simple and just use the extraction logic from OCRService
+            var bytes = await System.IO.File.ReadAllBytesAsync(pdfDoc.FilePath);
+            string rawText = "";
+            using (var stream = new MemoryStream(bytes))
+            using (var document = UglyToad.PdfPig.PdfDocument.Open(stream))
+            {
+                foreach (var page in document.GetPages())
+                {
+                    rawText += page.Text + " ";
+                }
+            }
+
+            if (string.IsNullOrEmpty(rawText)) throw new BadRequestException("Could not extract text from document.");
+
+            // 2. RUN AI
+            var aiResult = await _aiService.AdjudicateClaimAsync(claim, rawText);
+            
+            claim.AIConfidenceScore = aiResult.ConfidenceScore;
+            claim.AIAdjudicationReasoning = aiResult.Reasoning;
+            claim.IsAIApproved = aiResult.IsApprovedRecommendation;
+
+            if (claim.IsAIApproved && claim.AIConfidenceScore >= 90 && claim.ClaimAmount < 50000)
+            {
+                claim.IsAutoApproved = true;
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+
+            return await GetClaimDetailAsync(claimId, Guid.Empty, "Admin"); // caller details don't matter for detail return here
+        }
+
         public async Task<(byte[] content, string contentType, string fileName)> GetSecureDocumentAsync(Guid userId, string role, Guid documentId)
         {
             var claimDoc = await _claimRepo.GetDocumentByIdAsync(documentId);
@@ -643,6 +721,44 @@ namespace EGI_Backend.Application.Services
             };
 
             return (bytes, contentType, fileName);
+        }
+
+        public async Task<string> GetClaimRejectionExplanationAsync(Guid userId, string role, Guid claimId)
+        {
+            var claim = await _claimRepo.GetByIdAsync(claimId);
+            if (claim == null) throw new NotFoundException("Claim not found.");
+
+            // 1. Authorization check: If Customer, they must own the policy or the member record
+            if (role == "Customer")
+            {
+                var client = await _clientRepo.GetByUserIdAsync(userId);
+                var policy = await _policyRepo.GetByIdAsync(claim.PolicyAssignmentId);
+                if (policy == null || client == null || policy.CorporateClientId != client.Id)
+                {
+                    throw new ForbiddenException("You do not have permission to view this claim's details.");
+                }
+            }
+            else if (!IsHighAuthority(role))
+            {
+                throw new ForbiddenException("Invalid role permissions.");
+            }
+
+            // 2. State Check
+            if (claim.Status != ClaimStatus.Rejected)
+            {
+                return "This claim is not in a rejected state. No explanation needed.";
+            }
+
+            if (string.IsNullOrEmpty(claim.RejectionReason))
+            {
+                return "Your claim was rejected, but no specific reason was recorded. Please contact support.";
+            }
+
+            // 3. AI Translation (Groq)
+            return await _aiService.GetClaimRejectionExplanationAsync(
+                claim.RejectionReason, 
+                claim.ClaimType.ToString(), 
+                claim.ClaimAmount);
         }
 
         private bool IsHighAuthority(string? role)

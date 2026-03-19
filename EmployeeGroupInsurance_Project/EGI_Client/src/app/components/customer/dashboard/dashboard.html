@@ -474,6 +474,45 @@
                         placeholder="Provide formal justification for this revision..."></textarea>
                 </div>
 
+                <!-- LIVE PREMIUM CALCULATOR WITH AI EXPLANATION -->
+                @if (isCalculatingEndorsement()) {
+                <div class="mt-6 p-6 rounded-3xl bg-gray-50 dark:bg-gray-700/30 border-2 border-dashed border-gray-200 dark:border-gray-700 animate-pulse flex items-center justify-center gap-3">
+                    <div class="w-5 h-5 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span class="text-[10px] font-black uppercase tracking-widest text-gray-400">Recalculating Financial Adjustment...</span>
+                </div>
+                } @else if (endorsementPreview()) {
+                <div class="mt-6 p-6 rounded-3xl bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-100 dark:border-blue-800/30 animate-in slide-in-from-bottom-4 duration-500 overflow-hidden relative group">
+                    <div class="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <svg class="w-12 h-12 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                    </div>
+                    
+                    <div class="flex items-start gap-4">
+                        <div class="p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-500/20 active:scale-95 transition-transform duration-300 transform group-hover:rotate-6">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                        <div class="flex-1">
+                            <h4 class="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 tracking-widest mb-1 flex items-center gap-2">
+                                <span class="flex h-1.5 w-1.5 rounded-full bg-blue-600 animate-ping"></span>
+                                Live Financial Specification
+                            </h4>
+                            <div class="flex items-baseline gap-2">
+                                <span class="text-2xl font-black text-blue-900 dark:text-white tracking-tight">₹{{formatINR(endorsementPreview().premiumAdjustment)}}</span>
+                                <span class="text-[10px] text-blue-500 font-bold uppercase tracking-widest">
+                                    Prorated for {{endorsementPreview().remainingDaysToNextCycle}} days ({{endorsementPreview().billingFrequency}})
+                                </span>
+                            </div>
+                            <p class="text-xs text-blue-700 dark:text-blue-300/80 mt-3 font-medium leading-relaxed italic border-l-2 border-blue-300 dark:border-blue-700 pl-3">
+                                "{{endorsementPreview().aiExplanation}}"
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                }
+
                 <div class="flex justify-center pt-2">
                     <button type="submit" [disabled]="endorsementForm.invalid || isLoading()"
                         class="w-full py-4 bg-primary-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl shadow-primary-500/20 transition active:scale-[0.98] disabled:opacity-50">
@@ -639,6 +678,60 @@
                     <p class="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-xl border dark:border-gray-600">{{selectedClaimForView()?.claimReason}}</p>
                 </div>
             </div>
+
+            <!-- AI REJECTION GUIDANCE (APPEAL ASSISTANT) -->
+            @if (selectedClaimForView()?.status === 'Rejected') {
+            <div class="mb-8 p-6 rounded-[2rem] bg-amber-50 dark:bg-amber-900/10 border-2 border-amber-100 dark:border-amber-800/20 relative overflow-hidden group">
+                <div class="absolute top-0 right-0 p-4 opacity-10">
+                    <svg class="w-16 h-16 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </div>
+
+                <div class="relative flex flex-col gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-amber-500 text-white rounded-xl shadow-lg shadow-amber-500/20">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <h4 class="text-[11px] font-black uppercase text-amber-700 dark:text-amber-400 tracking-widest">Rejection Guidance & Appeal Pathway</h4>
+                    </div>
+
+                    @if (isFetchingRejectionExplanation()) {
+                        <div class="flex items-center gap-3 py-4 text-amber-600 animate-pulse">
+                            <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            <span class="text-xs font-black tracking-widest uppercase">Groq AI Analyzing Rejection...</span>
+                        </div>
+                    } @else if (rejectionExplanation()) {
+                        <div class="prose prose-sm dark:prose-invert max-w-none">
+                            <div class="text-[13px] leading-relaxed text-amber-900 dark:text-amber-200/90 whitespace-pre-wrap font-medium">
+                                {{ rejectionExplanation() }}
+                            </div>
+                        </div>
+                        <div class="mt-4 flex justify-end">
+                            <button (click)="viewClaimDetail(selectedClaimForView())" class="text-[10px] text-amber-600 hover:text-amber-800 font-bold uppercase flex items-center gap-1">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                Regenerate Summary
+                            </button>
+                        </div>
+                    } @else {
+                        <div class="flex flex-col items-center justify-center py-6 text-center bg-amber-50 rounded-xl border border-amber-100 mt-2">
+                             <div class="p-3 bg-white rounded-full shadow-sm mb-3">
+                                <svg class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                             </div>
+                             <p class="text-[11px] font-medium text-amber-800 max-w-[240px] leading-snug">
+                                Decision specialists are finalizing your results.
+                             </p>
+                             <button (click)="viewClaimDetail(selectedClaimForView())" class="mt-3 text-[10px] font-black uppercase text-amber-700 hover:text-amber-900 flex items-center gap-1.5">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                Try Refreshing
+                             </button>
+                        </div>
+                    }
+                </div>
+            </div>
+            }
 
             <!-- OCR EXTRACTED DATA SECTION -->
             <div class="border-t dark:border-gray-700 pt-6">

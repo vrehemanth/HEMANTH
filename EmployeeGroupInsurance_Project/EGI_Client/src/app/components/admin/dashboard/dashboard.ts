@@ -219,7 +219,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         case 'name': comparison = (a.name || '').localeCompare(b.name || ''); break;
         case 'email': comparison = (a.email || '').localeCompare(b.email || ''); break;
         case 'status': comparison = (a.status || '').localeCompare(b.status || ''); break;
+        case 'salaryLPA': comparison = (a.salaryLPA || 0) - (b.salaryLPA || 0); break;
       }
+
       return sort.direction === 'asc' ? comparison : -comparison;
     });
   });
@@ -245,6 +247,12 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   policyInvoices = signal<any[]>([]);
   policyEndorsements = signal<any[]>([]);
   selectedClaimDetail = signal<any>(null);
+  selectedClientForAi = signal<any>(null);
+
+  cleanText(text: string | null | undefined): string {
+    if (!text) return '';
+    return text.replace(/\*/g, '').replace(/#/g, '').trim();
+  }
 
   getDocumentUrl(docId: string): string {
     const token = this.authService.currentUser()?.token;
@@ -274,9 +282,30 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   isStaffLoading = signal(false);
   showNewStaffForm = signal(false);
-  newStaff = { name: '', email: '', role: 'Agent' as any };
+  newStaff = { name: '', email: '', role: 'Agent' as any, salaryLPA: 0 };
 
-  approvalCategory: { [key: string]: string } = {};
+
+  approvalIndustry: { [key: string]: number } = {};
+
+  getIndustryName(id: any): string {
+    const numericId = parseInt(id, 10);
+    return this.industryTypesList.find(i => i.id === numericId)?.name || 'Others';
+  }
+
+  industryTypesList = [
+    { id: 0, name: 'IT' },
+    { id: 1, name: 'Banking' },
+    { id: 2, name: 'Education' },
+    { id: 3, name: 'Others' },
+    { id: 4, name: 'Retail' },
+    { id: 5, name: 'Healthcare' },
+    { id: 6, name: 'Hospitality' },
+    { id: 7, name: 'Logistics' },
+    { id: 8, name: 'Manufacturing' },
+    { id: 9, name: 'Construction' },
+    { id: 10, name: 'Oil & Gas' },
+    { id: 11, name: 'Mining' }
+  ];
 
   showRejectionModal = signal(false);
   rejectionForm = { clientId: '', reason: '' };
@@ -366,22 +395,25 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   private initFinancialChart(ctx: HTMLCanvasElement) {
     const s = this.summary();
     const revenue = s?.totalRevenue || 0;
+
     const payouts = s?.totalPayouts || 0;
     const commissions = s?.totalCommissionPayouts || 0;
+    const salaries = s?.totalSalaryPayouts || 0;
     const profit = s?.netProfit || 0;
 
     this.financialChart = new Chart(ctx, {
       type: 'doughnut',
       data: {
-        labels: ['Net Profit', 'Claim Payouts', 'Agent Commissions'],
+        labels: ['Net Profit', 'Claim Payouts', 'Agent Commissions', 'Staff Salaries'],
         datasets: [{
-          data: [profit, payouts, commissions],
-          backgroundColor: ['#10b981', '#f59e0b', '#6366f1'],
+          data: [profit, payouts, commissions, salaries],
+          backgroundColor: ['#10b981', '#f59e0b', '#6366f1', '#ec4899'],
           borderWidth: 0,
           borderRadius: 8,
           hoverOffset: 15
         }]
       },
+
       options: {
         cutout: '75%',
         responsive: true,
@@ -510,7 +542,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       next: (res: any) => {
         const pendingData = this.extractArray(res);
         this.pendingClients.set(pendingData);
-        pendingData.forEach((r: any) => { if (!this.approvalCategory[r.id]) this.approvalCategory[r.id] = 'Enterprise'; });
+        pendingData.forEach((r: any) => { 
+          if (this.approvalIndustry[r.id] === undefined) this.approvalIndustry[r.id] = r.industryType !== undefined ? r.industryType : 0;
+        });
       }
     });
 
@@ -638,7 +672,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     const dto = {
       isApproved: true,
       rejectionReason: '',
-      businessCategory: this.approvalCategory[id] || 'Small'
+      industryType: this.approvalIndustry[id] !== undefined ? this.approvalIndustry[id] : 0
     };
     this.adminService.approveClient(id, dto).subscribe(() => {
       this.toastService.success('Corporate entity approved successfully.');
@@ -660,8 +694,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
     const dto = {
       isApproved: false,
-      rejectionReason: this.rejectionForm.reason,
-      businessCategory: 'Small'
+      rejectionReason: this.rejectionForm.reason
     };
 
     this.adminService.approveClient(this.rejectionForm.clientId, dto).subscribe({
@@ -692,8 +725,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   toggleNewStaffForm() {
     this.showNewStaffForm.update(v => !v);
-    this.newStaff = { name: '', email: '', role: 'Agent' };
+    this.newStaff = { name: '', email: '', role: 'Agent', salaryLPA: 0 };
   }
+
 
   createStaff() {
     if (!this.newStaff.name || !this.newStaff.email) {

@@ -1,4 +1,4 @@
-﻿using EGI_Backend.Domain.Enums;
+using EGI_Backend.Domain.Enums;
 
 namespace EGI_Backend.Application.DTOs
 {
@@ -6,5 +6,6 @@ namespace EGI_Backend.Application.DTOs
     {
         public bool IsApproved { get; set; }
         public string RejectionReason { get; set; } = string.Empty;
+        public EGI_Backend.Domain.Enums.IndustryType? IndustryType { get; set; }
     }
 }

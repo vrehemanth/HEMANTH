@@ -11,4 +11,9 @@ import { AdminDashboardComponent } from '../../dashboard';
 })
 export class ClientsTabComponent {
   @Input() p!: AdminDashboardComponent;
+
+  cleanText(text: string | null | undefined): string {
+    if (!text) return '';
+    return text.replace(/\*/g, '').replace(/#/g, '').trim();
+  }
 }

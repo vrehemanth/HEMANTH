@@ -25,6 +25,7 @@ namespace EGI_Backend.Application.Tests.Services
         private readonly Mock<INotificationService> _mockNotification;
         private readonly Mock<IUnitOfWork> _mockUoW;
         private readonly Mock<IMapper> _mockMapper;
+        private readonly Mock<IAIAdjudicationService> _mockAiService;
         private readonly PolicyEndorsementService _service;
 
         public PolicyEndorsementServiceTests()
@@ -39,6 +40,7 @@ namespace EGI_Backend.Application.Tests.Services
             _mockNotification = new Mock<INotificationService>();
             _mockUoW = new Mock<IUnitOfWork>();
             _mockMapper = new Mock<IMapper>();
+            _mockAiService = new Mock<IAIAdjudicationService>();
 
             _service = new PolicyEndorsementService(
                 _mockEndorsementRepo.Object,
@@ -50,7 +52,8 @@ namespace EGI_Backend.Application.Tests.Services
                 _mockInvoiceService.Object,
                 _mockNotification.Object,
                 _mockUoW.Object,
-                _mockMapper.Object
+                _mockMapper.Object,
+                _mockAiService.Object
             );
         }
 

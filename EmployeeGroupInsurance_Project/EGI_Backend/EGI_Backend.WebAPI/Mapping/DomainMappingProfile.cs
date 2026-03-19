@@ -24,7 +24,10 @@ namespace EGI_Backend.WebAPI.Mapping
                 .ForMember(dest => dest.ReviewedByName, opt => opt.MapFrom(src => src.ReviewedByUser != null && src.Status != ClaimStatus.InReview ? src.ReviewedByUser.Name : null))
                 .ForMember(dest => dest.InReviewByOfficerName, opt => opt.MapFrom(src => src.ReviewedByUser != null && src.Status == ClaimStatus.InReview ? src.ReviewedByUser.Name : null))
                 .ForMember(dest => dest.IsAutoApproved, opt => opt.MapFrom(src => src.IsAutoApproved))
-                .ForMember(dest => dest.RequiresAdminApproval, opt => opt.MapFrom(src => src.RequiresAdminApproval));
+                .ForMember(dest => dest.RequiresAdminApproval, opt => opt.MapFrom(src => src.RequiresAdminApproval))
+                .ForMember(dest => dest.AIConfidenceScore, opt => opt.MapFrom(src => src.AIConfidenceScore))
+                .ForMember(dest => dest.AIAdjudicationReasoning, opt => opt.MapFrom(src => src.AIAdjudicationReasoning))
+                .ForMember(dest => dest.IsAIApproved, opt => opt.MapFrom(src => src.IsAIApproved));
 
             CreateMap<Claim, ClaimDetailResponseDto>()
                 .ForMember(dest => dest.PolicyNo, opt => opt.MapFrom(src => src.PolicyAssignment != null ? src.PolicyAssignment.PolicyNo : string.Empty))
@@ -35,7 +38,10 @@ namespace EGI_Backend.WebAPI.Mapping
                 .ForMember(dest => dest.ClaimType, opt => opt.MapFrom(src => src.ClaimType.ToString()))
                 .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()))
                 .ForMember(dest => dest.ReviewedByName, opt => opt.MapFrom(src => src.ReviewedByUser != null ? src.ReviewedByUser.Name : null))
-                .ForMember(dest => dest.AdminApprovedByName, opt => opt.MapFrom(src => src.AdminApprovedByUser != null ? src.AdminApprovedByUser.Name : null));
+                .ForMember(dest => dest.AdminApprovedByName, opt => opt.MapFrom(src => src.AdminApprovedByUser != null ? src.AdminApprovedByUser.Name : null))
+                .ForMember(dest => dest.AIConfidenceScore, opt => opt.MapFrom(src => src.AIConfidenceScore))
+                .ForMember(dest => dest.AIAdjudicationReasoning, opt => opt.MapFrom(src => src.AIAdjudicationReasoning))
+                .ForMember(dest => dest.IsAIApproved, opt => opt.MapFrom(src => src.IsAIApproved));
 
             CreateMap<ClaimDocument, ClaimDocumentDto>()
                 .ForMember(dest => dest.DocumentType, opt => opt.MapFrom(src => src.DocumentType.ToString()))
@@ -72,7 +78,9 @@ namespace EGI_Backend.WebAPI.Mapping
             // User mappings
             CreateMap<User, UserResponseDto>()
                 .ForMember(dest => dest.Role, opt => opt.MapFrom(src => src.Role.ToString()))
-                .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()));
+                .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()))
+                .ForMember(dest => dest.SalaryLPA, opt => opt.MapFrom(src => src.SalaryLPA));
+
 
             CreateMap<Member, MemberResponseDto>()
                 .ForMember(dest => dest.PolicyNo, opt => opt.MapFrom(src => src.PolicyAssignment != null ? src.PolicyAssignment.PolicyNo : null));

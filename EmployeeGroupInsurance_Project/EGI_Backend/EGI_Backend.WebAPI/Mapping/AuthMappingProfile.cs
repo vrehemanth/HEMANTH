@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using EGI_Backend.Application.Contracts.Auth;
 using EGI_Backend.Application.DTOs;
 using EGI_Backend.Domain.Entities;
@@ -35,7 +35,10 @@ namespace EGI_Backend.WebAPI.Mapping
                 .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()))
                 .ForMember(dest => dest.IsBlocked, opt => opt.MapFrom(src => src.IsBlocked))
                 .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.User != null ? src.User.Email : string.Empty))
-                .ForMember(dest => dest.Phone, opt => opt.MapFrom(src => src.Phone ?? string.Empty));
+                .ForMember(dest => dest.Phone, opt => opt.MapFrom(src => src.Phone ?? string.Empty))
+                .ForMember(dest => dest.IndustryType, opt => opt.MapFrom(src => (int)src.IndustryType))
+                .ForMember(dest => dest.KybAiAnalysis, opt => opt.MapFrom(src => src.KybAiAnalysis))
+                .ForMember(dest => dest.KybAiConfidenceScore, opt => opt.MapFrom(src => src.KybAiConfidenceScore));
 
             CreateMap<CorporateClientDocument, CorporateClientDocumentDto>()
                 .ForMember(dest => dest.DocumentType, 

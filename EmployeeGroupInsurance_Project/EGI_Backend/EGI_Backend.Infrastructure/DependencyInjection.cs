@@ -14,7 +14,8 @@ namespace EGI_Backend.Infrastructure
         public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
         {
             services.AddDbContext<EGIDbContext>(options =>
-                options.UseSqlServer(configuration.GetConnectionString("EGIConnection")));
+                options.UseSqlServer(configuration.GetConnectionString("EGIConnection"),
+                    o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
 
             services.AddScoped<IUnitOfWork, UnitOfWork>();
 
@@ -40,6 +41,7 @@ namespace EGI_Backend.Infrastructure
             services.AddScoped<INotificationService, NotificationService>();
             services.AddScoped<IOCRService, OCRService>();
             services.AddScoped<IFraudDetectionService, FraudDetectionService>();
+            services.AddHttpClient<IAIAdjudicationService, AIAdjudicationService>();
             services.AddHostedService<EGI_Backend.Infrastructure.BackgroundServices.InsuranceAutomationWorker>();
 
             return services;

@@ -8,6 +8,7 @@ namespace EGI_Backend.Application.Interfaces
         Task AddAsync(PolicyAssignment policyAssignment);
         Task<PolicyAssignment?> GetByIdAsync(Guid id);
         Task<PolicyAssignment?> GetByIdWithDetailsAsync(Guid id);
+        Task<PolicyAssignment?> GetByIdMinimalAsync(Guid id);
         Task UpdateAsync(PolicyAssignment policyAssignment);
         Task<List<PolicyAssignment>> GetAllWithDetailsAsync();
         Task<int> CountAsync();

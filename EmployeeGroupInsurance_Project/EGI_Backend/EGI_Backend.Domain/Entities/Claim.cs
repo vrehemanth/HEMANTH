@@ -79,7 +79,12 @@ namespace EGI_Backend.Domain.Entities
         public bool IsFraudOverridden { get; set; } = false;
         public Guid? FraudOverriddenBy { get; set; }
         public string? FraudOverrideReason { get; set; }
- 
+
+        // AI Autonomous Adjudication (Groq Llama-3.3-70b Integration)
+        public int AIConfidenceScore { get; set; } = 0; // 0-100
+        public string? AIAdjudicationReasoning { get; set; }
+        public bool IsAIApproved { get; set; } = false;
+
         // Navigation property for supporting documents
         public ICollection<ClaimDocument> Documents { get; set; } = new List<ClaimDocument>();
     }

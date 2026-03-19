@@ -114,11 +114,40 @@ namespace EGI_Backend.Application.Services
                 return await scope.ServiceProvider.GetRequiredService<IAuditLogRepository>().GetTopRecentLogsAsync(5);
             });
 
+            var salaryPayoutTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                var officers = await scope.ServiceProvider.GetRequiredService<IUserRepository>().GetAllByRoleAsync(UserRole.ClaimsOfficer);
+                decimal totalSalary = 0;
+                var now = DateTime.UtcNow;
+
+                foreach (var officer in officers)
+                {
+                    if (officer.SalaryLPA.HasValue && officer.SalaryLPA > 0)
+                    {
+                        // Salary is paid on every month 1st.
+                        // Count 1sts between CreatedAt and Now.
+                        var start = officer.CreatedAt;
+                        int monthsPaid = ((now.Year - start.Year) * 12) + now.Month - start.Month;
+                        
+                        // If they joined on the 1st, they got paid that day. 
+                        // If they joined after the 1st, they get paid from the NEXT 1st.
+                        if (start.Day == 1) monthsPaid += 1;
+
+                        if (monthsPaid > 0)
+                        {
+                            var monthlySalary = (officer.SalaryLPA.Value * 100000m) / 12m;
+                            totalSalary += (monthlySalary * monthsPaid);
+                        }
+                    }
+                }
+                return totalSalary;
+            });
+
             await Task.WhenAll(
                 agentCountTask, customerCountTask, officerCountTask, pendingClientsTask,
                 totalClaimsTask, pendingClaimsTask, totalPoliciesTask, totalRevenueTask,
                 totalPayoutsTask, totalCommissionTask, approvalRateTask, avgClaimTask,
-                recentLogsCountTask, topLogsTask
+                recentLogsCountTask, topLogsTask, salaryPayoutTask
             );
 
             var summary = new DashboardSummaryDto
@@ -133,6 +162,7 @@ namespace EGI_Backend.Application.Services
                 TotalRevenue = totalRevenueTask.Result,
                 TotalPayouts = totalPayoutsTask.Result,
                 TotalCommissionPayouts = totalCommissionTask.Result,
+                TotalSalaryPayouts = Math.Round(salaryPayoutTask.Result, 2),
                 ClaimApprovalRate = approvalRateTask.Result,
                 AverageClaimAmount = avgClaimTask.Result,
                 RecentActivitiesCount = recentLogsCountTask.Result,
@@ -143,6 +173,7 @@ namespace EGI_Backend.Application.Services
                     Timestamp = l.Timestamp
                 }).ToList()
             };
+
 
             // Process Top Agents (Sequential is fine here as it's just one part)
             using (var scope = _scopeFactory.CreateScope())

@@ -91,6 +91,13 @@ namespace EGI_Backend.WebAPI.Controllers
             var result = await _endorsementService.SubmitEndorsementAsync(CurrentUserId, dto);
             return Ok(result);
         }
+        
+        [HttpPost("preview-endorsement")]
+        public async Task<IActionResult> GetEndorsementPreview([FromBody] SubmitEndorsementDto dto)
+        {
+            var result = await _endorsementService.GetEndorsementPreviewAsync(CurrentUserId, dto);
+            return Ok(result);
+        }
 
         [HttpGet("endorsements/policy/{policyId}")]
         public async Task<IActionResult> GetEndorsementsByPolicy(Guid policyId)
@@ -176,6 +183,13 @@ namespace EGI_Backend.WebAPI.Controllers
         {
             var claims = await _claimService.GetClaimsByPolicyAsync(policyAssignmentId, CurrentUserId, "Customer");
             return Ok(claims);
+        }
+
+        [HttpGet("claims/{claimId}/rejection-explanation")]
+        public async Task<IActionResult> GetClaimRejectionExplanation(Guid claimId)
+        {
+            var explanation = await _claimService.GetClaimRejectionExplanationAsync(CurrentUserId, "Customer", claimId);
+            return Ok(new { explanation });
         }
 
         // ─── Dashboard Aggregates ─────────────────────────────────

@@ -28,6 +28,7 @@ namespace EGI_Backend.Infrastructure.Repositories
         {
             return await _context.Invoices
                 .Include(i => i.PolicyAssignment)
+                    .ThenInclude(pa => pa.CorporateClient)
                 .Include(i => i.Payments)
                 .FirstOrDefaultAsync(i => i.Id == id);
         }

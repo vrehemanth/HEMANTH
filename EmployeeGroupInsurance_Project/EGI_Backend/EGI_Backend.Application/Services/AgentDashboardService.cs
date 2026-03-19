@@ -16,26 +16,17 @@ namespace EGI_Backend.Application.Services
     {
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly IMapper _mapper;
-        private readonly IMemoryCache _cache;
 
         public AgentDashboardService(
             IServiceScopeFactory scopeFactory,
-            IMapper mapper,
-            IMemoryCache cache)
+            IMapper mapper)
         {
             _scopeFactory = scopeFactory;
             _mapper = mapper;
-            _cache = cache;
         }
 
         public async Task<AgentDashboardSummaryDto> GetSummaryAsync(Guid agentId)
         {
-            string cacheKey = $"AgentDashboardSummary_{agentId}";
-            if (_cache.TryGetValue(cacheKey, out AgentDashboardSummaryDto cached))
-            {
-                return cached;
-            }
-
             // Parallel Execution for Summary Metrics
             var countTask = Task.Run(async () => {
                 using var scope = _scopeFactory.CreateScope();
@@ -106,7 +97,6 @@ namespace EGI_Backend.Application.Services
             var policies = await policyRepo.GetByAgentIdAsync(agentId);
             summary.PoliciesSoldThisMonth = policies.Count(p => p.CreatedAt.Month == now.Month && p.CreatedAt.Year == now.Year);
 
-            _cache.Set(cacheKey, summary, TimeSpan.FromMinutes(3));
             return summary;
         }
 

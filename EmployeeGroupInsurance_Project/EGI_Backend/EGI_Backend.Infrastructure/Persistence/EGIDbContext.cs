@@ -128,9 +128,12 @@ namespace EGI_Backend.Infrastructure.Persistence
         {
             base.OnModelCreating(modelBuilder);
 
-            modelBuilder.Entity<User>()
-                .HasIndex(u => u.Email)
-                .IsUnique();
+            modelBuilder.Entity<User>(entity =>
+            {
+                entity.HasIndex(u => u.Email).IsUnique();
+                entity.Property(u => u.SalaryLPA).HasPrecision(18, 2);
+            });
+
 
             modelBuilder.Entity<AuditLog>()
                 .HasIndex(al => al.Timestamp);
@@ -169,8 +172,7 @@ namespace EGI_Backend.Infrastructure.Persistence
                 .HasIndex(i => i.PolicyAssignmentId);
 
             modelBuilder.Entity<Member>()
-                .HasIndex(m => new { m.EmployeeCode, m.CorporateClientId })
-                .IsUnique();
+                .HasIndex(m => new { m.EmployeeCode, m.CorporateClientId });
 
             modelBuilder.Entity<Member>()
                 .HasIndex(m => m.PolicyAssignmentId);

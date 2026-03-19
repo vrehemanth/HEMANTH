@@ -32,6 +32,8 @@ namespace EGI_Backend.Domain.Entities
 
         public DateTime? LastLogin { get; set; }
 
+        public decimal? SalaryLPA { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
     }
 }

@@ -19,6 +19,8 @@ namespace EGI_Backend.Application.Interfaces
         Task<List<ClaimResponseDto>> GetClaimsReviewedByOfficerAsync(Guid officerId);
         Task TakeClaimAsync(Guid officerId, Guid claimId);
         Task ReleaseClaimAsync(Guid claimId);
+        Task<ClaimDetailResponseDto> RunAIAdjudicationAsync(Guid claimId);
+        Task<string> GetClaimRejectionExplanationAsync(Guid userId, string role, Guid claimId);
         Task<(byte[] content, string contentType, string fileName)> GetSecureDocumentAsync(Guid userId, string role, Guid documentId);
     }
 }

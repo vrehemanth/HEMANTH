@@ -37,5 +37,9 @@ namespace EGI_Backend.Application.DTOs
  
         public int FraudScore { get; set; }
         public bool IsSuspectedFraud { get; set; }
+
+        public int AIConfidenceScore { get; set; }
+        public string? AIAdjudicationReasoning { get; set; }
+        public bool IsAIApproved { get; set; }
     }
 }

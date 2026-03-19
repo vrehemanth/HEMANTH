@@ -59,6 +59,21 @@ export enum Gender {
     Other = 3
 }
 
+export enum IndustryType {
+    IT = 0,
+    Banking = 1,
+    Education = 2,
+    Others = 3,
+    Retail = 4,
+    Healthcare = 5,
+    Hospitality = 6,
+    Logistics = 7,
+    Manufacturing = 8,
+    Construction = 9,
+    OilGas = 10,
+    Mining = 11
+}
+
 // ─── Core Interfaces ───────────────────────────────────────
 export interface UserResponse {
     id: string;
@@ -67,6 +82,7 @@ export interface UserResponse {
     role: string;
     status: string;
     commissionEarned?: number;
+    salaryLPA?: number;
 }
 
 export interface InsurancePlan {
@@ -125,3 +141,28 @@ export interface Claim {
     memberName?: string;
     rejectionReason?: string;
 }
+
+export interface CorporateClientDocumentDto {
+    id: string;
+    documentType: string;
+    fileName: string;
+    fileUrl: string;
+}
+
+export interface CorporateClientResponseDto {
+    id: string;
+    companyName: string;
+    address: string;
+    status: string;
+    isBlocked: boolean;
+    email: string;
+    phone: string;
+    industryType: number;
+    kybAiAnalysis?: string;
+    kybAiConfidenceScore?: number;
+    KybAiAnalysis?: string; // Adding PascalCase variant just in case of casing issues
+    KybAiConfidenceScore?: number;
+    documents: CorporateClientDocumentDto[];
+}
+
+

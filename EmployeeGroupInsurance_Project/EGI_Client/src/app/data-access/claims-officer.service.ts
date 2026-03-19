@@ -25,4 +25,5 @@ export class ClaimsOfficerService {
     getPlanById(id: string): Observable<any> { return this.http.get(`${API_BASE}/claims-officer/dashboard/insurance-plans/${id}`); }
     getClaimsByPolicy(policyId: string): Observable<any[]> { return this.http.get<any[]>(`${API_BASE}/claims-officer/dashboard/claims/policy/${policyId}`); }
     getClaimsByMember(memberId: string): Observable<any[]> { return this.http.get<any[]>(`${API_BASE}/claims-officer/dashboard/claims/member/${memberId}/history`); }
+    runAI(claimId: string): Observable<any> { return this.http.post(`${API_BASE}/claims-officer/dashboard/claims/${claimId}/run-ai`, {}); }
 }

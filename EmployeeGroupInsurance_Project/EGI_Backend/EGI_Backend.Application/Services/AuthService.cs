@@ -128,7 +128,8 @@ namespace EGI_Backend.Application.Services
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(tempPassword);
             user.MustChangePassword = true;
             await _repo.AddAsync(user);
-            await _emailService.SendCredentialsEmailAsync(req.Email, tempPassword);
+            await _emailService.SendCredentialsEmailAsync(req.Email, tempPassword, req.SalaryLPA);
+
 
             await _notificationService.CreateNotificationAsync(user.Id, "Account Created", $"Welcome to EGI! Your {user.Role} account has been created by the administrator.", "Info");
         }

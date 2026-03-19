@@ -99,4 +99,26 @@ export class HomeComponent implements OnInit {
       this.isMenuOpen.set(false);
     }
   }
+
+  downloadMemberTemplate() {
+    const csvContent = "EmployeeCode,FullName,Email,PhoneNo,DateOfBirth,Gender\nEMP001,John Doe,john@example.com,9876543210,1990-05-15,Male\nEMP002,Jane Smith,jane@example.com,9887766554,1988-10-20,Female";
+    this.downloadFile(csvContent, 'EGI_Member_Template.csv');
+  }
+
+  downloadDependentTemplate() {
+    const csvContent = "MemberEmployeeCode,FullName,Relationship,DateOfBirth,Gender\nEMP001,Sarah Doe,Spouse,1992-12-10,Female\nEMP001,Tommy Doe,Child,2015-03-25,Male";
+    this.downloadFile(csvContent, 'EGI_Family_Template.csv');
+  }
+
+  private downloadFile(content: string, filename: string) {
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
 }

@@ -58,4 +58,17 @@
     .text-premium {
         @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-indigo-600 dark:from-primary-400 dark:to-indigo-400;
     }
+
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+        @apply bg-transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        @apply bg-indigo-200 dark:bg-indigo-900/60 rounded-full;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        @apply bg-indigo-300 dark:bg-indigo-800;
+    }
 }
