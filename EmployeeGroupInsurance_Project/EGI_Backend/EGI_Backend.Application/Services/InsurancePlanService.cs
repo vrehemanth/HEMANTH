@@ -75,6 +75,7 @@ namespace EGI_Backend.Application.Services
                 BasePremium = dto.BasePremium,
                 Description = dto.Description,
                 Status = true,
+                HasHealthCheckup = dto.HasHealthCheckup,
                 CreatedAt = DateTime.UtcNow,
                 Coverages = planCoverages
             };
@@ -108,6 +109,7 @@ namespace EGI_Backend.Application.Services
             plan.BasePremium = dto.BasePremium;
             plan.Description = dto.Description;
             plan.Status = dto.Status;
+            plan.HasHealthCheckup = dto.HasHealthCheckup;
 
             // Simple update strategy: Create new, delete old
             plan.Coverages.Clear();

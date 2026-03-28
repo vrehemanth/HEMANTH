@@ -26,4 +26,18 @@ export class ClaimsOfficerService {
     getClaimsByPolicy(policyId: string): Observable<any[]> { return this.http.get<any[]>(`${API_BASE}/claims-officer/dashboard/claims/policy/${policyId}`); }
     getClaimsByMember(memberId: string): Observable<any[]> { return this.http.get<any[]>(`${API_BASE}/claims-officer/dashboard/claims/member/${memberId}/history`); }
     runAI(claimId: string): Observable<any> { return this.http.post(`${API_BASE}/claims-officer/dashboard/claims/${claimId}/run-ai`, {}); }
+    searchMember(identifier: string): Observable<any> { return this.http.get<any>(`${API_BASE}/claims-officer/dashboard/members/search/${identifier}`); }
+    getHospitals(): Observable<any[]> { return this.http.get<any[]>(`${API_BASE}/Hospital`); }
+    submitPartnershipClaim(data: FormData): Observable<any> { return this.http.post(`${API_BASE}/claims-officer/dashboard/claims/partnership`, data); }
+    getLiveDispatches(): Observable<any[]> { return this.http.get<any[]>(`${API_BASE}/claims-officer/dashboard/live-dispatches`); }
+
+    // Health Checkup Synchronization
+    getPendingHealthCheckups(): Observable<any[]> {
+        return this.http.get<any[]>(`${API_BASE}/claims-officer/dashboard/pending-health-checkups`);
+    }
+
+    updateHealthCheckupActuals(clientId: string, counts: { memberCount: number, dependentCount: number }): Observable<any> {
+        return this.http.post(`${API_BASE}/claims-officer/dashboard/update-health-checkup-actuals/${clientId}`, counts);
+    }
 }
+

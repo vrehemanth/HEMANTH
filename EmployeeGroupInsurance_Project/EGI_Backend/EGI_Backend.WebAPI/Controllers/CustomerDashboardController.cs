@@ -171,6 +171,13 @@ namespace EGI_Backend.WebAPI.Controllers
 
         // ─── Claims ──────────────────────────────────────────────
 
+        [HttpPost("hospital-dispatch/{hospitalId}/{memberId}")]
+        public async Task<IActionResult> DispatchEmergency(Guid hospitalId, Guid memberId)
+        {
+            await _claimService.DispatchEmergencyAsync(CurrentUserId, hospitalId, memberId);
+            return Ok(new { message = "Clinical Dispatch Successful. Hospital staff and Claims Officers have been notified of your emergency status and coverage eligibility." });
+        }
+
         [HttpPost("submit-claim")]
         public async Task<IActionResult> SubmitClaim([FromForm] SubmitClaimDto dto)
         {
@@ -241,6 +248,13 @@ namespace EGI_Backend.WebAPI.Controllers
         {
             var endorsements = await _dashboardService.GetMyEndorsementsAsync(CurrentUserId);
             return Ok(endorsements);
+        }
+
+        [HttpPost("claim-health-checkup/{hospitalId}")]
+        public async Task<IActionResult> ClaimHealthCheckup(Guid hospitalId)
+        {
+            await _dashboardService.ClaimHealthCheckupAsync(CurrentUserId, hospitalId);
+            return Ok(new { message = "Health checkup claim initiated successfully. The hospital has been notified and expects you within the next 7 days." });
         }
     }
 }

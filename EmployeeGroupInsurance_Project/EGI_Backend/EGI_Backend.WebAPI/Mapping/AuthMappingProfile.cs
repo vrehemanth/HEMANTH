@@ -38,7 +38,13 @@ namespace EGI_Backend.WebAPI.Mapping
                 .ForMember(dest => dest.Phone, opt => opt.MapFrom(src => src.Phone ?? string.Empty))
                 .ForMember(dest => dest.IndustryType, opt => opt.MapFrom(src => (int)src.IndustryType))
                 .ForMember(dest => dest.KybAiAnalysis, opt => opt.MapFrom(src => src.KybAiAnalysis))
-                .ForMember(dest => dest.KybAiConfidenceScore, opt => opt.MapFrom(src => src.KybAiConfidenceScore));
+                .ForMember(dest => dest.KybAiConfidenceScore, opt => opt.MapFrom(src => src.KybAiConfidenceScore))
+                .ForMember(dest => dest.LastHealthCheckupDate, opt => opt.MapFrom(src => src.LastHealthCheckupDate))
+                .ForMember(dest => dest.HealthCheckupHospitalId, opt => opt.MapFrom(src => src.HealthCheckupHospitalId))
+                .ForMember(dest => dest.HealthCheckupActualMemberCount, opt => opt.MapFrom(src => src.HealthCheckupActualMemberCount))
+                .ForMember(dest => dest.HealthCheckupActualDependentCount, opt => opt.MapFrom(src => src.HealthCheckupActualDependentCount))
+                .ForMember(dest => dest.IsHealthCheckupClaimPending, opt => opt.MapFrom(src => src.IsHealthCheckupClaimPending))
+                .ForMember(dest => dest.HealthCheckupVerifiedAt, opt => opt.MapFrom(src => src.HealthCheckupVerifiedAt));
 
             CreateMap<CorporateClientDocument, CorporateClientDocumentDto>()
                 .ForMember(dest => dest.DocumentType, 

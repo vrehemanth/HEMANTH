@@ -17,13 +17,14 @@ import { ClaimsTabComponent } from './tabs/claims/claims';
 import { LogsTabComponent } from './tabs/logs/logs';
 
 import { ApprovalsTabComponent } from './tabs/approvals/approvals';
+import { HospitalsTabComponent } from './tabs/hospitals/hospitals';
 
 Chart.register(...registerables);
 
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, OverviewTabComponent, PlansTabComponent, ClientsTabComponent, StaffTabComponent, PoliciesTabComponent, ClaimsTabComponent, LogsTabComponent, ApprovalsTabComponent],
+  imports: [CommonModule, FormsModule, OverviewTabComponent, PlansTabComponent, ClientsTabComponent, StaffTabComponent, PoliciesTabComponent, ClaimsTabComponent, LogsTabComponent, ApprovalsTabComponent, HospitalsTabComponent],
   templateUrl: './dashboard.html'
 })
 export class AdminDashboardComponent implements OnInit, OnDestroy {
@@ -32,7 +33,49 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   private toastService = inject(ToastService);
   authService = inject(AuthService);
 
-  activeTab = signal<'dashboard' | 'plans' | 'clients' | 'staff' | 'policies' | 'claims' | 'logs' | 'approvals'>('dashboard');
+  activeTab = signal<'dashboard' | 'plans' | 'clients' | 'staff' | 'policies' | 'claims' | 'logs' | 'approvals' | 'hospitals'>('dashboard');
+  
+  hospitals = signal<any[]>([]);
+  hospitalSearchTerm = signal('');
+  hospitalSearchQuery = signal('');
+  hospitalSuggestions = signal<any[]>([]);
+  hospitalCenter = signal<{lat: number, lng: number}>({lat: 20.5937, lng: 78.9629});
+  userLocation = signal<{lat: number, lng: number} | null>(null);
+
+  hospitalSortConfig = signal<{ column: string, direction: 'asc' | 'desc' }>({ column: 'name', direction: 'asc' });
+
+  filteredHospitals = computed(() => {
+    let result = this.hospitals();
+    const search = this.hospitalSearchTerm().toLowerCase().trim();
+    if (search) {
+      result = result.filter(h => 
+        (h.name && h.name.toLowerCase().includes(search)) ||
+        (h.city && h.city.toLowerCase().includes(search)) ||
+        (h.specialties && h.specialties.toLowerCase().includes(search))
+      );
+    }
+    const sort = this.hospitalSortConfig();
+    return [...result].sort((a, b) => {
+      let comparison = 0;
+      switch (sort.column) {
+        case 'name': comparison = (a.name || '').localeCompare(b.name || ''); break;
+        case 'city': comparison = (a.city || '').localeCompare(b.city || ''); break;
+        case 'network': comparison = Number(b.isNetworkHospital) - Number(a.isNetworkHospital); break;
+      }
+      return sort.direction === 'asc' ? comparison : -comparison;
+    });
+  });
+
+  sortHospitals(column: string) { this.updateSort(this.hospitalSortConfig, column); }
+
+  showHospitalForm = signal(false);
+  isEditingHospital = signal(false);
+  editingHospitalId: string | null = null;
+  newHospital = {
+    name: '', address: '', city: '', state: '', zipCode: '',
+    phone: '', email: '', latitude: 20.5937, longitude: 78.9629,
+    specialties: '', isNetworkHospital: true, isActive: true
+  };
   routerSub: Subscription | undefined;
   isLoading = signal(false);
 
@@ -47,6 +90,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   allPolicyAssignments = signal<any[]>([]);
   allClaimsRegistry = signal<any[]>([]);
   auditLogs = signal<any[]>([]);
+  pendingHealthCheckups = signal<any[]>([]);
 
   // --- Filtering & Sorting Signals ---
   claimSearchTerm = signal('');
@@ -91,11 +135,62 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         case 'amount': comparison = a.claimAmount - b.claimAmount; break;
         case 'member': comparison = (a.memberName || '').localeCompare(b.memberName || ''); break;
         case 'status': comparison = (a.status || '').localeCompare(b.status || ''); break;
-        case 'reviewer': comparison = (a.reviewerName || '').localeCompare(b.reviewerName || ''); break;
       }
       return sort.direction === 'asc' ? comparison : -comparison;
     });
   });
+
+  ngOnInit() {
+    // Current user is already loaded by AuthService constructor
+    this.getUserLocation();
+    
+    // Initial tab setup
+    this.updateTab(this.router.url);
+
+    this.routerSub = this.router.events.pipe(
+      filter(event => event instanceof NavigationEnd)
+    ).subscribe((e: any) => {
+      this.updateTab(e.urlAfterRedirects || this.router.url);
+      this.loadDashboardData();
+    });
+    
+    this.loadDashboardData();
+  }
+
+  ngOnDestroy() {
+    this.routerSub?.unsubscribe();
+  }
+
+  getUserLocation() {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setTimeout(() => {
+            const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            this.userLocation.set(loc);
+            if (!this.isEditingHospital()) {
+              this.hospitalCenter.set(loc);
+              this.newHospital.latitude = Number(loc.lat.toFixed(6));
+              this.newHospital.longitude = Number(loc.lng.toFixed(6));
+            }
+          }, 0);
+        },
+        (err) => console.warn("Location access denied", err)
+      );
+    }
+  }
+
+  calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): string {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const d = R * c;
+    return d > 1 ? `${d.toFixed(1)} km` : `${(d * 1000).toFixed(0)} m`;
+  }
 
   filteredClients = computed(() => {
     let result = this.allClients();
@@ -278,7 +373,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   showNewPlanForm = signal(false);
   isEditingPlan = signal(false);
   editingPlanId: string | null = null;
-  newPlan = { planCode: '', planName: '', description: '', basePremium: 0, status: true };
+  newPlan = { planCode: '', planName: '', description: '', basePremium: 0, status: true, hasHealthCheckup: false };
 
   isStaffLoading = signal(false);
   showNewStaffForm = signal(false);
@@ -310,19 +405,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   showRejectionModal = signal(false);
   rejectionForm = { clientId: '', reason: '' };
 
-  ngOnInit() {
-    this.updateTab(this.router.url);
-    this.routerSub = this.router.events.pipe(
-      filter(e => e instanceof NavigationEnd)
-    ).subscribe((e: any) => this.updateTab(e.urlAfterRedirects));
-  }
-
-  ngOnDestroy() {
-    this.routerSub?.unsubscribe();
-  }
 
   updateTab(url: string) {
-    let tab: 'dashboard' | 'plans' | 'clients' | 'staff' | 'policies' | 'claims' | 'logs' | 'approvals' = 'dashboard';
+    let tab: 'dashboard' | 'plans' | 'clients' | 'staff' | 'policies' | 'claims' | 'logs' | 'approvals' | 'hospitals' = 'dashboard';
     if (url.includes('plans')) tab = 'plans';
     else if (url.includes('clients')) tab = 'clients';
     else if (url.includes('staff')) tab = 'staff';
@@ -330,9 +415,176 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     else if (url.includes('claims')) tab = 'claims';
     else if (url.includes('logs')) tab = 'logs';
     else if (url.includes('approvals')) tab = 'approvals';
+    else if (url.includes('hospitals')) tab = 'hospitals';
 
     this.activeTab.set(tab);
     this.lazyLoadTab(tab);
+  }
+
+  loadHospitalsData() {
+    if (this.pendingReqs.has('hospitals')) return;
+    this.pendingReqs.add('hospitals');
+    this.adminService.getAllHospitals().subscribe({
+      next: (res: any) => {
+        this.hospitals.set(this.extractArray(res));
+        this.pendingReqs.delete('hospitals');
+      },
+      error: () => this.pendingReqs.delete('hospitals')
+    });
+  }
+
+  toggleHospitalForm() {
+    this.showHospitalForm.update(v => !v);
+    if (!this.showHospitalForm()) {
+      this.isEditingHospital.set(false);
+      this.editingHospitalId = null;
+      this.resetHospitalForm();
+    }
+  }
+
+  resetHospitalForm() {
+    this.newHospital = {
+      name: '', address: '', city: '', state: '', zipCode: '',
+      phone: '', email: '', latitude: 20.5937, longitude: 78.9629, specialties: '',
+      isNetworkHospital: true, isActive: true
+    };
+    this.hospitalSearchQuery.set('');
+    this.hospitalCenter.set({lat: 20.5937, lng: 78.9629});
+  }
+
+  editHospital(h: any) {
+    this.isEditingHospital.set(true);
+    this.editingHospitalId = h.id;
+    this.newHospital = { ...h };
+    this.hospitalCenter.set({lat: h.latitude, lng: h.longitude});
+    this.showHospitalForm.set(true);
+  }
+
+  saveHospital() {
+    if (!this.newHospital.name || !this.newHospital.city) {
+      this.toastService.warning("Name and City are basically required.");
+      return;
+    }
+
+    this.isLoading.set(true);
+    const obs = this.isEditingHospital() 
+      ? this.adminService.updateHospital(this.editingHospitalId!, this.newHospital)
+      : this.adminService.createHospital(this.newHospital);
+
+    obs.subscribe({
+      next: () => {
+        this.toastService.success(`Hospital ${this.isEditingHospital() ? 'updated' : 'registered'} successfully.`);
+        this.toggleHospitalForm();
+        this.loadHospitalsData();
+        this.isLoading.set(false);
+      },
+      error: (err) => {
+        this.toastService.error(err.error?.message || "Failed to save hospital.");
+        this.isLoading.set(false);
+      }
+    });
+  }
+
+  selectHospitalSuggestion(s: any) {
+    const lat = parseFloat(s.lat);
+    const lng = parseFloat(s.lon);
+    this.newHospital.latitude = Number(lat.toFixed(6));
+    this.newHospital.longitude = Number(lng.toFixed(6));
+    this.hospitalCenter.set({lat, lng});
+    this.hospitalSearchQuery.set(s.display_name);
+    this.hospitalSuggestions.set([]);
+    this.toastService.success(`Location set: ${s.display_name.substring(0, 30)}...`);
+  }
+
+  private autocompleteTimeout: any;
+  handleOsmAutocomplete(lat?: number, lng?: number) {
+    const query = this.hospitalSearchQuery();
+    if (query.trim().length < 3) {
+      this.hospitalSuggestions.set([]);
+      return;
+    }
+
+    let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=10&addressdetails=1`;
+    if (lat && lng) {
+      const viewbox = `${lng - 0.5},${lat + 0.5},${lng + 0.5},${lat - 0.5}`;
+      url += `&lat=${lat}&lon=${lng}&viewbox=${viewbox}&bounded=0`;
+    }
+
+    clearTimeout(this.autocompleteTimeout);
+    this.autocompleteTimeout = setTimeout(() => {
+      fetch(url, { headers: { 'Accept-Language': 'en-US,en;q=0.5' } })
+        .then(res => res.json())
+        .then(data => {
+          let suggestions = data || [];
+          const userLoc = this.userLocation() || this.hospitalCenter();
+          if (suggestions.length > 0) {
+            suggestions = suggestions.sort((a: any, b: any) => {
+              const latA = parseFloat(a.lat);
+              const lonA = parseFloat(a.lon);
+              const latB = parseFloat(b.lat);
+              const lonB = parseFloat(b.lon);
+              
+              const R = 6371;
+              const dLatA = (latA - userLoc.lat) * Math.PI / 180;
+              const dLonA = (lonA - userLoc.lng) * Math.PI / 180;
+              const distA = R * 2 * Math.atan2(Math.sqrt(Math.sin(dLatA/2)**2 + Math.cos(userLoc.lat*Math.PI/180)*Math.cos(latA*Math.PI/180)*Math.sin(dLonA/2)**2), Math.sqrt(1-Math.sin(dLatA/2)**2 - Math.cos(userLoc.lat*Math.PI/180)*Math.cos(latA*Math.PI/180)*Math.sin(dLonA/2)**2));
+
+              const dLatB = (latB - userLoc.lat) * Math.PI / 180;
+              const dLonB = (lonB - userLoc.lng) * Math.PI / 180;
+              const distB = R * 2 * Math.atan2(Math.sqrt(Math.sin(dLatB/2)**2 + Math.cos(userLoc.lat*Math.PI/180)*Math.cos(latB*Math.PI/180)*Math.sin(dLonB/2)**2), Math.sqrt(1-Math.sin(dLatB/2)**2 - Math.cos(userLoc.lat*Math.PI/180)*Math.cos(latB*Math.PI/180)*Math.sin(dLonB/2)**2));
+              
+              return distA - distB;
+            });
+          }
+          this.hospitalSuggestions.set(suggestions);
+        })
+        .catch(err => console.error("Autocomplete ERR", err));
+    }, 500); // 500ms debounce
+  }
+
+  handleOsmSearch() {
+    const query = this.hospitalSearchQuery();
+    if (!query) return;
+
+    const lat = this.hospitalCenter().lat;
+    const lng = this.hospitalCenter().lng;
+    const viewbox = `${lng - 0.5},${lat + 0.5},${lng + 0.5},${lat - 0.5}`;
+    
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&lat=${lat}&lon=${lng}&viewbox=${viewbox}&bounded=0`;
+
+    fetch(url, { headers: { 'Accept-Language': 'en-US,en;q=0.5' } })
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.length > 0) {
+          const first = data[0];
+          this.selectHospitalSuggestion(first);
+        } else {
+          this.toastService.warning("Location not found on OpenStreetMap.");
+        }
+      })
+      .catch(err => {
+        console.error("Nomination Search ERR", err);
+        this.toastService.error("Geocoding service unavailable.");
+      });
+  }
+
+  deleteHospital(id: string) {
+    Swal.fire({
+      title: 'Are you sure?',
+      text: "This will permanently remove the hospital from the system.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, delete it!'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        this.adminService.deleteHospital(id).subscribe(() => {
+          this.toastService.success("Hospital deleted.");
+          this.loadHospitalsData();
+        });
+      }
+    });
   }
 
   private pendingReqs = new Set<string>();
@@ -354,6 +606,8 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       if (this.auditLogs().length === 0) this.loadAuditLogs();
     } else if (tab === 'approvals') {
       if (this.allClaimsRegistry().length === 0) this.loadClaimsRegistry();
+    } else if (tab === 'hospitals') {
+      if (this.hospitals().length === 0) this.loadHospitalsData();
     }
   }
 
@@ -373,6 +627,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     // These can run in parallel without blocking summary
     this.loadClaimsRegistry();
     this.loadPoliciesData();
+    this.loadPendingHealthCheckups();
   }
 
   destroyCharts() {
@@ -433,7 +688,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
             borderColor: 'rgba(255,255,255,0.1)',
             borderWidth: 1,
             callbacks: {
-              label: (i: any) => ` ${i.label}: ₹${i.raw.toLocaleString()}`
+              label: (i: any) => ` ${i.label}: ₹${i.raw.toLocaleString('en-IN')}`
             }
           }
         }
@@ -625,6 +880,60 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   }
 
 
+  loadPendingHealthCheckups() {
+    this.adminService.getPendingHealthCheckups().subscribe(res => {
+      this.pendingHealthCheckups.set(res);
+    });
+  }
+
+  async verifyHealthCheckupActuals(client: any) {
+    const { value: formValues } = await Swal.fire({
+      title: 'Verify Participation Counts',
+      html: `
+        <div class="p-4 bg-gray-50 rounded-2xl text-left">
+          <p class="text-[10px] font-black uppercase text-gray-400 mb-4 tracking-widest text-center">Syncing Hospital Feedback with Ledger</p>
+          <div class="mb-4">
+            <label class="block text-xs font-bold mb-1 uppercase">Actual Employees Treated</label>
+            <input id="swal-input1" class="w-full p-3 border-2 border-gray-100 rounded-xl" type="number" value="${client.healthCheckupActualMemberCount || 0}">
+          </div>
+          <div>
+            <label class="block text-xs font-bold mb-1 uppercase">Actual Dependents Treated</label>
+            <input id="swal-input2" class="w-full p-3 border-2 border-gray-100 rounded-xl" type="number" value="${client.healthCheckupActualDependentCount || 0}">
+          </div>
+          <p class="text-[9px] text-gray-500 mt-4 leading-tight italic">By clicking synchronize, you confirm these counts match the formal attendance record sent by <b>${client.healthCheckupHospitalName || 'the network hospital'}</b>.</p>
+        </div>
+      `,
+      focusConfirm: false,
+      confirmButtonText: 'Synchronize Data',
+      confirmButtonColor: '#10b981',
+      showCancelButton: true,
+      preConfirm: () => {
+        return [
+          (document.getElementById('swal-input1') as HTMLInputElement).value,
+          (document.getElementById('swal-input2') as HTMLInputElement).value
+        ];
+      }
+    });
+
+    if (formValues) {
+      const [mem, dep] = formValues;
+      this.adminService.updateHealthCheckupActuals(client.id, { 
+        memberCount: parseInt(mem), 
+        dependentCount: parseInt(dep) 
+      }).subscribe({
+        next: () => {
+          this.toastService.success("Attendance ledger updated successfully.");
+          this.loadPendingHealthCheckups();
+          // Assuming loadClientsAsync() is a method that refreshes client data,
+          // but it's not present in the provided context.
+          // If it exists, it should be called. Otherwise, this line might need adjustment.
+          // this.loadClientsAsync(); 
+        },
+        error: () => this.toastService.error("Failed to update ledge.")
+      });
+    }
+  }
+
   viewPolicyDetails(policy: any) {
     this.selectedPolicyHistory.set(policy);
     this.policyInvoices.set([]);
@@ -759,7 +1068,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       this.showNewPlanForm.set(false);
       this.isEditingPlan.set(false);
       this.editingPlanId = null;
-      this.newPlan = { planCode: '', planName: '', description: '', basePremium: 0, status: true };
+      this.newPlan = { planCode: '', planName: '', description: '', basePremium: 0, status: true, hasHealthCheckup: false };
     } else {
       this.showNewPlanForm.set(true);
     }
@@ -773,7 +1082,8 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       planName: plan.planName,
       description: plan.description,
       basePremium: plan.basePremium,
-      status: plan.status
+      status: plan.status,
+      hasHealthCheckup: plan.hasHealthCheckup || false
     };
     this.showNewPlanForm.set(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -807,6 +1117,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       basePremium: this.newPlan.basePremium,
       description: this.newPlan.description,
       status: this.newPlan.status,
+      hasHealthCheckup: this.newPlan.hasHealthCheckup,
       coverages: [] // Keeping simplest update for now as per DTO
     };
 

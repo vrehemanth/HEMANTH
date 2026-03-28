@@ -125,6 +125,33 @@ namespace EGI_Backend.Infrastructure.Services
             Console.WriteLine($"[EMAIL SERVICE] Invoice Email sent to: {email} with attachment: {pdfFileName}");
         }
 
+        public async Task SendHealthCheckupNotificationToHospitalAsync(string hospitalEmail, string hospitalName, string companyName, int memberCount, int dependentCount, DateTime expectedDate)
+        {
+            var subject = $"Upcoming Group Health Checkup - {companyName}";
+            var body = $@"
+                <div style='font-family: Arial, sans-serif; color: #333; line-height: 1.6;'>
+                    <h2 style='color: #16a085;'>Group Health Checkup Notification</h2>
+                    <p>Dear Administrator at <b>{hospitalName}</b>,</p>
+                    <p>This is to inform you that <b>{companyName}</b> has scheduled an annual group health checkup at your facility.</p>
+                    <div style='background-color: #f9f9f9; padding: 20px; border-radius: 8px; border-left: 5px solid #16a085;'>
+                        <p><b>Expected Date:</b> {expectedDate.ToString("dd MMM yyyy")} (within next 7 days)</p>
+                        <p><b>Estimated Participants:</b></p>
+                        <ul>
+                            <li>Employees: {memberCount}</li>
+                            <li>Dependents: {dependentCount}</li>
+                        </ul>
+                        <p><b>Total Authorized:</b> {memberCount + dependentCount}</p>
+                    </div>
+                    <p>Please ensure all necessary medical checkup kits and staff are available to accommodate this group.</p>
+                    <p>Post-event, please provide the actual participation list to the EGI Claims Officer for verification.</p>
+                    <br/>
+                    <p>Best Regards,<br/>System Operations - Employee Group Insurance</p>
+                </div>";
+
+            await SendEmailAsync(hospitalEmail, subject, body);
+            Console.WriteLine($"[EMAIL SERVICE] Health Checkup Notification sent to Hospital: {hospitalEmail} for Client: {companyName}");
+        }
+
         private async Task SendEmailAsync(string toEmail, string subject, string body, byte[]? attachmentBytes = null, string? attachmentName = null)
         {
             var smtpHost = _configuration["SmtpSettings:Server"];

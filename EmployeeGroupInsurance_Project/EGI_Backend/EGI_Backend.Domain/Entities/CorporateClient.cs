@@ -28,6 +28,13 @@ namespace EGI_Backend.Domain.Entities
         public string? KybAiAnalysis { get; set; }
         public int KybAiConfidenceScore { get; set; } = 0;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? LastHealthCheckupDate { get; set; }
+        public Guid? HealthCheckupHospitalId { get; set; }
+        public int HealthCheckupActualMemberCount { get; set; } = 0;
+        public int HealthCheckupActualDependentCount { get; set; } = 0;
+        public bool IsHealthCheckupClaimPending { get; set; } = false;
+        public DateTime? HealthCheckupVerifiedAt { get; set; }
+
         public ICollection<CorporateClientDocument> Documents { get; set; } = new List<CorporateClientDocument>();
     }
 }

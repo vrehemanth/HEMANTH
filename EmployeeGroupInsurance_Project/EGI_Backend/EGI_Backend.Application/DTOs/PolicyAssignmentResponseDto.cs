@@ -17,6 +17,7 @@ namespace EGI_Backend.Application.DTOs
         public string BillingFrequency { get; set; } = string.Empty;
         public int BillingDay { get; set; }
         public string Status { get; set; } = string.Empty;
+        public decimal PendingCredit { get; set; }
         public bool CanRenew { get; set; }
     }
 }

@@ -15,5 +15,6 @@ namespace EGI_Backend.Application.Interfaces
         Task<List<ClaimResponseDto>> GetMyClaimsAsync(Guid userId);
         Task<List<InvoiceResponseDto>> GetMyInvoicesAsync(Guid userId);
         Task<List<EndorsementResponseDto>> GetMyEndorsementsAsync(Guid userId);
+        Task<bool> ClaimHealthCheckupAsync(Guid userId, Guid hospitalId);
     }
 }

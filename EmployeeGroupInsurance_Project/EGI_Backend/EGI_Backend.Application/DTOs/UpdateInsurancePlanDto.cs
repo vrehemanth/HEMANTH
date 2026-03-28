@@ -12,6 +12,7 @@ namespace EGI_Backend.Application.DTOs
         [Required]
         public string Description { get; set; } = string.Empty;
         public bool Status { get; set; }
+        public bool HasHealthCheckup { get; set; }
 
         public List<CreatePlanCoverageDto> Coverages { get; set; } = new List<CreatePlanCoverageDto>();
     }

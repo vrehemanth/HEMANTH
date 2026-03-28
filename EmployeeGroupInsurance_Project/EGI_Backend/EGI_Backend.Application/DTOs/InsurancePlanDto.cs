@@ -11,6 +11,7 @@ namespace EGI_Backend.Application.DTOs
         public decimal BasePremium { get; set; }
         public string Description { get; set; } = string.Empty;
         public bool Status { get; set; }
+        public bool HasHealthCheckup { get; set; }
         public DateTime CreatedAt { get; set; }
         public List<PlanCoverageDto> Coverages { get; set; } = new List<PlanCoverageDto>();
     }

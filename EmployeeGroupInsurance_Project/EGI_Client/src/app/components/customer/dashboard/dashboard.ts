@@ -3,11 +3,12 @@ import { CommonModule } from '@angular/common';
 import { CustomerService } from '../../../data-access/customer.service';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, NavigationEnd } from '@angular/router';
-import { Subscription, forkJoin, of } from 'rxjs';
+import { Subscription, forkJoin, of, firstValueFrom } from 'rxjs';
 import { filter, catchError } from 'rxjs/operators';
 import { ToastService } from '../../../core/services/toast.service';
 import { AuthService } from '../../../core/services/auth.service';
 import * as htmlToImage from 'html-to-image';
+import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 
 import { OverviewTabComponent } from './tabs/overview/overview';
@@ -16,6 +17,7 @@ import { PoliciesTabComponent } from './tabs/policies/policies';
 import { ClaimsTabComponent } from './tabs/claims/claims';
 import { BillingTabComponent } from './tabs/billing/billing';
 import { RevisionsTabComponent } from './tabs/revisions/revisions';
+import { HospitalsTabComponent } from './tabs/hospitals/hospitals';
 
 import {
   RelationshipType,
@@ -39,7 +41,8 @@ import {
     PoliciesTabComponent,
     ClaimsTabComponent,
     BillingTabComponent,
-    RevisionsTabComponent
+    RevisionsTabComponent,
+    HospitalsTabComponent
   ],
   templateUrl: './dashboard.html'
 })
@@ -52,7 +55,7 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
   private routerSub?: Subscription;
 
 
-  activeTab = signal<'overview' | 'profile' | 'policies' | 'claims' | 'billing' | 'revisions'>('overview');
+  activeTab = signal<'overview' | 'profile' | 'policies' | 'claims' | 'billing' | 'revisions' | 'hospitals'>('overview');
   pageTitle = signal('Strategic Portal');
   isLoading = signal(false);
   isBlocked = signal(false);
@@ -66,7 +69,11 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
   plans = signal<any[]>([]);
   profileData = signal<any>(null);
 
-  // --- Data Loading Flags (Ensures full lists are fetched even if partials exist from Overview) ---
+  selectedMemberForCard = signal<any>(null);
+  showEgiCardModal = signal<boolean>(false);
+  selectedMemberForHospitalId = signal<string | null>(null);
+
+  // --- Data Loading Flags
   fullInvoicesLoaded = signal(false);
   fullClaimsLoaded = signal(false);
   fullMembersLoaded = signal(false);
@@ -78,6 +85,39 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
   claimSubmissionStep = signal(1);
   activeActionMenu = signal<string | null>(null);
   isProfileApproved = computed(() => this.profileData()?.status === 'Approved');
+
+  currentUserMember = computed(() => {
+    const userEmail = this.authService.currentUser()?.email;
+    if (!userEmail) return this.members()[0] || null;
+    return this.members().find(m => m.email?.toLowerCase() === userEmail.toLowerCase()) || this.members()[0];
+  });
+
+  displayedMemberForHospital = computed(() => {
+    const id = this.selectedMemberForHospitalId();
+    if (id) {
+      const m = this.members().find(m => m.id === id);
+      if (m) return m;
+
+      for (const member of this.members()) {
+        const deps = this.extractArray(member.dependents);
+        const dep = deps.find((d: any) => d.id === id);
+        if (dep) return { ...dep, employeeCode: member.employeeCode };
+      }
+    }
+    return this.currentUserMember();
+  });
+
+  allEligiblePeople = computed(() => {
+    const list: any[] = [];
+    this.members().forEach(m => {
+      list.push({ id: m.id, fullName: m.fullName, employeeCode: m.employeeCode, type: 'Employee' });
+      const deps = this.extractArray(m.dependents);
+      deps.forEach((d: any) => {
+        list.push({ id: d.id, fullName: d.fullName, employeeCode: m.employeeCode, type: 'Dependent' });
+      });
+    });
+    return list;
+  });
 
   isPremiumDueSoon = computed(() => {
     const today = new Date();
@@ -105,7 +145,7 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
   showClaimDetailModal = signal(false);
   rejectionExplanation = signal<string | null>(null);
   isFetchingRejectionExplanation = signal(false);
-  
+
   // --- Renewal State ---
   showRenewalModal = signal(false);
   activeRenewalPolicyId = signal<string | null>(null);
@@ -113,10 +153,361 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
   renewalFrequency = signal<number>(BillingFrequency.Annually);
   renewalQuote = signal<any>(null);
   isFetchingQuote = signal(false);
-  
+
   // --- Endorsement Preview State ---
   isCalculatingEndorsement = signal(false);
   endorsementPreview = signal<any>(null);
+
+  showHealthCheckModal = signal(false);
+  healthCheckClaimedDate = signal<Date | null>(null);
+  selectedHealthCheckHospital = signal<any | null>(null);
+  healthCheckExpiryDate = computed(() => {
+    const d = this.healthCheckClaimedDate();
+    if (!d) return null;
+    const expiry = new Date(d);
+    expiry.setDate(expiry.getDate() + 14);
+    return expiry;
+  });
+
+  isHealthCheckEligible = computed(() => {
+    return this.policies().some(p => {
+      const plan = p.insurancePlan || this.plans().find(pl => pl.id === p.insurancePlanId);
+      return plan?.hasHealthCheckup === true;
+    });
+  });
+
+  isHealthCheckCooldownOver = computed(() => {
+    const data = this.profileData();
+    if (!data || !data.lastHealthCheckupDate) return true;
+
+    // Once verified by Claims Officer, it's definitely over the 'active' phase.
+    if (data.isHealthCheckupClaimPending === false && data.healthCheckupActualMemberCount > 0) {
+      // Fall back to the 365 day rule
+    }
+
+    const lastDate = new Date(data.lastHealthCheckupDate);
+    const diffDays = (new Date().getTime() - lastDate.getTime()) / (1000 * 3600 * 24);
+    return diffDays >= 365;
+  });
+
+  isHealthCheckActive = computed(() => {
+    const d = this.healthCheckClaimedDate();
+    if (!d) return false;
+
+    // If it's still pending verification and within 14 days, it's active
+    const expiry = new Date(d);
+    expiry.setDate(expiry.getDate() + 14);
+    return new Date() < expiry && this.profileData()?.isHealthCheckupClaimPending;
+  });
+
+  claimHealthCheck() {
+    this.selectedHealthCheckHospital.set(null);
+    this.showHealthCheckModal.set(true);
+
+    if (!this.fullMembersLoaded()) {
+      this.customerService.getMyMembers().subscribe(res => {
+        const rawMembers = this.extractArray(res);
+        this.members.set(rawMembers.map(m => ({
+          ...m,
+          dependents: this.extractArray(m.dependents)
+        })));
+        this.fullMembersLoaded.set(true);
+      });
+    }
+
+    if (this.hospitals().length === 0) {
+      this.customerService.getNetworkHospitals().subscribe(res => {
+        this.hospitals.set(this.extractArray(res));
+      });
+    }
+  }
+
+  confirmHealthCheckExecution() {
+    if (!this.selectedHealthCheckHospital()) {
+      this.toastService.warning("Please select a target medical facility.");
+      return;
+    }
+    this.isLoading.set(true);
+    this.customerService.claimHealthCheckup(this.selectedHealthCheckHospital().id).subscribe({
+      next: () => {
+        const claimedDate = new Date();
+        this.healthCheckClaimedDate.set(claimedDate);
+        this.showHealthCheckModal.set(false);
+        this.toastService.success(`Health Check Protocol Activated! The hospital has been notified and expects you within 14 days.`);
+        this.isLoading.set(false);
+
+        // Refresh profile to get updated dates from server
+        this.customerService.getProfile().subscribe(res => this.handleProfileData(res?.data || res));
+      },
+      error: (err) => {
+        this.isLoading.set(false);
+        this.toastService.error(err.error?.message || "Protocol activation failed.");
+      }
+    });
+  }
+
+  getEligiblePersonnelCount() {
+    let empCount = 0;
+    let depCount = 0;
+    this.members().forEach(m => {
+      if (m.status) {
+        empCount++;
+        const deps = this.extractArray(m.dependents);
+        deps.forEach((d: any) => {
+          if (d.relationship === 0 || d.relationship === 2 || d.relationship === 3 || d.relationship === 'Spouse' || d.relationship === 'Father' || d.relationship === 'Mother') {
+            depCount++;
+          }
+        });
+      }
+    });
+    return { total: empCount + depCount, employees: empCount, dependents: depCount };
+  }
+
+  generateSimpleVoucher() {
+    this.isLoading.set(true);
+    const stats = this.getEligiblePersonnelCount();
+    const hospital = this.selectedHealthCheckHospital();
+    const company = this.profileData()?.companyName || 'CORPORATE CLIENT';
+    const expiry = this.healthCheckExpiryDate();
+    const corporateId = this.profileData()?.id?.slice(0, 8).toUpperCase() || 'EGI-CORP';
+
+    try {
+      const doc = new jsPDF();
+
+      // --- 1. CORPORATE HEADER (DUAL-TONE) ---
+      doc.setFillColor(15, 23, 42); // Slate 900
+      doc.rect(0, 0, 210, 45, 'F');
+
+      doc.setFillColor(16, 185, 129); // Emerald 500
+      doc.rect(0, 45, 210, 2, 'F');
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(28);
+      doc.setFont('helvetica', 'bold');
+      doc.text("EGI", 20, 25);
+      doc.setFont('helvetica', 'normal');
+      doc.text("GROUP INSURANCE", 40, 25);
+
+      doc.setFontSize(9);
+      doc.setTextColor(16, 185, 129);
+      doc.text("OFFICIAL MEDICAL AUTHORIZATION PROTOCOL", 20, 33);
+
+      doc.setTextColor(255, 255, 255, 0.5);
+      doc.text(`REF-ID: ${corporateId}-${Math.floor(Math.random() * 9000) + 1000}`, 190, 33, { align: 'right' });
+
+      // --- 2. ENTITY INFORMATION (STRUCTURED) ---
+      doc.setTextColor(30, 41, 59); // Slate 800
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text("ISSUED TO (CORPORATE ENTITY):", 20, 65);
+
+      doc.setFontSize(22);
+      doc.setFont('helvetica', 'bold');
+      doc.text(company.toUpperCase(), 20, 78);
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 116, 139);
+      doc.text(`${this.profileData()?.city || 'REGIONAL METRO'} · CORPORATE ACCOUNT ACTIVE`, 20, 85);
+
+      // --- 3. FACILITY BLOCK ---
+      doc.setFillColor(248, 250, 252); // Slate 50
+      doc.roundedRect(20, 95, 170, 35, 3, 3, 'F');
+      doc.setDrawColor(226, 232, 240); // Slate 200
+      doc.rect(20, 95, 170, 35);
+
+      doc.setTextColor(16, 185, 129);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text("DESIGNATED CLINICAL FACILITY:", 30, 105);
+
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(16);
+      doc.text((hospital?.name || "AUTHORIZED CLINICAL CENTER").toUpperCase(), 30, 115);
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 116, 139);
+
+      const fullAddress = `${hospital?.city || 'METRO'} · ${hospital?.address || 'NETWORK REGISTERED LOCATION'}`;
+      const splitAddress = doc.splitTextToSize(fullAddress, 150); // Width is 170 box - padding
+      doc.text(splitAddress, 30, 123);
+
+      const addressHeight = splitAddress.length * 5;
+      const boxHeight = 25 + addressHeight;
+
+      // Redraw box with dynamic height (need to do this before the texts if we want it perfect, but let's just adjust the box drawing logic)
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(20, 95, 170, boxHeight, 3, 3, 'F');
+      doc.setDrawColor(226, 232, 240);
+      doc.rect(20, 95, 170, boxHeight);
+
+      // Redraw texts on top (simpler than refactoring the whole sequence)
+      doc.setTextColor(16, 185, 129);
+      doc.setFontSize(9); doc.setFont('helvetica', 'bold');
+      doc.text("DESIGNATED CLINICAL FACILITY:", 30, 105);
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(16);
+      doc.text((hospital?.name || "AUTHORIZED CLINICAL CENTER").toUpperCase(), 30, 115);
+      doc.setTextColor(100, 116, 139);
+      doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+      doc.text(splitAddress, 30, 123);
+
+      // --- 4. PARTICIPATION MATRIX ---
+      const matrixTop = 105 + boxHeight;
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text("PARTICIPANT AUTHORIZATION MATRIX:", 20, matrixTop);
+
+      // Grid Table
+      doc.setDrawColor(241, 245, 249);
+      doc.setFillColor(255, 255, 255);
+
+      // Rows
+      const rowH = 12;
+      const startY = matrixTop + 8;
+
+      const drawRow = (label: string, value: string, y: number, isTotal: boolean) => {
+        if (isTotal) doc.setFillColor(241, 245, 249);
+        else doc.setFillColor(255, 255, 255);
+        doc.rect(20, y, 170, rowH, 'F');
+        doc.setDrawColor(226, 232, 240);
+        doc.line(20, y + rowH, 190, y + rowH);
+
+        doc.setFont('helvetica', isTotal ? 'bold' : 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(isTotal ? 15 : 100);
+        doc.text(label, 30, y + (rowH / 2) + 1.5);
+
+        doc.setFontSize(12);
+        doc.setTextColor(isTotal ? 16 : 30);
+        doc.text(value, 180, y + (rowH / 2) + 1.5, { align: 'right' });
+      };
+
+      drawRow("Primary Corporate Employees", stats.employees.toString(), startY, false);
+      drawRow("Eligible Dependents (Spouse/Parents)", stats.dependents.toString(), startY + rowH, false);
+      drawRow("TOTAL AUTHORIZED HEADCOUNT", stats.total.toString(), startY + (rowH * 2), true);
+
+      // --- 5. VALIDITY & VERIFICATION ---
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(15, 23, 42);
+      doc.text("AUTHORIZATION DEADLINE:", 20, 215);
+
+      doc.setFontSize(24);
+      doc.setTextColor(16, 185, 129);
+      doc.text(expiry ? expiry.toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' }).toUpperCase() : 'EXPIRED', 20, 230);
+
+      // Verification Seal (Drawn)
+      doc.setDrawColor(16, 185, 129);
+      doc.setLineWidth(0.5);
+      doc.circle(165, 225, 18);
+      doc.circle(165, 225, 16);
+      doc.setFontSize(6);
+      doc.text("EGI VERIFIED", 165, 223, { align: 'center' });
+      doc.setFontSize(5);
+      doc.text("AUTHENTIC ARTIFACT", 165, 228, { align: 'center' });
+
+      // --- 6. FOOTER ---
+      doc.setLineWidth(0.1);
+      doc.setDrawColor(226, 232, 240);
+      doc.line(20, 265, 190, 265);
+
+      doc.setTextColor(148, 163, 184);
+      doc.setFontSize(7);
+      const footerNote = "This is a computer-generated clinical authorization. No physical signature required for baseline triage. Authorized for EGI Network Hospitals only.";
+      doc.text(footerNote, 105, 275, { align: 'center' });
+      doc.text(`Generated on ${new Date().toLocaleString()} · Security Token: ${Math.random().toString(36).substr(2, 9).toUpperCase()}`, 105, 280, { align: 'center' });
+
+      doc.save(`EGI_AUTHORIZATION_${company.replace(/\s+/g, '_')}.pdf`);
+      this.toastService.success("Official Artifact Dispatched.");
+    } catch (err) {
+      console.error("PDF Crash:", err);
+      this.toastService.error("PDF Generation failure.");
+    } finally {
+      this.isLoading.set(false);
+    }
+  }
+
+  dispatchClinicalIntimation(hospital: any) {
+    const member = this.displayedMemberForHospital();
+    if (!member) return;
+    this.isLoading.set(true);
+
+    this.customerService.dispatchClinicalIntimation(hospital.id, member.id).subscribe({
+      next: (res: any) => {
+        this.isLoading.set(false);
+        this.toastService.success(res.message);
+      },
+      error: (err) => {
+        this.isLoading.set(false);
+        const msg = err.error?.message || "Clinical Dispatch failed to synchronize.";
+        this.toastService.error(msg);
+      }
+    });
+  }
+
+  generateHospitalVoucher(hospital: any) {
+    const member = this.displayedMemberForHospital();
+    if (!member) return;
+
+    this.isLoading.set(true);
+    try {
+      const doc = new jsPDF();
+      doc.setFillColor(15, 23, 42); doc.rect(0, 0, 210, 40, 'F');
+      doc.setTextColor(255, 255, 255); doc.setFontSize(22); doc.text("EGI PARTNER REFERRAL", 20, 25);
+
+      doc.setTextColor(30, 41, 59); doc.setFontSize(10);
+      doc.text("PATIENT IDENTITY", 20, 55);
+      doc.setFontSize(16); doc.text(member.fullName.toUpperCase(), 20, 65);
+      doc.setFontSize(9); doc.text(`POL-PIN: ${member.employeeCode}`, 20, 72);
+
+      doc.setFillColor(248, 250, 252); doc.rect(20, 85, 170, 45, 'F');
+      doc.setTextColor(16, 185, 129); doc.text("DESIGNATED FACILITY:", 30, 95);
+      doc.setTextColor(15, 23, 42); doc.setFontSize(14); doc.text(hospital.name.toUpperCase(), 30, 105);
+      doc.setFontSize(9);
+      const addr = `${hospital.address}, ${hospital.city}`;
+      const splitAddr = doc.splitTextToSize(addr, 150);
+      doc.text(splitAddr, 30, 112);
+
+      doc.setFontSize(8); doc.setTextColor(100);
+      doc.text("This voucher authorizes the hospital to begin cashless triage for the identified member.", 20, 140);
+      doc.text(`Security Token: ${Math.random().toString(36).substr(2, 9).toUpperCase()}`, 20, 155);
+
+      doc.save(`EGI_Referral_${member.fullName.replace(/\s+/g, '_')}.pdf`);
+      this.toastService.success("Digital Voucher Generated.");
+    } catch (e) {
+      this.toastService.error("Voucher generation failed.");
+    } finally {
+      this.isLoading.set(false);
+    }
+  }
+
+  loadHealthCheckState() {
+    const data = this.profileData();
+    if (!data) return;
+
+    if (data.lastHealthCheckupDate) {
+      this.healthCheckClaimedDate.set(new Date(data.lastHealthCheckupDate));
+
+      // Hide if more than 14 days passed? No, the user said "dont show on the ui after the checkup again activate after 365 days"
+      // So if lastHealthCheckupDate exists, we check if 365 days passed.
+      const diffDays = (new Date().getTime() - new Date(data.lastHealthCheckupDate).getTime()) / (1000 * 3600 * 24);
+      if (diffDays < 365) {
+        // Already claimed this year. We can still show the "Active" status for the first 14 days for voucher printing
+        // But if it's pending verification or just claimed, we show it.
+        // If they just claimed it, we show the Success state.
+      }
+    }
+  }
+
+  checkPolicyHealthCheckEligibility(pol: any): boolean {
+    if (!pol) return false;
+    // Check embedded plan first, then search plan cache
+    const plan = pol.insurancePlan || this.plans().find(pl => pl.id === pol.insurancePlanId);
+    return plan?.hasHealthCheckup === true;
+  }
 
   // --- Filtered and Sorted Computeds ---
   filteredClaims = computed(() => {
@@ -168,6 +559,31 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
       this.claimSortConfig.set({ column, direction: current.direction === 'asc' ? 'desc' : 'asc' });
     } else {
       this.claimSortConfig.set({ column, direction: 'asc' });
+    }
+  }
+
+  calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): string {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const d = R * c;
+    return d > 1 ? `${d.toFixed(1)} km` : `${(d * 1000).toFixed(0)} m`;
+  }
+
+  getUserLocation() {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setTimeout(() => {
+            this.userLocation.set({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          }, 0);
+        },
+        (err) => console.warn("Location denied", err)
+      );
     }
   }
 
@@ -239,7 +655,7 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
   confirmRenewal() {
     const id = this.activeRenewalPolicyId();
     if (!id) return;
-    
+
     this.isLoading.set(true);
     this.customerService.renewPolicy(id, this.renewalYears(), this.renewalFrequency()).subscribe({
       next: (res) => {
@@ -426,8 +842,17 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
   selectedInvoice = signal<any>(null);
   invoicePayments = signal<any[]>([]);
 
+  hasUnpaidInvoices(): boolean {
+    return this.invoices().some(i => i.status !== 'Paid' && i.status !== 'Settled');
+  }
+
   showClaimForm = signal(false);
   toggleClaimForm() {
+    if (!this.showClaimForm() && this.hasUnpaidInvoices()) {
+      this.toastService.error("Access Restricted: Adjudication ledger is locked due to outstanding premiums. Please settle all unpaid invoices in the 'Billing' tab to restore filing privileges.");
+      this.setActiveTab('billing');
+      return;
+    }
     this.showClaimForm.set(!this.showClaimForm());
     if (this.showClaimForm()) {
       this.claimSubmissionStep.set(1);
@@ -447,7 +872,7 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
 
     // Find the plan to get the specific "Life" coverage amount
     const plan = this.plans().find(pl => pl.id === policy.insurancePlanId || pl.planName === policy.planName);
-    
+
     let lifeCoverageAmount = 0;
     if (plan) {
       const lifeCoverage = plan.coverages?.find((c: any) => c.type === 'Life');
@@ -463,7 +888,7 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
       this.toastService.info(`Life Settlement auto-filled: ₹${this.formatINR(lifeCoverageAmount)}. Standard protocol enforced.`);
     } else {
       // If we can't find specific Life coverage, don't use the aggregate sumInsured as it includes Health/Accident
-      this.claimForm.get('claimAmount')?.enable(); 
+      this.claimForm.get('claimAmount')?.enable();
       this.toastService.warning("Specific Life coverage amount not found in plan. Please enter manually.");
     }
   }
@@ -497,8 +922,62 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
     { id: ClaimDocumentType.DeathCertificate.toString(), name: 'Death Certificate' },
     { id: ClaimDocumentType.PostMortemReport.toString(), name: 'Post Mortem Report' },
     { id: ClaimDocumentType.DiagnosisReport.toString(), name: 'Diagnosis Report' },
-    { id: ClaimDocumentType.Other.toString(), name: 'Other' }
+    { id: ClaimDocumentType.Other.toString(), name: 'Other Document' }
   ];
+
+  hospitals = signal<any[]>([]);
+  hospitalSearchTerm = signal('');
+  hospitalSortConfig = signal<{ column: string, direction: 'asc' | 'desc' }>({ column: 'name', direction: 'asc' });
+
+  filteredHospitals = computed(() => {
+    let result = this.hospitals();
+    const search = this.hospitalSearchTerm().toLowerCase().trim();
+    if (search) {
+      result = result.filter(h =>
+        (h.name && h.name.toLowerCase().includes(search)) ||
+        (h.city && h.city.toLowerCase().includes(search)) ||
+        (h.specialties && h.specialties.toLowerCase().includes(search))
+      );
+    }
+    const sort = this.hospitalSortConfig();
+    const userLoc = this.userLocation();
+
+    return [...result].sort((a, b) => {
+      // Proximity Bias if available
+      if (userLoc && sort.column === 'name') {
+        const distA = Math.sqrt(Math.pow(a.latitude - userLoc.lat, 2) + Math.pow(a.longitude - userLoc.lng, 2));
+        const distB = Math.sqrt(Math.pow(b.latitude - userLoc.lat, 2) + Math.pow(b.longitude - userLoc.lng, 2));
+        return distA - distB;
+      }
+
+      let comparison = 0;
+      switch (sort.column) {
+        case 'name': comparison = (a.name || '').localeCompare(b.name || ''); break;
+        case 'city': comparison = (a.city || '').localeCompare(b.city || ''); break;
+      }
+      return sort.direction === 'asc' ? comparison : -comparison;
+    });
+  });
+
+  enrichedHospitals = computed(() => {
+    return this.filteredHospitals().map((h) => {
+      return {
+        ...h,
+        distanceStr: this.userLocation() ? this.calculateDistance(this.userLocation()!.lat, this.userLocation()!.lng, h.latitude, h.longitude) : ''
+      };
+    });
+  });
+
+  sortHospitals(column: string) {
+    const current = this.hospitalSortConfig();
+    if (current.column === column) {
+      this.hospitalSortConfig.set({ column, direction: current.direction === 'asc' ? 'desc' : 'asc' });
+    } else {
+      this.hospitalSortConfig.set({ column, direction: 'asc' });
+    }
+  }
+
+  userLocation = signal<{ lat: number, lng: number } | null>(null);
 
   // Making Enums available to the template
   EnumRelationship = RelationshipType;
@@ -538,7 +1017,7 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
     policyAssignmentId: ['', Validators.required],
     employeeCode: ['', Validators.required],
     memberId: ['', Validators.required],
-    dependentId: [{ value: '', disabled: true }],
+    dependentId: [{ value: '', disabled: false }], // Changed to false for easier use
     claimType: ['', Validators.required],
     claimAmount: ['', Validators.required],
     description: ['', Validators.required]
@@ -595,6 +1074,7 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
+    this.getUserLocation();
     this.updateTab(this.router.url);
     this.routerSub = this.router.events.pipe(
       filter(e => e instanceof NavigationEnd)
@@ -695,6 +1175,7 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
 
   private handleProfileData(data: any) {
     this.profileData.set(data);
+    this.loadHealthCheckState();
     if (data) {
       this.isBlocked.set(!!data.isBlocked);
       this.profileForm.patchValue({
@@ -743,6 +1224,7 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
     else if (url.includes('/invoices')) tab = 'billing';
     else if (url.includes('/claims')) tab = 'claims';
     else if (url.includes('/revisions')) tab = 'revisions';
+    else if (url.includes('/hospitals')) tab = 'hospitals';
 
     this.setActiveTab(tab);
   }
@@ -754,6 +1236,7 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
       case 'billing': return 'Financial Settlement';
       case 'claims': return 'Adjudication Ledger';
       case 'revisions': return 'Policy Revision Ledger';
+      case 'hospitals': return 'Provider Asset Network';
       default: return 'Strategic Overview';
     }
   }
@@ -813,6 +1296,16 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
           error: () => this.pendingReqs.delete('members')
         });
       }
+      if (this.hospitals().length === 0 && !this.pendingReqs.has('hospitals')) {
+        this.pendingReqs.add('hospitals');
+        this.customerService.getNetworkHospitals().subscribe({
+          next: res => {
+            this.hospitals.set(this.extractArray(res));
+            this.pendingReqs.delete('hospitals');
+          },
+          error: () => this.pendingReqs.delete('hospitals')
+        });
+      }
     } else if (tab === 'billing' && !this.fullInvoicesLoaded() && !this.pendingReqs.has('invoices')) {
       this.pendingReqs.add('invoices');
       this.customerService.getMyInvoices().subscribe({
@@ -850,6 +1343,40 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
           error: () => this.pendingReqs.delete('members')
         });
       }
+    } else if (tab === 'hospitals') {
+      if (this.hospitals().length === 0 && !this.pendingReqs.has('hospitals')) {
+        this.pendingReqs.add('hospitals');
+        this.customerService.getNetworkHospitals().subscribe({
+          next: res => {
+            this.hospitals.set(this.extractArray(res));
+            this.pendingReqs.delete('hospitals');
+          },
+          error: () => this.pendingReqs.delete('hospitals')
+        });
+      }
+    }
+  }
+
+  viewEgiCard(member: any) {
+    this.selectedMemberForCard.set(member);
+    this.showEgiCardModal.set(true);
+  }
+
+  async downloadCard() {
+    const card = document.getElementById('egi-smart-card');
+    if (!card) return;
+    try {
+      this.isLoading.set(true);
+      const dataUrl = await htmlToImage.toPng(card, { quality: 1, backgroundColor: 'transparent' });
+      const link = document.createElement('a');
+      link.download = `EGI_Card_${this.selectedMemberForCard().employeeCode}.png`;
+      link.href = dataUrl;
+      link.click();
+      this.toastService.success("EGI Smart Card Identity Artifact Generated.");
+    } catch (err) {
+      this.toastService.error("Identity export failure.");
+    } finally {
+      this.isLoading.set(false);
     }
   }
 
@@ -1061,7 +1588,7 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
     if (!this.selectedProfileDoc) return;
     this.isLoading.set(true);
     const fd = new FormData();
-    fd.append('documentType', this.selectedProfileDocType()); 
+    fd.append('documentType', this.selectedProfileDocType());
     fd.append('file', this.selectedProfileDoc);
     this.customerService.uploadDocument(fd).subscribe({
       next: () => {
@@ -1162,6 +1689,10 @@ export class CustomerDashboardComponent implements OnInit, OnDestroy {
   }
 
   submitClaim() {
+    if (this.hasUnpaidInvoices()) {
+      this.toastService.error("Submission Blocked: System detected unpaid invoices. Claim processing is suspended until financial settlement is reached.");
+      return;
+    }
     if (this.claimForm.invalid) return;
     this.isLoading.set(true);
     const fd = new FormData();

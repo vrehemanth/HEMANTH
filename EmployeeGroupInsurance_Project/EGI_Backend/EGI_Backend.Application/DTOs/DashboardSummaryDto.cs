@@ -11,6 +11,9 @@ namespace EGI_Backend.Application.DTOs
         public int TotalClaimsCount { get; set; }
         public int PendingClaimsCount { get; set; }
         public int TotalPoliciesCount { get; set; }
+        public int TotalMembersCount { get; set; }
+        public int TotalDependentsCount { get; set; }
+        public int TotalEndorsementsCount { get; set; }
         public decimal TotalRevenue { get; set; }
         public decimal TotalPayouts { get; set; }
         public decimal TotalCommissionPayouts { get; set; }

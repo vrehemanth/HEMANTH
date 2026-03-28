@@ -63,6 +63,9 @@
     @if (activeTab() === 'revisions') {
     <app-revisions-tab [p]="this"></app-revisions-tab>
     }
+    @if (activeTab() === 'hospitals') {
+    <app-hospitals-tab [p]="this"></app-hospitals-tab>
+    }
 
     <!-- Official EGI Invoice Document Modal -->
     @if (selectedInvoice()) {
@@ -499,11 +502,16 @@
                                 <span class="flex h-1.5 w-1.5 rounded-full bg-blue-600 animate-ping"></span>
                                 Live Financial Specification
                             </h4>
-                            <div class="flex items-baseline gap-2">
-                                <span class="text-2xl font-black text-blue-900 dark:text-white tracking-tight">₹{{formatINR(endorsementPreview().premiumAdjustment)}}</span>
-                                <span class="text-[10px] text-blue-500 font-bold uppercase tracking-widest">
-                                    Prorated for {{endorsementPreview().remainingDaysToNextCycle}} days ({{endorsementPreview().billingFrequency}})
-                                </span>
+                            <div class="space-y-1">
+                                <div class="flex items-baseline gap-2">
+                                    <span class="text-2xl font-black text-blue-900 dark:text-white tracking-tight">₹{{formatINR(endorsementPreview().premiumChange)}}</span>
+                                    <span class="text-[10px] text-blue-500 font-bold uppercase tracking-widest">
+                                        {{endorsementPreview().billingFrequency}} Premium Increase
+                                    </span>
+                                </div>
+                                <div class="text-[10px] text-gray-500 font-medium italic">
+                                    Immediate Adjustment: <span class="font-bold text-blue-600">₹{{formatINR(endorsementPreview().premiumAdjustment)}}</span> (Prorated for {{endorsementPreview().remainingDaysToNextCycle}} days)
+                                </div>
                             </div>
                             <p class="text-xs text-blue-700 dark:text-blue-300/80 mt-3 font-medium leading-relaxed italic border-l-2 border-blue-300 dark:border-blue-700 pl-3">
                                 "{{endorsementPreview().aiExplanation}}"
@@ -744,12 +752,18 @@
                     <h4 class="text-xs font-black dark:text-white uppercase tracking-widest">OCR Technical Extraction</h4>
                 </div>
 
-                @if (selectedClaimForView()?.extractedHospitalName || selectedClaimForView()?.extractedFirNumber || selectedClaimForView()?.extractedDateOfDeath || selectedClaimForView()?.extractedDiagnosis) {
+                @if (selectedClaimForView()?.isCashless || selectedClaimForView()?.hospitalName || selectedClaimForView()?.extractedHospitalName || selectedClaimForView()?.extractedFirNumber || selectedClaimForView()?.extractedDateOfDeath || selectedClaimForView()?.extractedDiagnosis) {
                     <div class="grid grid-cols-2 gap-4 bg-primary-50/30 dark:bg-primary-900/10 p-5 rounded-2xl border border-primary-100 dark:border-primary-800">
-                        @if (selectedClaimForView()?.extractedHospitalName) {
-                            <div>
-                                <span class="block text-[8px] font-black text-primary-400 uppercase tracking-wider">Hospital Name</span>
-                                <span class="text-[11px] font-bold text-primary-900 dark:text-primary-100">{{selectedClaimForView()?.extractedHospitalName}}</span>
+                        @if (selectedClaimForView()?.isCashless) {
+                            <div class="col-span-2 flex items-center gap-2 mb-2">
+                                <span class="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase rounded">Cashless Adjudication</span>
+                                <span class="text-[9px] text-gray-400 font-bold uppercase tracking-widest">— Authorized for Direct Settlement</span>
+                            </div>
+                        }
+                        @if (selectedClaimForView()?.hospitalName || selectedClaimForView()?.extractedHospitalName) {
+                            <div class="col-span-2">
+                                <span class="block text-[8px] font-black text-primary-400 uppercase tracking-wider">Network Medical Facility</span>
+                                <span class="text-sm font-black text-primary-900 dark:text-primary-100">{{selectedClaimForView()?.hospitalName || selectedClaimForView()?.extractedHospitalName}}</span>
                             </div>
                         }
                         @if (selectedClaimForView()?.extractedBillDate) {
@@ -954,4 +968,65 @@
     </div>
     }
 
+    <!-- EGI SMART CARD IDENTITY (CASHLESS AUTHENTICATOR) -->
+    @if (showEgiCardModal() && selectedMemberForCard()) {
+    <div class="fixed inset-0 bg-black/80 backdrop-blur-xl z-[120] flex items-center justify-center p-4 overflow-y-auto">
+        <div class="relative w-full max-w-lg transform animate-in zoom-in duration-500 flex flex-col items-center">
+            <button (click)="showEgiCardModal.set(false)" class="absolute -top-12 right-0 p-2 text-white/50 hover:text-white transition-colors">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-width="2.5" stroke-linecap="round"></path></svg>
+            </button>
+
+            <div id="egi-smart-card" class="w-full aspect-[1.586/1] rounded-[2.5rem] bg-slate-900 text-white shadow-2xl overflow-hidden relative group">
+                <div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image: radial-gradient(circle at 2px 2px, white 1px, transparent 0); background-size: 20px 20px;"></div>
+                <div class="relative h-full flex flex-col p-8 z-10">
+                    <div class="flex justify-between items-start mb-auto">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center p-2.5 shadow-xl">
+                                <svg class="w-full h-full text-primary-600 font-black" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-width="2.5"/></svg>
+                            </div>
+                            <div>
+                                <h2 class="text-2xl font-black tracking-tighter leading-none text-white">EGI</h2>
+                                <p class="text-[8px] font-black uppercase tracking-[0.3em] text-primary-400 mt-1">Smart Health Identity</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-10 text-white">
+                        <h1 class="text-3xl font-black tracking-tight mb-4 uppercase">{{ selectedMemberForCard().fullName }}</h1>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-[7px] font-black text-white/40 uppercase tracking-widest mb-1">Corporate ID</p>
+                                <p class="text-sm font-mono font-black">{{ selectedMemberForCard().employeeCode || 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-[7px] font-black text-white/40 uppercase tracking-widest mb-1">Relationship</p>
+                                <p class="text-sm font-black uppercase tracking-tighter">{{ selectedMemberForCard().relationship || 'Primary' }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-auto flex justify-between items-end border-t border-white/10 pt-6">
+                        <div class="space-y-1">
+                            <p class="text-[8px] font-bold text-white/60">NETWORK-CASHLESS-ENABLED</p>
+                            <p class="text-[9px] font-mono opacity-80 text-white">{{ selectedMemberForCard().id | slice:0:16 }}</p>
+                        </div>
+                        <div class="w-16 h-16 bg-white rounded-xl p-1.5 shadow-xl flex items-center justify-center">
+                            <svg class="w-full h-full text-slate-800" viewBox="0 0 24 24" fill="currentColor"><path d="M3,3h8v8H3V3M5,5v4h4V5H5M3,13h8v8H3V13M5,15v4h4v-4H5M13,3h8v8h-8V3M15,5v4h4V5H15M13,13h2v2h-2V13M19,13h2v2h-2V13M13,15h2v2h-2V15M17,17h2v2h-2V17M15,17h2v2h-2V17M13,19h2v2h-2V19M17,13h2v2h-2V13M19,15h2v2h-2V15"/></svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-8 flex gap-4 w-full">
+                <button (click)="downloadCard()" class="flex-1 py-4 bg-white text-slate-900 rounded-2xl font-black uppercase tracking-widest text-xs shadow-2xl hover:scale-105 active:scale-[0.98] transition-all flex items-center justify-center gap-3">
+                    Save Identity Artifact
+                </button>
+                <button (click)="showEgiCardModal.set(false)" class="px-8 py-4 bg-white/10 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-white/20 transition-all border border-white/10">
+                    Dismiss
+                </button>
+            </div>
+            <p class="mt-6 text-[10px] text-white/40 font-bold uppercase tracking-[0.2em] text-center">Authorized for Zero-Payment Hospital Check-in</p>
+        </div>
+    </div>
+    }
 </div>

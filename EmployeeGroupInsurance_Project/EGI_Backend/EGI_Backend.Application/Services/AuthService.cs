@@ -73,10 +73,11 @@ namespace EGI_Backend.Application.Services
             if (!validUser)
                 throw new UnauthorizedException("Invalid Credentials");
 
-            // Flaw 6 Fix: Check if user is Active
-            if (user.Status != UserStatus.Active)
+            // Allow Inactive users to login (needed for customers whose profile is Rejected/Draft)
+            // But Block Suspended users
+            if (user.Status == UserStatus.Suspended)
             {
-                throw new UnauthorizedException("Your account is currently inactive. Please contact your administrator for assistance.");
+                throw new UnauthorizedException("Your account has been suspended. Please contact support.");
             }
 
             user.LastLogin = DateTime.UtcNow;

@@ -137,5 +137,48 @@ namespace EGI_Backend.WebAPI.Controllers
             var result = await _claimService.RunAIAdjudicationAsync(id);
             return Ok(result);
         }
+
+        [HttpPost("claims/partnership")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> RegisterPartnershipClaim([FromForm] SubmitClaimDto dto)
+        {
+            var claimNumber = await _claimService.RegisterPartnershipClaimAsync(CurrentUserId, dto);
+            return Ok(new { message = "Partnership bill registered successfully and sent for Admin approval.", claimNumber });
+        }
+
+        [HttpGet("live-dispatches")]
+        public async Task<IActionResult> GetLiveDispatches()
+        {
+            var dispatches = await _claimService.GetLiveDispatchesAsync();
+            return Ok(dispatches);
+        }
+
+        [HttpGet("members/search/{identifier}")]
+        public async Task<ActionResult<MemberSearchResultDto>> SearchMember(string identifier)
+        {
+            var member = await _claimService.SearchMemberAsync(identifier);
+            return Ok(member);
+        }
+
+        [HttpGet("pending-health-checkups")]
+        public async Task<IActionResult> GetPendingHealthCheckups()
+        {
+            var result = await _dashboardService.GetPendingHealthCheckupsAsync();
+            return Ok(result);
+        }
+
+        [HttpPost("update-health-checkup-actuals/{corporateClientId}")]
+        public async Task<IActionResult> UpdateHealthCheckupActuals(Guid corporateClientId, [FromBody] HealthCheckActualsDto dto)
+        {
+            var result = await _dashboardService.UpdateHealthCheckupActualsAsync(corporateClientId, dto.MemberCount, dto.DependentCount);
+            if (!result) return NotFound("Corporate Client not found.");
+            return Ok(new { message = "Attendance counts synchronized successfully." });
+        }
+    }
+
+    public class HealthCheckActualsDto
+    {
+        public int MemberCount { get; set; }
+        public int DependentCount { get; set; }
     }
 }

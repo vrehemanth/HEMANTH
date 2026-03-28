@@ -33,6 +33,8 @@ namespace EGI_Backend.Infrastructure
             services.AddScoped<IPolicyEndorsementRepository, PolicyEndorsementRepository>();
             services.AddScoped<IAuditLogRepository, AuditLogRepository>();
             services.AddScoped<IUserRepository, UserRepository>();
+            services.AddScoped<IHospitalRepository, HospitalRepository>();
+            services.AddScoped<IClinicalDispatchRepository, ClinicalDispatchRepository>();
 
             // Infrastructure Services
             services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
@@ -42,6 +44,7 @@ namespace EGI_Backend.Infrastructure
             services.AddScoped<IOCRService, OCRService>();
             services.AddScoped<IFraudDetectionService, FraudDetectionService>();
             services.AddHttpClient<IAIAdjudicationService, AIAdjudicationService>();
+            services.AddHttpClient<EGI_Backend.Application.Interfaces.IAIService, EGI_Backend.Infrastructure.AI.GroqService>();
             services.AddHostedService<EGI_Backend.Infrastructure.BackgroundServices.InsuranceAutomationWorker>();
 
             return services;
@@ -61,6 +64,9 @@ namespace EGI_Backend.Infrastructure
             services.AddScoped<IAgentDashboardService, AgentDashboardService>();
             services.AddScoped<IClaimsOfficerDashboardService, ClaimsOfficerDashboardService>();
             services.AddScoped<ICustomerDashboardService, CustomerDashboardService>();
+            services.AddScoped<IHospitalService, HospitalService>();
+            services.AddScoped<IChatService, ChatService>();
+            services.AddScoped<IDataService, DataService>();
 
             return services;
         }

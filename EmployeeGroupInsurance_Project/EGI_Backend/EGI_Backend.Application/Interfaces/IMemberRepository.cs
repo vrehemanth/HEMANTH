@@ -13,7 +13,11 @@ namespace EGI_Backend.Application.Interfaces
         Task AddAsync(Member member);
         Task UpdateAsync(Member member);
         Task<int> CountByClientIdAsync(Guid clientId);
+        Task<int> CountActiveAsync();
+        Task<int> CountActiveDependentsAsync();
         Task<List<Member>> GetByClientIdAsync(Guid clientId);
         Task<Member?> GetByEmployeeCodeAndClientAsync(string employeeCode, Guid clientId);
+        Task<Member?> SearchAsync(string identifier);
+        Task<Dependent?> SearchDependentAsync(string identifier);
     }
 }

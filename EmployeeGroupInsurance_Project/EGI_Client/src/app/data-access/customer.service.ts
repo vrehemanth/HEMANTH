@@ -41,4 +41,14 @@ export class CustomerService {
     getInvoicesByPolicy(policyId: string): Observable<any[]> { return this.http.get<any[]>(`${API_BASE}/customer/dashboard/invoices/policy/${policyId}`); }
     getClaimsByPolicy(policyId: string): Observable<any[]> { return this.http.get<any[]>(`${API_BASE}/customer/dashboard/claims/policy/${policyId}`); }
     getClaimRejectionExplanation(claimId: string): Observable<any> { return this.http.get(`${API_BASE}/customer/dashboard/claims/${claimId}/rejection-explanation`); }
+    
+    // Hospital Network
+    getNetworkHospitals(): Observable<any[]> { return this.http.get<any[]>(`${API_BASE}/hospital/network`); }
+    dispatchClinicalIntimation(hospitalId: string, memberId: string): Observable<any> { 
+        return this.http.post(`${API_BASE}/customer/dashboard/hospital-dispatch/${hospitalId}/${memberId}`, {}); 
+    }
+
+    claimHealthCheckup(hospitalId: string): Observable<any> {
+        return this.http.post(`${API_BASE}/customer/dashboard/claim-health-checkup/${hospitalId}`, {});
+    }
 }

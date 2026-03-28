@@ -16,6 +16,14 @@
             </div>
             }
 
+            <button (click)="togglePartnershipForm()"
+                class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-primary-500/20 transition-all active:scale-95 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+                </svg>
+                Register Partnership Bill
+            </button>
+
             @if (['queue', 'history'].includes(activeTab())) {
             <button (click)="exportData()"
                 class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-emerald-500/20 transition-all active:scale-95 flex items-center gap-2">
@@ -42,5 +50,181 @@
         @if (activeTab() === 'history') {
             <app-history-tab [p]="this"></app-history-tab>
         }
+        @if (activeTab() === 'dispatches') {
+            <app-dispatches-tab [p]="this"></app-dispatches-tab>
+        }
+        @if (activeTab() === 'health-checkups') {
+            <app-health-checkup-tab [p]="this"></app-health-checkup-tab>
+        }
     </div>
+
+    <!-- Partnership Claim Registration Modal -->
+    @if (showPartnershipForm()) {
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] max-w-2xl w-full shadow-2xl p-10 transform animate-in zoom-in duration-300 overflow-y-auto max-h-[90vh]">
+            <div class="flex justify-between items-center mb-10">
+                <div>
+                    <h3 class="text-2xl font-black dark:text-white uppercase tracking-tighter italic">Partner Medical Registration</h3>
+                    <p class="text-[10px] text-primary-500 font-bold uppercase tracking-[0.3em] mt-1">Hospital Direct Billing Intake</p>
+                </div>
+                <button (click)="togglePartnershipForm()" class="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-width="2.5"></path></svg>
+                </button>
+            </div>
+
+            <!-- Progress Tracker -->
+            <div class="flex items-center gap-4 mb-10 overflow-x-auto pb-4">
+                @for (step of [1,2,3]; track step) {
+                    <div class="flex items-center gap-3 shrink-0">
+                        <div [class]="partnershipStep() >= step ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/20' : 'bg-gray-100 dark:bg-gray-700 text-gray-400'" 
+                             class="w-10 h-10 rounded-2xl flex items-center justify-center text-xs font-black transition-all">
+                            {{step}}
+                        </div>
+                        <span class="text-[10px] font-black uppercase tracking-widest" [class.text-primary-600]="partnershipStep() === step" [class.text-gray-400]="partnershipStep() !== step">
+                            {{ step === 1 ? 'Personnel' : (step === 2 ? 'Bill Detail' : 'Compliance docs') }}
+                        </span>
+                        @if (step < 3) {
+                            <div class="w-8 h-px bg-gray-200 dark:bg-gray-700"></div>
+                        }
+                    </div>
+                }
+            </div>
+
+            <form [formGroup]="partnershipForm" (ngSubmit)="submitPartnershipClaim()" class="space-y-8">
+                <!-- STEP 1: Personnel Identification -->
+                @if (partnershipStep() === 1) {
+                <div class="space-y-6 animate-in slide-in-from-right-4">
+                    <div class="p-8 rounded-[2rem] bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
+                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Unique Smart Card ID / Employee Index</label>
+                        <div class="relative group">
+                            <input type="text" formControlName="employeeCode" (input)="onMemberCodeInput($event)"
+                                class="w-full px-6 py-4 border-2 border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-700 dark:text-white font-black text-xl text-primary-600 focus:ring-4 focus:ring-primary-500/10 transition-all outline-none"
+                                placeholder="Scan Card or Enter HEX (e.g. ad61...)">
+                            
+                            @if (selectedMemberForClaim()) {
+                                <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-3 pl-4 pr-3 py-2 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 shadow-sm animate-in zoom-in duration-300">
+                                    <div class="flex flex-col items-end">
+                                        <span class="text-[12px] font-black uppercase tracking-tight leading-none">{{ selectedMemberForClaim().fullName }}</span>
+                                        <span class="text-[8px] font-black uppercase tracking-[0.2em] opacity-60 mt-1">{{ selectedMemberForClaim().category }}</span>
+                                    </div>
+                                    <div class="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-width="4"></path></svg>
+                                    </div>
+                                </div>
+                            } @else if (isInvalidMember()) {
+                                <div class="absolute right-4 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-red-50 text-red-600 rounded-xl border border-red-100 text-[10px] font-black uppercase animate-pulse">
+                                    No Policy Match Found
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Patient Classification (If Dependent)</label>
+                        <select formControlName="dependentId" class="w-full px-5 py-4 border-2 border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-700 dark:text-white font-bold transition-all focus:ring-4 focus:ring-primary-500/10 outline-none">
+                            <option value="">Primary Member (The Employee)</option>
+                            @for(d of selectedMemberForClaim()?.dependents; track d.id) {
+                                <option [value]="d.id">{{ d.fullName }} ({{ d.relationship }})</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="flex justify-end pt-4">
+                        <button type="button" (click)="partnershipStep.set(2)" [disabled]="!selectedMemberForClaim()" class="px-12 py-4 bg-primary-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-primary-500/20 disabled:opacity-50 transition active:scale-95">
+                            Validate Benefits & Proceed
+                        </button>
+                    </div>
+                </div>
+                }
+
+                <!-- STEP 2: Bill Detail -->
+                @if (partnershipStep() === 2) {
+                <div class="space-y-6 animate-in slide-in-from-right-4">
+                    <div class="grid grid-cols-2 gap-6">
+                        <div class="col-span-2">
+                            <div class="flex items-center justify-between mb-3">
+                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Network Partner Facility</label>
+                                @if (currentDispatch()) {
+                                    <span class="flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-[8px] font-black uppercase border border-amber-100 italic transition-all animate-pulse">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 00-2 2zm10-10V7a4 4 0 00-8 0v4h8z" stroke-width="2.5"></path></svg>
+                                        Digital Referral Lock
+                                    </span>
+                                }
+                            </div>
+                            <select formControlName="hospitalId" 
+                                    class="w-full px-5 py-4 border-2 border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-700 dark:text-white font-bold outline-none disabled:opacity-70 disabled:bg-gray-50/50">
+                                <option [value]="null">Select Facility...</option>
+                                @for (h of hospitals(); track h.id) {
+                                    <option [value]="h.id">{{ h.name }} — {{ h.city }}</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Investigation Category</label>
+                            <select formControlName="claimType" class="w-full px-5 py-4 border-2 border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-700 dark:text-white font-bold outline-none">
+                                <option value="Health">Medical / Clinical (Health)</option>
+                                <option value="Life">Mortality (Life)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Final Bill Amount (INR)</label>
+                            <input type="number" formControlName="claimAmount" class="w-full px-5 py-4 border-2 border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-700 dark:text-white font-black text-xl text-red-600 outline-none" placeholder="0.00">
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Clinical Narrative / Case Reason</label>
+                            <textarea formControlName="claimReason" rows="4" class="w-full px-5 py-4 border-2 border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-700 dark:text-white font-medium outline-none" placeholder="Extract reason from hospital email..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between pt-4">
+                        <button type="button" (click)="partnershipStep.set(1)" class="px-8 py-4 font-black text-[10px] text-gray-400 uppercase tracking-widest hover:text-gray-600 transition">Back</button>
+                        <button type="button" (click)="partnershipStep.set(3)" [disabled]="partnershipForm.get('claimType')?.invalid || partnershipForm.get('claimAmount')?.invalid || partnershipForm.get('claimReason')?.invalid" class="px-12 py-4 bg-primary-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-primary-500/20 transition active:scale-95 disabled:opacity-50">
+                            Configure Artifacts
+                        </button>
+                    </div>
+                </div>
+                }
+
+                <!-- STEP 3: Compliance Documents -->
+                @if (partnershipStep() === 3) {
+                <div class="space-y-6 animate-in slide-in-from-right-4">
+                    <div class="p-10 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-3xl flex flex-col items-center justify-center text-center group hover:border-primary-500/50 transition-all">
+                        <div class="p-4 bg-primary-50 dark:bg-gray-900 rounded-2xl text-primary-600 mb-6">
+                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" stroke-width="2"></path></svg>
+                        </div>
+                        <h5 class="text-sm font-black uppercase tracking-widest dark:text-white mb-2">Hospital Bill Upload</h5>
+                        <p class="text-[10px] text-gray-400 font-bold mb-6">Attach the PDF/Report received via Email</p>
+                        
+                        <label class="px-10 py-3 bg-white dark:bg-gray-700 border-2 border-gray-100 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl font-black text-[10px] uppercase tracking-widest cursor-pointer hover:bg-gray-50 transition active:scale-95">
+                            Browse Local Archive
+                            <input type="file" multiple (change)="onPartnershipDocsSelect($event)" class="hidden">
+                        </label>
+
+                        @if (selectedPartnershipFiles().length > 0) {
+                            <div class="w-full mt-8 space-y-2">
+                                @for (item of selectedPartnershipFiles(); track $index) {
+                                    <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700">
+                                        <div class="flex items-center gap-3">
+                                            <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-width="3"></path></svg>
+                                            <span class="text-[10px] font-black uppercase dark:text-white truncate">{{ item.file.name }}</span>
+                                        </div>
+                                        <button type="button" (click)="selectedPartnershipFiles.set([])" class="text-red-500"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-width="2"></path></svg></button>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <div class="flex justify-between pt-4">
+                        <button type="button" (click)="partnershipStep.set(2)" class="px-8 py-4 font-black text-[10px] text-gray-400 uppercase tracking-widest hover:text-gray-600 transition">Back</button>
+                        <button type="submit" [disabled]="selectedPartnershipFiles().length === 0 || isLoading()" class="px-12 py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-500/20 transition active:scale-95 disabled:opacity-50">
+                            @if (isLoading()) { <span class="animate-pulse">Finalizing...</span> } @else { Commit Partnership Claim }
+                        </button>
+                    </div>
+                </div>
+                }
+            </form>
+        </div>
+    </div>
+    }
 </div>

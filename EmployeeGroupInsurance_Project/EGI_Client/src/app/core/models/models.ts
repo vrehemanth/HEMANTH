@@ -92,6 +92,7 @@ export interface InsurancePlan {
     description: string;
     basePremium: number;
     status: boolean;
+    hasHealthCheckup: boolean;
     coverages: Coverage[];
 }
 
@@ -139,7 +140,26 @@ export interface Claim {
     status: ClaimStatus;
     memberId: string;
     memberName?: string;
+    dependentId?: string;
+    dependentName?: string;
     rejectionReason?: string;
+    isCashless?: boolean;
+    hospitalId?: string;
+    hospitalName?: string;
+}
+
+export interface Hospital {
+    id: string;
+    name: string;
+    address: string;
+    city: string;
+    contactPerson: string;
+    contactNumber: string;
+    isNetworkHospital: boolean;
+    googleMapsUrl?: string;
+    latitude?: number;
+    longitude?: number;
+    specialties?: string;
 }
 
 export interface CorporateClientDocumentDto {
@@ -163,6 +183,13 @@ export interface CorporateClientResponseDto {
     KybAiAnalysis?: string; // Adding PascalCase variant just in case of casing issues
     KybAiConfidenceScore?: number;
     documents: CorporateClientDocumentDto[];
+    lastHealthCheckupDate?: string;
+    healthCheckupHospitalId?: string;
+    healthCheckupHospitalName?: string;
+    healthCheckupActualMemberCount?: number;
+    healthCheckupActualDependentCount?: number;
+    isHealthCheckupClaimPending?: boolean;
+    healthCheckupVerifiedAt?: string;
 }
 
 

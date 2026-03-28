@@ -62,6 +62,8 @@ namespace EGI_Backend.Application.Services
                 UserId      = user.Id,
                 CompanyName = dto.CompanyName,
                 Address     = dto.Address,
+                Phone       = dto.MobileNumber,
+                IndustryType = dto.IndustryType,
                 Status      = VerificationStatus.Pending
             };
             await _clientRepo.AddAsync(corporateClient);
@@ -79,18 +81,14 @@ namespace EGI_Backend.Application.Services
             await _unitOfWork.SaveChangesAsync();
 
             // 8. Financial/Audit: Corporate documentation ingestion
-            int fileIdx = 0;
-            foreach (var file in dto.Documents)
+            for (int i = 0; i < dto.Documents.Count; i++)
             {
+                var file = dto.Documents[i];
+                var docType = (dto.DocumentTypes != null && i < dto.DocumentTypes.Count) 
+                              ? dto.DocumentTypes[i] 
+                              : DocumentType.Other;
+
                 var filePath = await _documentStorage.UploadAsync(file);
-
-                // Flaw 9 Fix: Avoid hardcoding all files as PAN. 
-                // Cycle through common types or use 'Miscellaneous'
-                var docType = fileIdx == 0 ? DocumentType.PAN : 
-                             fileIdx == 1 ? DocumentType.GSTIN :
-                             DocumentType.CIN;
-
-                if (fileIdx > 2) docType = DocumentType.PAN; // Fallback
 
                 var document = new CorporateClientDocument
                 {
@@ -101,7 +99,6 @@ namespace EGI_Backend.Application.Services
                     FilePath          = filePath
                 };
                 await _docRepo.AddAsync(document);
-                fileIdx++;
             }
 
             await _unitOfWork.SaveChangesAsync();

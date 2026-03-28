@@ -15,6 +15,7 @@
                 data.' :
                 activeTab() === 'claims' ? 'High-transparency audit trail and adjudication oversight of all claims.' :
                 activeTab() === 'approvals' ? 'Executive sign-off queue for high-value claims requiring admin authority.' :
+                activeTab() === 'hospitals' ? 'Manage medical provider infrastructure, network partnerships, and geospatial assets.' :
                 'Deep-dive security audit and system-wide intelligence monitoring.' }}
             </p>
         </div>
@@ -96,6 +97,11 @@
     <!-- ==================== APPROVALS TAB ==================== -->
     @if (activeTab() === 'approvals') {
         <app-approvals-tab [p]="this"></app-approvals-tab>
+    }
+
+    <!-- ==================== HOSPITALS TAB ==================== -->
+    @if (activeTab() === 'hospitals') {
+        <app-hospitals-tab [p]="this"></app-hospitals-tab>
     }
 
     <!-- GLOBAL CLAIM AUDIT MODAL -->
@@ -265,7 +271,7 @@
                             <p class="text-lg font-bold text-gray-800 dark:text-gray-200">{{ selectedClientForAi().companyName }}</p>
                         </div>
                         <div class="text-right">
-                            <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Confidence Accuracy</label>
+                            <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">AI Confidence Score</label>
                             <div class="flex items-center gap-2">
                                 <span class="text-2xl font-black text-indigo-600 dark:text-indigo-400">{{ selectedClientForAi().kybAiConfidenceScore || selectedClientForAi().KybAiConfidenceScore }}%</span>
                                 <div class="w-20 h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">

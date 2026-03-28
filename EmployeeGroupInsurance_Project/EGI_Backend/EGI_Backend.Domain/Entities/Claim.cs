@@ -42,6 +42,13 @@ namespace EGI_Backend.Domain.Entities
         public ClaimStatus Status { get; set; } = ClaimStatus.Pending;
 
         // ClaimsOfficer who reviewed this claim
+        // --- Cashless & Network Features ---
+        public bool IsCashless { get; set; } = false;
+        public Guid? NetworkHospitalId { get; set; }
+        public Hospital? NetworkHospital { get; set; }
+        public bool IsSettledWithHospital { get; set; } = false; // Directly settled by EGI
+        public DateTime? SettledAt { get; set; }
+
         public Guid? ReviewedBy { get; set; }
         public User? ReviewedByUser { get; set; }
 

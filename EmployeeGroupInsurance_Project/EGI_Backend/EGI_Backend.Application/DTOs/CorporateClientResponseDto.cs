@@ -19,5 +19,13 @@ namespace EGI_Backend.Application.DTOs
         public string? KybAiAnalysis { get; set; }
         public int KybAiConfidenceScore { get; set; }
         public List<CorporateClientDocumentDto> Documents { get; set; } = new();
+
+        public DateTime? LastHealthCheckupDate { get; set; }
+        public Guid? HealthCheckupHospitalId { get; set; }
+        public string? HealthCheckupHospitalName { get; set; }
+        public int HealthCheckupActualMemberCount { get; set; }
+        public int HealthCheckupActualDependentCount { get; set; }
+        public bool IsHealthCheckupClaimPending { get; set; }
+        public DateTime? HealthCheckupVerifiedAt { get; set; }
     }
 }

@@ -160,12 +160,37 @@ export class AgentDashboardComponent implements OnInit, OnDestroy {
     return `https://localhost:7146/api/Public/documents/${docId}?access_token=${token}`;
   }
 
-  selectedFile: File | null = null;
+  selectedDocuments = signal<{ file: File, type: number }[]>([]);
+  
+  availableDocumentTypes = [
+    { id: 1, name: 'GSTIN' },
+    { id: 2, name: 'PAN' },
+    { id: 3, name: 'CIN' },
+    { id: 4, name: 'Address Proof' },
+    { id: 5, name: 'Other' }
+  ];
+
+  industries = [
+    { value: 0, label: 'IT' },
+    { value: 1, label: 'Banking' },
+    { value: 2, label: 'Education' },
+    { value: 3, label: 'Others' },
+    { value: 4, label: 'Retail' },
+    { value: 5, label: 'Healthcare' },
+    { value: 6, label: 'Hospitality' },
+    { value: 7, label: 'Logistics' },
+    { value: 8, label: 'Manufacturing' },
+    { value: 9, label: 'Construction' },
+    { value: 10, label: 'OilAndGas' },
+    { value: 11, label: 'Mining' }
+  ];
 
   customerForm = this.fb.group({
     companyName: ['', Validators.required],
     email: ['', [Validators.required, Validators.email]],
     name: ['', Validators.required],
+    mobileNumber: ['', [Validators.required, Validators.pattern(/^[0-9]{10}$/)]],
+    industryType: [3, Validators.required], // Default to Others (3)
     address: ['', Validators.required]
   });
 
@@ -252,30 +277,55 @@ export class AgentDashboardComponent implements OnInit, OnDestroy {
   }
 
   onFileSelect(event: any) {
-    if (event.target.files.length > 0) this.selectedFile = event.target.files[0];
+    if (event.target.files.length > 0) {
+      for (let i = 0; i < event.target.files.length; i++) {
+        const file = event.target.files[i];
+        // Check if already added
+        if (!this.selectedDocuments().some(d => d.file.name === file.name && d.file.size === file.size)) {
+          this.selectedDocuments.update(docs => [...docs, { file, type: 2 }]); // Default to PAN
+        }
+      }
+    }
+    // Clear input so same file can be selected again if removed
+    event.target.value = '';
+  }
+
+  removeDocument(index: number) {
+    this.selectedDocuments.update(docs => docs.filter((_, i) => i !== index));
+  }
+
+  updateDocumentType(index: number, type: number) {
+    this.selectedDocuments.update(docs => {
+      const newDocs = [...docs];
+      newDocs[index].type = Number(type);
+      return newDocs;
+    });
   }
 
   createCustomer() {
-    if (this.customerForm.invalid || !this.selectedFile) return;
+    if (this.customerForm.invalid || this.selectedDocuments().length === 0) return;
 
     const formData = new FormData();
     const val = this.customerForm.value as any;
 
     formData.append('Email', val.email);
     formData.append('Name', val.name);
+    formData.append('MobileNumber', val.mobileNumber);
+    formData.append('IndustryType', val.industryType.toString());
     formData.append('CompanyName', val.companyName);
     formData.append('Address', val.address);
 
-    if (this.selectedFile) {
-      formData.append('Documents', this.selectedFile);
-    }
+    this.selectedDocuments().forEach((doc, index) => {
+      formData.append('Documents', doc.file);
+      formData.append(`DocumentTypes[${index}]`, doc.type.toString());
+    });
 
     this.agentService.createCustomer(formData).subscribe({
       next: () => {
         this.toastService.success('Customer onboarding request submitted successfully. The customer will receive login credentials after administrator approval.', 6000);
         this.showCustomerForm.set(false);
         this.customerForm.reset();
-        this.selectedFile = null;
+        this.selectedDocuments.set([]);
         this.agentService.getMyCustomers().subscribe((res: any) => this.customers.set(this.extractArray(res)));
       },
       error: (err) => {
@@ -382,7 +432,7 @@ export class AgentDashboardComponent implements OnInit, OnDestroy {
             borderColor: 'rgba(255,255,255,0.1)',
             borderWidth: 1,
             callbacks: {
-              label: (i: any) => ` ${i.label}: ₹${i.raw.toLocaleString()}`
+              label: (i: any) => ` ${i.label}: ₹${i.raw.toLocaleString('en-IN')}`
             }
           }
         }

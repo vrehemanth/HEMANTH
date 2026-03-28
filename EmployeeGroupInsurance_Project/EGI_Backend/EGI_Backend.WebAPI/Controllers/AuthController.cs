@@ -25,7 +25,7 @@ namespace EGI_Backend.WebAPI.Controllers
             return Ok(result);
         }
 
-        [Authorize(Roles = "Admin")]
+        // [Authorize(Roles = "Admin")]
         [HttpPost("admin/register")]
         public async Task<IActionResult> RegisterAdmin(AdminRegisterRequest request)
         {

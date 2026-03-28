@@ -160,15 +160,20 @@ namespace EGI_Backend.Application.Services
                 // 1. Calculate the FULL annual rate impact (un-prorated)
                 decimal fullAnnualImpact = await CalculateFullAnnualRateAsync(policy, endorsement.Type, endorsement.EndorsementData);
 
-                // 2. Apply the physical changes (Add member/dependent, soft-delete removed ones)
-                await ApplyEndorsementChanges(policy, endorsement);
+                // 2. Recalculate adjustment based on the original submission date to avoid "Approval Drift" (Flaw 5)
+                // IMPORTANT: We do this BEFORE ApplyEndorsementChanges so that if it's a Removal, 
+                // the calculator can still see the member/dependents as 'Active' to get their cost.
+                endorsement.PremiumAdjustment = await CalculateProratedAdjustmentAsync(policy, endorsement.Type, endorsement.EndorsementData, endorsement.CreatedAt);
 
                 // 3. Update Policy master premium data
                 policy.AnnualPremium += fullAnnualImpact;
                 
-                // FIXED: Remaining term calculation needs to be precise relative to submission (Flaw 5)
+                // Precise Remaining term calculation relative to submission
                 var remainingDays = (decimal)((policy.EndDate.Date - endorsement.CreatedAt.Date).TotalDays);
                 policy.TotalPremium += Math.Round(fullAnnualImpact * (remainingDays / 365.0m), 2);
+
+                // 4. Apply the physical changes (Add member/dependent, soft-delete removed ones)
+                await ApplyEndorsementChanges(policy, endorsement);
 
                 // 4. Calculate and record the COMMISSION ADJUSTMENT
                 // Flaw 1: Count ONLY active members for categorization
@@ -179,10 +184,6 @@ namespace EGI_Backend.Application.Services
                 policy.BusinessCategory = EGI_Backend.Domain.Constants.BusinessRules.GetCategoryByHeadcount(policyLives);
                 decimal commissionPercentage = EGI_Backend.Domain.Constants.BusinessRules.GetCommissionRate(policy.BusinessCategory);
                 
-                // Recalculate adjustment based on the original submission date to avoid "Approval Drift" (Flaw 5)
-                endorsement.PremiumAdjustment = await CalculateProratedAdjustmentAsync(policy, endorsement.Type, endorsement.EndorsementData, endorsement.CreatedAt);
-                
-                // Flaw 2: Commission calculation
                 // Note: InvoiceService handles EARNED commission on PAYMENT. 
                 // Here we update the POTENTIAL total commission for the policy term.
                 endorsement.CommissionAdjustment = Math.Round(endorsement.PremiumAdjustment * commissionPercentage, 2);
@@ -318,7 +319,14 @@ namespace EGI_Backend.Application.Services
                 freqLabel = "Annual";
                 recurringChange = Math.Round(fullAnnualDelta, 2);
                 nextRecurringTotal = Math.Round(policy.AnnualPremium + fullAnnualDelta, 2);
-                remainingDaysInCycle = (int)(policy.EndDate.Date - anchorDate.Date).TotalDays;
+                
+                // Calculate remaining days in current annual cycle
+                var cycleStart = policy.StartDate.Date;
+                while (cycleStart.AddYears(1) <= anchorDate.Date) cycleStart = cycleStart.AddYears(1);
+                var cycleEnd = cycleStart.AddYears(1).AddDays(-1);
+                if (cycleEnd > policy.EndDate.Date) cycleEnd = policy.EndDate.Date;
+                
+                remainingDaysInCycle = (int)(cycleEnd - anchorDate.Date).TotalDays;
             }
 
             if (remainingDaysInCycle < 0) remainingDaysInCycle = 0;
@@ -575,6 +583,18 @@ namespace EGI_Backend.Application.Services
                     cycleStart = cycleStart.AddMonths(1);
                 }
                 referenceEndDate = cycleStart.AddMonths(1).AddDays(-1);
+
+                if (referenceEndDate > policy.EndDate.Date)
+                    referenceEndDate = policy.EndDate.Date;
+            }
+            else if (policy.BillingFrequency == BillingFrequency.Annual)
+            {
+                var cycleStart = policy.StartDate.Date;
+                while (cycleStart.AddYears(1) <= calculationDate)
+                {
+                    cycleStart = cycleStart.AddYears(1);
+                }
+                referenceEndDate = cycleStart.AddYears(1).AddDays(-1);
 
                 if (referenceEndDate > policy.EndDate.Date)
                     referenceEndDate = policy.EndDate.Date;

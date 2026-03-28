@@ -48,8 +48,8 @@ namespace EGI_Backend.Infrastructure.Repositories
         public async Task<List<Member>> GetByPolicyAssignmentIdAsync(Guid policyAssignmentId)
         {
             return await _context.Members
-                .Include(m => m.Dependents)
-                .Where(m => m.PolicyAssignmentId == policyAssignmentId)
+                .Include(m => m.Dependents.Where(d => d.IsActive))
+                .Where(m => m.PolicyAssignmentId == policyAssignmentId && m.Status)
                 .ToListAsync();
         }
 
@@ -57,6 +57,16 @@ namespace EGI_Backend.Infrastructure.Repositories
         {
             return await _context.Members
                 .CountAsync(m => m.PolicyAssignment.CorporateClientId == clientId && m.Status);
+        }
+
+        public async Task<int> CountActiveAsync()
+        {
+            return await _context.Members.CountAsync(m => m.Status);
+        }
+
+        public async Task<int> CountActiveDependentsAsync()
+        {
+            return await _context.Dependents.CountAsync(d => d.IsActive && d.Member.Status);
         }
 
         public async Task<List<Member>> GetByClientIdAsync(Guid clientId)
@@ -74,6 +84,38 @@ namespace EGI_Backend.Infrastructure.Repositories
             return await _context.Members
                 .Include(m => m.Dependents)
                 .FirstOrDefaultAsync(m => m.EmployeeCode == employeeCode && m.CorporateClientId == clientId);
+        }
+
+        public async Task<Member?> SearchAsync(string identifier)
+        {
+            var lowerId = identifier.ToLower().Trim();
+            // Strict check: partial ID search only if >= 8 chars to avoid accidental hits on short hex strings
+            bool isFullSearch = lowerId.Length >= 8;
+
+            return await _context.Members
+                .Include(m => m.Dependents)
+                .Include(m => m.PolicyAssignment)
+                .FirstOrDefaultAsync(m => 
+                    m.Status && (
+                    m.EmployeeCode.ToLower() == lowerId || 
+                    (isFullSearch && m.Id.ToString().ToLower().StartsWith(lowerId)) ||
+                    (isFullSearch && m.Id.ToString().ToLower().Replace("-", "").StartsWith(lowerId.Replace("-", ""))))
+                );
+        }
+
+        public async Task<Dependent?> SearchDependentAsync(string identifier)
+        {
+            var lowerId = identifier.ToLower().Trim();
+            bool isFullSearch = lowerId.Length >= 8;
+
+            return await _context.Dependents
+                .Include(d => d.Member)
+                    .ThenInclude(m => m.PolicyAssignment)
+                .FirstOrDefaultAsync(d => 
+                    d.IsActive && d.Member.Status && (
+                    (isFullSearch && d.Id.ToString().ToLower().StartsWith(lowerId)) ||
+                    (isFullSearch && d.Id.ToString().ToLower().Replace("-", "").StartsWith(lowerId.Replace("-", ""))))
+                );
         }
     }
 }

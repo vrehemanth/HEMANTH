@@ -15,6 +15,10 @@ namespace EGI_Backend.WebAPI.Mapping
                 .ForMember(dest => dest.Type, opt => opt.MapFrom(src => src.Type.ToString()))
                 .ForMember(dest => dest.CoveredGroup, opt => opt.MapFrom(src => src.CoveredGroup.ToString()));
 
+            // Hospital mappings
+            CreateMap<Hospital, HospitalDto>();
+            CreateMap<CreateUpdateHospitalDto, Hospital>();
+
             // Claim mappings
             CreateMap<Claim, ClaimResponseDto>()
                 .ForMember(dest => dest.MemberName, opt => opt.MapFrom(src => src.Member.FullName))
@@ -66,6 +70,7 @@ namespace EGI_Backend.WebAPI.Mapping
                 .ForMember(dest => dest.BillingFrequency, opt => opt.MapFrom(src => src.BillingFrequency.ToString()))
                 .ForMember(dest => dest.InsurancePlanId, opt => opt.MapFrom(src => src.InsurancePlanId))
                 .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()))
+                .ForMember(dest => dest.PendingCredit, opt => opt.MapFrom(src => src.PendingCredit))
                 .ForMember(dest => dest.CanRenew, opt => opt.MapFrom(src => 
                     (src.Status == PolicyStatus.Active || (src.Status == PolicyStatus.Inactive && DateTime.UtcNow > src.EndDate)) && 
                     (src.InsurancePlan == null || src.InsurancePlan.Status) &&

@@ -41,4 +41,21 @@ export class AdminService {
     getAuditLogs(userId?: string, entityName?: string): Observable<any[]> {
         return this.http.get<any[]>(`${API_BASE}/admin/dashboard/audit-logs?userId=${userId || ''}&entityName=${entityName || ''}`);
     }
+
+    // Hospital Management
+    getAllHospitals(): Observable<any[]> { return this.http.get<any[]>(`${API_BASE}/hospital`); }
+    getNetworkHospitals(): Observable<any[]> { return this.http.get<any[]>(`${API_BASE}/hospital/network`); }
+    getHospitalById(id: string): Observable<any> { return this.http.get<any>(`${API_BASE}/hospital/${id}`); }
+    createHospital(dto: any): Observable<any> { return this.http.post(`${API_BASE}/hospital`, dto); }
+    updateHospital(id: string, dto: any): Observable<any> { return this.http.put(`${API_BASE}/hospital/${id}`, dto); }
+    deleteHospital(id: string): Observable<any> { return this.http.delete(`${API_BASE}/hospital/${id}`); }
+
+    // Health Checkup Synchronization (Claims Officer / Admin path)
+    getPendingHealthCheckups(): Observable<any[]> {
+        return this.http.get<any[]>(`${API_BASE}/claims-officer/dashboard/pending-health-checkups`);
+    }
+
+    updateHealthCheckupActuals(clientId: string, counts: { memberCount: number, dependentCount: number }): Observable<any> {
+        return this.http.post(`${API_BASE}/claims-officer/dashboard/update-health-checkup-actuals/${clientId}`, counts);
+    }
 }

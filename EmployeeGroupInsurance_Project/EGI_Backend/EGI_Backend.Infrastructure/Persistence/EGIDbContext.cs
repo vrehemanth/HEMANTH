@@ -36,6 +36,8 @@ namespace EGI_Backend.Infrastructure.Persistence
         public DbSet<AgentCustomer> AgentCustomers { get; set; }
         public DbSet<PolicyEndorsement> PolicyEndorsements { get; set; }
         public DbSet<Notification> Notifications { get; set; }
+        public DbSet<Hospital> Hospitals { get; set; }
+        public DbSet<ClinicalDispatch> ClinicalDispatches { get; set; }
 
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
@@ -217,6 +219,12 @@ namespace EGI_Backend.Infrastructure.Persistence
             modelBuilder.Entity<Notification>()
                 .HasIndex(n => n.IsRead);
 
+            modelBuilder.Entity<Hospital>()
+                .HasIndex(h => h.IsNetworkHospital);
+
+            modelBuilder.Entity<Hospital>()
+                .HasIndex(h => h.City);
+
             modelBuilder.Entity<CorporateClient>(entity =>
             {
                 entity.HasKey(c => c.Id);
@@ -353,6 +361,11 @@ namespace EGI_Backend.Infrastructure.Persistence
                 entity.HasOne(c => c.Dependent)
                       .WithMany()
                       .HasForeignKey(c => c.DependentId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(c => c.NetworkHospital)
+                      .WithMany()
+                      .HasForeignKey(c => c.NetworkHospitalId)
                       .OnDelete(DeleteBehavior.Restrict);
 
                 entity.HasOne(c => c.ReviewedByUser)

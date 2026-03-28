@@ -8,6 +8,7 @@ namespace EGI_Backend.Application.Interfaces
     public interface IClaimService
     {
         Task<string> SubmitClaimAsync(Guid corporateClientUserId, SubmitClaimDto dto);
+        Task<string> RegisterPartnershipClaimAsync(Guid officerUserId, SubmitClaimDto dto);
         Task ReviewClaimAsync(Guid claimsOfficerUserId, Guid claimId, ReviewClaimDto dto);
         Task<List<ClaimResponseDto>> GetClaimsByPolicyAsync(Guid policyAssignmentId, Guid callerUserId, string role);
         Task<List<ClaimResponseDto>> GetPendingClaimsAsync();
@@ -22,5 +23,8 @@ namespace EGI_Backend.Application.Interfaces
         Task<ClaimDetailResponseDto> RunAIAdjudicationAsync(Guid claimId);
         Task<string> GetClaimRejectionExplanationAsync(Guid userId, string role, Guid claimId);
         Task<(byte[] content, string contentType, string fileName)> GetSecureDocumentAsync(Guid userId, string role, Guid documentId);
+        Task<MemberSearchResultDto> SearchMemberAsync(string identifier);
+        Task DispatchEmergencyAsync(Guid userId, Guid hospitalId, Guid personId);
+        Task<List<ClinicalDispatchDto>> GetLiveDispatchesAsync();
     }
 }

@@ -242,29 +242,51 @@ namespace EGI_Backend.Application.Services
                 .OrderBy(i => i.BillingPeriodFrom) // Apply to the SOONEST available invoices first (Waterfall)
                 .ToList();
 
-            if (!pendingInvoices.Any()) return;
-
             decimal remainingCredit = creditAmount;
 
+            // Waterfall to pending invoices using Credit Note Payments
             foreach (var targetInvoice in pendingInvoices)
             {
                 if (remainingCredit <= 0) break;
 
                 decimal balance = targetInvoice.Amount - targetInvoice.TotalPaid;
+                decimal applyNow = Math.Min(balance, remainingCredit);
 
-                if (balance <= remainingCredit)
+                if (applyNow > 0)
                 {
-                    // Balance can be fully wiped by credit
-                    remainingCredit -= balance;
-                    targetInvoice.Amount = targetInvoice.TotalPaid; // Set amount TO what was already paid to reach 0 balance
-                    targetInvoice.Status = InvoiceStatus.Paid;
+                    remainingCredit -= applyNow;
+
+                    var creditPayment = new Payment
+                    {
+                        Id = Guid.NewGuid(),
+                        InvoiceId = targetInvoice.Id,
+                        PaidBy = targetInvoice.PolicyAssignment?.CorporateClient?.UserId ?? Guid.Empty, 
+                        TransactionId = $"CREDIT-{Guid.NewGuid().ToString().Substring(0, 8)}",
+                        PaidAmount = applyNow,
+                        PaymentDate = DateTime.UtcNow,
+                        PaymentMethod = PaymentMethod.CreditNote,
+                        Status = PaymentStatus.Success,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    targetInvoice.TotalPaid += applyNow;
+                    if (targetInvoice.TotalPaid >= targetInvoice.Amount)
+                        targetInvoice.Status = InvoiceStatus.Paid;
+                    else
+                        targetInvoice.Status = InvoiceStatus.PartiallyPaid;
+
+                    await _paymentRepo.AddAsync(creditPayment);
                 }
-                else
+            }
+
+            // Save leftover to PendingCredit on Policy
+            if (remainingCredit > 0)
+            {
+                var policyObj = await _policyRepo.GetByIdAsync(policyAssignmentId);
+                if (policyObj != null)
                 {
-                    // Partial balance reduction
-                    targetInvoice.Amount = Math.Round(targetInvoice.Amount - remainingCredit, 2);
-                    remainingCredit = 0;
-                    // Status remains Partial/Overdue but with smaller balance
+                    policyObj.PendingCredit += remainingCredit;
+                    await _policyRepo.UpdateAsync(policyObj);
                 }
             }
 
@@ -290,15 +312,32 @@ namespace EGI_Backend.Application.Services
             var periodFrom = DateTime.UtcNow.Date;
             var periodTo = (customPeriodTo ?? policy.EndDate).Date; 
 
+            // Match against PendingCredit FIRST before generating invoice
+            if (policy.PendingCredit > 0)
+            {
+                decimal applyNow = Math.Min(policy.PendingCredit, roundedAmount);
+                policy.PendingCredit -= applyNow;
+                roundedAmount -= applyNow;
+                
+                await _policyRepo.UpdateAsync(policy);
+
+                // IMPORTANT: If credit covers the entire adjustment, we DO NOT generate an invoice
+                if (roundedAmount <= 0)
+                {
+                    await _unitOfWork.SaveChangesAsync();
+                    return;
+                }
+            }
+
             var invoice = new Invoice
             {
                 Id = Guid.NewGuid(),
                 PolicyAssignmentId = policy.Id,
-                InvoiceNo = GenerateInvoiceNo() + "-ADJ", // Suffix to mark as adjustment
+                InvoiceNo = GenerateInvoiceNo() + "-ADJ",
                 InvoiceDate = DateTime.UtcNow,
                 BillingPeriodFrom = periodFrom,
                 BillingPeriodTo = periodTo,
-                Amount = roundedAmount, // ONLY the extra amount, not the new total
+                Amount = roundedAmount,
                 DueDate = DateTime.UtcNow.AddDays(EGI_Backend.Domain.Constants.BusinessRules.InvoiceDueGraceDays),
                 Status = InvoiceStatus.Pending,
                 CreatedAt = DateTime.UtcNow
@@ -322,20 +361,26 @@ namespace EGI_Backend.Application.Services
         {
             int today = DateTime.UtcNow.Day;
             var policies = await _invoiceRepo.GetActivePoliciesDueForInvoiceAsync(today);
+            Console.WriteLine($"[RECURRING-SCAN] Found {policies.Count} active policies to evaluate today.");
 
             var newlyGeneratedInvoices = new List<(Invoice Inv, PolicyAssignment Pol)>();
 
             foreach (var policy in policies)
             {
+                Console.WriteLine($"[RECURRING-SCAN] Evaluating Policy: {policy.PolicyNo} (Start: {policy.StartDate.Date}, End: {policy.EndDate.Date})");
                 // Get the latest invoice so we can continue from where it left off
                 var latest = await _invoiceRepo.GetLatestInvoiceForPolicyAsync(policy.Id);
-                if (latest == null) continue; // First invoice handled at creation
+                if (latest == null) {
+                   Console.WriteLine($"[RECURRING-SCAN] Bootstrapping missing initial invoice for {policy.PolicyNo}...");
+                   // If the initial invoice was manually deleted from the database, the chain is broken.
+                   // We must recreate the very first invoice (Year 1) so the recurring worker can continue counting from there.
+                   await GenerateFirstInvoiceAsync(policy);
+                   continue; 
+                }
 
                 var nextPeriodFrom = latest.BillingPeriodTo.Date.AddDays(1);
                 var nextPeriodTo = AddOneBillingCycle(nextPeriodFrom, policy.BillingFrequency).AddDays(-1);
 
-                // REAL WORLD GUARD: Only generate if the next period starts within the next 30 days.
-                // We don't want to generate invoices for Year 2030 while we are in 2026!
                 if (nextPeriodFrom > DateTime.UtcNow.AddDays(30))
                 {
                     continue;
@@ -354,14 +399,6 @@ namespace EGI_Backend.Application.Services
                 // Calculate standard amount
                 decimal invoiceAmount = CalculateInvoiceAmount(policy);
 
-                // PENNY TRUE-UP: If this is the final invoice of the term, adjust it to match TotalPremium exactly.
-                // This prevents rounding errors (e.g. 10000 / 12 = 833.33 * 12 = 9999.96)
-                if (nextPeriodTo >= policy.EndDate.Date)
-                {
-                    decimal amountPreviouslyBilled = alreadyExists.Sum(i => i.Amount);
-                    invoiceAmount = Math.Max(0, policy.TotalPremium - amountPreviouslyBilled);
-                }
-
                 var invoice = new Invoice
                 {
                     Id = Guid.NewGuid(),
@@ -377,6 +414,41 @@ namespace EGI_Backend.Application.Services
                 };
 
                 await _invoiceRepo.AddAsync(invoice);
+                await _unitOfWork.SaveChangesAsync(); // Essential for foreign key dependency
+
+                // Offset with PendingCredit as a Payment
+                if (policy.PendingCredit > 0)
+                {
+                    decimal applyNow = Math.Min(policy.PendingCredit, invoice.Amount);
+                    policy.PendingCredit -= applyNow;
+
+                    var creditPayment = new Payment
+                    {
+                        Id = Guid.NewGuid(),
+                        InvoiceId = invoice.Id,
+                        PaidBy = policy.CorporateClient?.UserId ?? Guid.Empty,
+                        TransactionId = $"CREDIT-{Guid.NewGuid().ToString().Substring(0, 8)}",
+                        PaidAmount = applyNow,
+                        PaymentDate = DateTime.UtcNow,
+                        PaymentMethod = PaymentMethod.CreditNote,
+                        Status = PaymentStatus.Success,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    invoice.TotalPaid = applyNow;
+                    if (invoice.TotalPaid >= invoice.Amount)
+                        invoice.Status = InvoiceStatus.Paid;
+                    else
+                        invoice.Status = InvoiceStatus.PartiallyPaid;
+
+                    await _paymentRepo.AddAsync(creditPayment);
+                    await _policyRepo.UpdateAsync(policy);
+                    
+                    // Update invoice status again if needed
+                    await _invoiceRepo.UpdateAsync(invoice);
+                    await _unitOfWork.SaveChangesAsync();
+                }
+
                 newlyGeneratedInvoices.Add((invoice, policy));
             }
 

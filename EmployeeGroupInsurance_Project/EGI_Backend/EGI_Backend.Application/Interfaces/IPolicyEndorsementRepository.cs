@@ -14,6 +14,7 @@ namespace EGI_Backend.Application.Interfaces
         Task<List<PolicyEndorsement>> GetByPolicyIdAsync(Guid policyAssignmentId);
         Task<List<PolicyEndorsement>> GetPendingAsync();
         Task<List<PolicyEndorsement>> GetByClientIdAsync(Guid clientId);
+        Task<List<PolicyEndorsement>> GetAllAsync();
         Task<bool> IsDuplicateAsync(string submissionToken);
     }
 }

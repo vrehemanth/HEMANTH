@@ -8,6 +8,7 @@ using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using System.Text.Json;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.EntityFrameworkCore;
 using System.IO;
 using UglyToad.PdfPig;
@@ -33,6 +34,9 @@ namespace EGI_Backend.Application.Services
         private readonly IFraudDetectionService _fraudService;
         private readonly IAIAdjudicationService _aiService;
         private readonly IAuditLogRepository _auditRepo;
+        private readonly IMemoryCache _cache;
+        private readonly IHospitalRepository _hospitalRepo;
+        private readonly IClinicalDispatchRepository _dispatchRepo;
  
         public ClaimService(
             IClaimRepository claimRepo,
@@ -51,7 +55,10 @@ namespace EGI_Backend.Application.Services
             IOCRService ocrService,
             IFraudDetectionService fraudService,
             IAIAdjudicationService aiService,
-            IAuditLogRepository auditRepo)
+            IAuditLogRepository auditRepo,
+            IMemoryCache cache,
+            IHospitalRepository hospitalRepo,
+            IClinicalDispatchRepository dispatchRepo)
         {
             _claimRepo = claimRepo;
             _policyRepo = policyRepo;
@@ -70,6 +77,9 @@ namespace EGI_Backend.Application.Services
             _fraudService = fraudService;
             _aiService = aiService;
             _auditRepo = auditRepo;
+            _cache = cache;
+            _hospitalRepo = hospitalRepo;
+            _dispatchRepo = dispatchRepo;
         }
 
         public async Task<string> SubmitClaimAsync(Guid corporateClientUserId, SubmitClaimDto dto)
@@ -87,6 +97,9 @@ namespace EGI_Backend.Application.Services
             var policy = member.PolicyAssignment;
             if (policy == null || policy.Id != dto.PolicyAssignmentId)
                 throw new NotFoundException("Policy not found or member does not belong to this policy.");
+
+            if (await _invoiceRepo.HasUnpaidInvoicesAsync(policy.Id))
+                throw new BadRequestException("Benefit Suspension: This policy has pending or overdue invoices. Claims cannot be filed until outstanding balances are settled.");
 
             OCRExtractedData? ocrData = null;
             if (dto.Documents.Count > 0)
@@ -134,11 +147,39 @@ namespace EGI_Backend.Application.Services
                     throw new NotFoundException("Dependent does not belong to this member.");
             }
 
-            if (!member.Status)
-                throw new ForbiddenException("Claim Submission Blocked: This member account is currently inactive.");
+            // 1. Status Check with "Endorsement" vs "Bereavement" distinction
+            if (!member.Status || (dependent != null && !dependent.IsActive))
+            {
+                // If inactive, we ONLY allow a Life claim if it's a "refile" or update of an existing one.
+                // If no Life claim exists in the system, it means they were removed via endorsement (End-of-Service).
+                bool isRefile = dto.ClaimType == CoverageType.Life && 
+                                await _claimRepo.GetApprovedClaimsTotalAsync(dto.PolicyAssignmentId, dto.MemberId, dto.DependentId, CoverageType.Life) > 0;
+                
+                if (!isRefile)
+                {
+                    string entity = dependent != null ? "dependent" : "primary member";
+                    throw new ForbiddenException($"Claim Submission Terminated: This {entity} was removed from the policy (Endorsement) or is no longer eligible for coverage. Any previous and future benefit tallies are suspended.");
+                }
+            }
 
-            if (dependent != null && !dependent.IsActive)
-                throw new ForbiddenException("Claim Submission Blocked: Attempting to claim for an inactive dependent.");
+            // 2. Terminal Event Deactivation Logic (Only for active accounts filing discovery Life claim)
+            if (dto.ClaimType == CoverageType.Life)
+            {
+                if (!dto.DependentId.HasValue && member.Status)
+                {
+                    // Primary Member Death
+                    member.Status = false;
+                    foreach (var dep in member.Dependents)
+                    {
+                        dep.IsActive = false;
+                    }
+                }
+                else if (dto.DependentId.HasValue && dependent != null && dependent.IsActive)
+                {
+                    // Specific Dependent Death
+                    dependent.IsActive = false;
+                }
+            }
 
             var client = await _clientRepo.GetByUserIdAsync(corporateClientUserId);
             if (client == null || policy.CorporateClientId != client.Id)
@@ -411,6 +452,9 @@ namespace EGI_Backend.Application.Services
                 claim.RejectionReason = null;
 
                 await AdjustMemberCoverageAsync(claim);
+
+                // Automate Balance Enforcement for Sibling Claims
+                await EnforceRemainingCoverageForPendingClaimsAsync(claim);
             }
             else
             {
@@ -445,6 +489,7 @@ namespace EGI_Backend.Application.Services
                 }
             }
             catch { /* Notifications should not block the main transaction */ }
+            _cache.Remove("AdminDashboardSummary");
         }
 
         public async Task<List<ClaimResponseDto>> GetClaimsByPolicyAsync(Guid policyAssignmentId, Guid callerUserId, string role)
@@ -603,6 +648,52 @@ namespace EGI_Backend.Application.Services
             }
         }
 
+        private async Task EnforceRemainingCoverageForPendingClaimsAsync(Claim approvedClaim)
+        {
+            // 1. Get current remaining coverage for this specific type and person
+            // Note: GetCoverageSummaryAsync calculates from DB. Since approvedClaim isn't saved yet, 
+            // the summary will NOT include it.
+            var summary = await GetCoverageSummaryAsync(approvedClaim.MemberId, approvedClaim.DependentId);
+            var coverageItem = summary.CoverageBreakdown.FirstOrDefault(c => c.ClaimType.Equals(approvedClaim.ClaimType.ToString(), StringComparison.OrdinalIgnoreCase));
+            
+            if (coverageItem == null) return;
+
+            // Subtract the amount JUST approved in memory from the balance reported by DB (since DB only knows Approved/Settled)
+            decimal currentRemainingBalance = coverageItem.Remaining - approvedClaim.ClaimAmount;
+            var indianCulture = new System.Globalization.CultureInfo("en-IN");
+
+            // 2. Fetch all other claims (Non-Final) that were already filed for the same person and type
+            var siblingClaims = (await _claimRepo.GetByMemberIdAsync(approvedClaim.MemberId))
+                .Where(c => c.Id != approvedClaim.Id && 
+                            c.DependentId == approvedClaim.DependentId && 
+                            c.ClaimType == approvedClaim.ClaimType &&
+                            (c.Status == ClaimStatus.Pending || 
+                             c.Status == ClaimStatus.InReview || 
+                             c.Status == ClaimStatus.PendingAdminApproval))
+                .OrderBy(c => c.ClaimDate)
+                .ToList();
+
+            if (!siblingClaims.Any()) return;
+
+            foreach (var sc in siblingClaims)
+            {
+                // STRICT REJECTION RULE: If any single claim exceeds the *current* 
+                // remaining balance, it is automatically rejected.
+                if (sc.ClaimAmount > currentRemainingBalance)
+                {
+                    sc.Status = ClaimStatus.Rejected;
+                    sc.RejectionReason = $"AUTOMATIC REJECTION: Plan limit of ₹{coverageItem.TotalCoverage.ToString("N0", indianCulture)} would be breached. Requested amount of ₹{sc.ClaimAmount.ToString("N0", indianCulture)} exceeds the live remaining balance of ₹{currentRemainingBalance.ToString("N0", indianCulture)} for this coverage classification.";
+                    sc.ReviewedAt = DateTime.UtcNow;
+                    sc.ReviewedBy = approvedClaim.AdminApprovedBy ?? approvedClaim.ReviewedBy; // Mark as system-rejected via same officer/admin
+                }
+                else
+                {
+                    // Deduct from temporary remaining balance to check the NEXT sibling claim in the queue
+                    currentRemainingBalance -= sc.ClaimAmount;
+                }
+            }
+        }
+
         public async Task<ClaimDetailResponseDto> RunAIAdjudicationAsync(Guid claimId)
         {
             var claim = await _claimRepo.GetByIdAsync(claimId);
@@ -662,16 +753,16 @@ namespace EGI_Backend.Application.Services
             {
                 if (!hasAccess && role != null && role.Equals("Customer", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Fix: Compare userId (User table PK) with CorporateClient.UserId
-                    if (claimDoc.Claim.PolicyAssignment != null && 
-                        (claimDoc.Claim.PolicyAssignment.CorporateClient != null && claimDoc.Claim.PolicyAssignment.CorporateClient.UserId == userId))
+                    if (claimDoc.Claim?.PolicyAssignment?.CorporateClient != null && 
+                        claimDoc.Claim.PolicyAssignment.CorporateClient.UserId == userId)
                     {
                         hasAccess = true;
                     }
                 }
                 else if (!hasAccess && role != null && role.Equals("Agent", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (claimDoc.Claim.PolicyAssignment.AgentId == userId)
+                    if (claimDoc.Claim?.PolicyAssignment != null && 
+                        claimDoc.Claim.PolicyAssignment.AgentId == userId)
                     {
                         hasAccess = true;
                     }
@@ -700,13 +791,43 @@ namespace EGI_Backend.Application.Services
             if (!hasAccess) throw new ForbiddenException("Security Access Denied.");
 
             string finalPath = filePath;
+            
+            // If the specialized FilePath is empty, attempt recovery using the legacy FileName property
+            // (Previous bugs stored the full path in FileName)
+            if (string.IsNullOrEmpty(finalPath)) finalPath = fileName ?? "";
+
             if (!System.IO.File.Exists(finalPath))
             {
-                var fileNameOnly = System.IO.Path.GetFileName(filePath);
-                var uploadsFolder = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "Uploads");
-                var localPath = System.IO.Path.Combine(uploadsFolder, fileNameOnly);
-                if (System.IO.File.Exists(localPath)) finalPath = localPath;
-                else throw new NotFoundException("Physical file not found.");
+                var fileNameOnly = System.IO.Path.GetFileName(finalPath);
+                
+                if (string.IsNullOrEmpty(fileNameOnly))
+                {
+                    // If still empty, try extracting from the other property
+                    fileNameOnly = System.IO.Path.GetFileName(fileName ?? "");
+                }
+
+                if (string.IsNullOrEmpty(fileNameOnly)) throw new NotFoundException("Document storage index is invalid (No filename specified).");
+
+                // Search in common places
+                var searchPaths = new List<string> {
+                    System.IO.Path.Combine(Directory.GetCurrentDirectory(), "Uploads", fileNameOnly),
+                    System.IO.Path.Combine(Directory.GetCurrentDirectory(), "EGI_Backend.WebAPI", "Uploads", fileNameOnly),
+                    System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Uploads", fileNameOnly),
+                    System.IO.Path.Combine(Directory.GetParent(Directory.GetCurrentDirectory())?.FullName ?? "", "EGI_Backend.WebAPI", "Uploads", fileNameOnly)
+                };
+
+                bool found = false;
+                foreach (var p in searchPaths)
+                {
+                    if (System.IO.File.Exists(p))
+                    {
+                        finalPath = p;
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found) throw new NotFoundException($"Document storage offline. Target segment: {fileNameOnly}");
             }
 
             var bytes = await System.IO.File.ReadAllBytesAsync(finalPath);
@@ -761,11 +882,280 @@ namespace EGI_Backend.Application.Services
                 claim.ClaimAmount);
         }
 
+        public async Task<MemberSearchResultDto> SearchMemberAsync(string identifier)
+        {
+            var result = new MemberSearchResultDto();
+
+            // 1. Try Primary Member first
+            var member = await _memberRepo.SearchAsync(identifier);
+            if (member != null)
+            {
+                result.MemberId = member.Id;
+                result.FullName = member.FullName;
+                result.EmployeeCode = member.EmployeeCode;
+                result.Category = "Primary Policyholder";
+                result.PolicyNo = member.PolicyAssignment?.PolicyNo;
+                result.PolicyAssignmentId = member.PolicyAssignmentId;
+                
+                // Only return active dependents for hospital search
+                result.Dependents = _mapper.Map<List<DependentResponseDto>>(member.Dependents.Where(d => d.IsActive).ToList());
+                return result;
+            }
+
+            // 2. Try Dependent search if member not found
+            var dependent = await _memberRepo.SearchDependentAsync(identifier);
+            if (dependent != null && dependent.Member != null)
+            {
+                result.MemberId = dependent.MemberId;
+                result.DependentId = dependent.Id;
+                result.FullName = dependent.FullName;
+                result.EmployeeCode = dependent.Member.EmployeeCode;
+                result.Category = $"Dependent ({dependent.Relationship})";
+                result.PolicyNo = dependent.Member.PolicyAssignment?.PolicyNo;
+                result.PolicyAssignmentId = dependent.Member.PolicyAssignmentId;
+                result.Dependents = _mapper.Map<List<DependentResponseDto>>(dependent.Member.Dependents.Where(d => d.IsActive).ToList());
+                return result;
+            }
+
+            throw new NotFoundException($"Identity '{identifier}' not recognized in our policy ledger. Check the Smart Card HEX ID.");
+        }
+
+        public async Task<string> RegisterPartnershipClaimAsync(Guid officerUserId, SubmitClaimDto dto)
+        {
+            var member = await _memberRepo.GetByIdWithPolicyAsync(dto.MemberId);
+            if (member == null)
+                throw new NotFoundException("Policyholder mismatch during intake.");
+
+            var policy = member.PolicyAssignment;
+            if (policy == null || policy.Id != dto.PolicyAssignmentId)
+                throw new NotFoundException("Referenced policy assignment is missing or invalid.");
+
+            Dependent? dependent = null;
+            if (dto.DependentId.HasValue)
+            {
+                dependent = await _dependentRepo.GetByIdAsync(dto.DependentId.Value);
+                if (dependent == null || dependent.MemberId != member.Id)
+                    throw new NotFoundException("Dependent does not belong to this member.");
+            }
+
+            // Status Check with "Endorsement" vs "Bereavement" distinction
+            if (!member.Status || (dependent != null && !dependent.IsActive))
+            {
+                // If inactive, we ONLY allow a Life claim if a preceding one already exists for this person (refile).
+                bool isRefile = dto.ClaimType == CoverageType.Life && 
+                                await _claimRepo.GetApprovedClaimsTotalAsync(policy.Id, member.Id, dto.DependentId, CoverageType.Life) > 0;
+                
+                if (!isRefile)
+                {
+                    string entity = dependent != null ? "dependent" : "primary member";
+                    throw new ForbiddenException($"Partnership Billing Terminated: This {entity} was removed from the policy (Endorsement). No further coverage intakes authorized.");
+                }
+            }
+
+            // Terminal Event Deactivation Logic (First filing)
+            if (dto.ClaimType == CoverageType.Life)
+            {
+                if (!dto.DependentId.HasValue && member.Status)
+                {
+                    // Primary Member Death
+                    member.Status = false;
+                    foreach (var dep in member.Dependents)
+                    {
+                        dep.IsActive = false;
+                    }
+                }
+                else if (dto.DependentId.HasValue && dependent != null && dependent.IsActive)
+                {
+                    // Specific Dependent Death
+                    dependent.IsActive = false;
+                }
+            }
+
+            if (await _invoiceRepo.HasUnpaidInvoicesAsync(policy.Id))
+                throw new BadRequestException("Benefit Suspension: This policy has pending or overdue invoices. Partnership billings are restricted until payment is cleared.");
+
+            var claim = new Claim
+            {
+                Id = Guid.NewGuid(),
+                ClaimNumber = $"PB-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString().Substring(0, 4).ToUpper()}", // PB for Partnership Bill
+                PolicyAssignmentId = policy.Id,
+                MemberId = member.Id,
+                DependentId = dto.DependentId,
+                ClaimType = dto.ClaimType,
+                ClaimAmount = dto.ClaimAmount,
+                ClaimReason = dto.ClaimReason,
+                IncidentDate = dto.IncidentDate,
+                ClaimDate = DateTime.UtcNow,
+                Status = ClaimStatus.PendingAdminApproval,
+                IsCashless = true,
+                NetworkHospitalId = dto.NetworkHospitalId,
+                ReviewedBy = officerUserId,
+                ReviewedAt = DateTime.UtcNow
+            };
+
+            await _claimRepo.AddAsync(claim);
+
+            // Handle Supporting Documents provided by the hospital/officer
+            foreach (var file in dto.Documents)
+            {
+                var storedPath = await _storage.UploadAsync(file);
+                claim.Documents.Add(new ClaimDocument
+                {
+                    Id = Guid.NewGuid(),
+                    ClaimId = claim.Id,
+                    FileName = file.FileName,
+                    FilePath = storedPath,
+                    DocumentType = ClaimDocumentType.HospitalDischargeReport,
+                    UploadedAt = DateTime.UtcNow
+                });
+            }
+
+            if (dto.DispatchId.HasValue)
+            {
+                var d = await _dispatchRepo.GetByIdAsync(dto.DispatchId.Value);
+                if (d != null)
+                {
+                    d.IsClosed = true;
+                    d.Status = "Admitted";
+                    await _dispatchRepo.UpdateAsync(d);
+                }
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+
+            // Notify Admin for final authorization
+            try
+            {
+                var admins = await _userRepo.GetAllByRoleAsync(UserRole.Admin);
+                foreach (var admin in admins)
+                {
+                    await _notificationService.CreateNotificationAsync(admin.Id, "Authorization Required", $"A new partnership bill {claim.ClaimNumber} was registered and requires your approval.", "Warning");
+                }
+            }
+            catch { }
+
+            _cache.Remove("AdminDashboardSummary");
+            return claim.ClaimNumber;
+        }
+
         private bool IsHighAuthority(string? role)
         {
             if (string.IsNullOrEmpty(role)) return false;
             var norm = role.Trim().Replace(" ", "").Replace("_", "").ToLowerInvariant();
             return norm == "admin" || norm == "claimsofficer" || norm == "officer";
+        }
+        public async Task DispatchEmergencyAsync(Guid userId, Guid hospitalId, Guid personId)
+        {
+            var hospital = await _hospitalRepo.GetByIdAsync(hospitalId);
+            if (hospital == null) throw new NotFoundException("Hospital not found.");
+
+            // Try find as member
+            var member = await _memberRepo.GetByIdWithPolicyAsync(personId);
+            Guid? dependentId = null;
+            Dependent? patientDependent = null;
+
+            if (member == null) {
+                patientDependent = await _dependentRepo.GetByIdAsync(personId);
+                if (patientDependent == null) throw new NotFoundException("Patient record not found.");
+                member = await _memberRepo.GetByIdWithPolicyAsync(patientDependent.MemberId);
+                dependentId = personId;
+            }
+
+            if (member == null) throw new NotFoundException("Parent member record missing.");
+
+            // STRICT STATUS CHECK: No Emergency Intimation for Inactive/Terminated status
+            if (!member.Status)
+                throw new ForbiddenException("Emergency Intake Denied: Primary member record is inactive. Insurance coverage is suspended.");
+
+            if (patientDependent != null && !patientDependent.IsActive)
+                throw new ForbiddenException("Emergency Intake Denied: Patient dependent record is inactive. Insurance coverage is suspended.");
+
+            var summary = await GetCoverageSummaryAsync(member.Id, dependentId);
+            var patientName = dependentId.HasValue ? summary.DependentName : summary.MemberName;
+
+            // Construct Dispatch SMS / Notification Content
+            var coverageText = string.Join(", ", summary.CoverageBreakdown.Select(c => $"{c.ClaimType}: {c.Remaining:N0}"));
+            var smsMsg = $"DISPATCH: {patientName} en route to {hospital.Name}. PIN: {summary.EmployeeCode}. Balances: {coverageText}.";
+            var inAppMsg = $"**EMERGENCY PRE-INTIMATION**\nPatient: {patientName}\nHospital: {hospital.Name}\nRemaining Limits: {coverageText}\nMember ID: {summary.EmployeeCode}\nPolicy: {summary.PolicyNo}";
+
+            // 1. Mock SMS (Logging)
+            Console.WriteLine($"[SMS GATEWAY] To ClaimsOfficer ({hospital.ContactNumber}): {smsMsg}");
+
+            // 2. Identify Claims Officers for the hospital
+            // Since we don't have a rigid hospital assignment in User yet, notify all active Claims Officers
+            var officers = await _userRepo.GetAllByRoleAsync(UserRole.ClaimsOfficer);
+            foreach (var officer in officers)
+            {
+                await _notificationService.CreateNotificationAsync(officer.Id, "CLINICAL DISPATCH", inAppMsg, "Warning");
+            }
+
+            // 3. Persist Clinical Dispatch for Dashboard Queue
+            var dispatch = new ClinicalDispatch
+            {
+                HospitalId = hospitalId,
+                MemberId = member.Id,
+                DependentId = dependentId,
+                PatientName = patientName,
+                EmployeeCode = summary.EmployeeCode,
+                PolicyNo = summary.PolicyNo,
+                CoverageSummaryJson = JsonSerializer.Serialize(summary.CoverageBreakdown),
+                DispatchDate = DateTime.UtcNow,
+                Status = "Intransit",
+                IsClosed = false
+            };
+            await _dispatchRepo.AddAsync(dispatch);
+
+            // 4. Audit Log
+            var log = new AuditLog {
+                UserId = userId.ToString(),
+                Action = "Clinical Dispatch",
+                NewValues = $"Emergency intimation for {patientName} to {hospital.Name}",
+                EntityName = "Hospital",
+                EntityId = hospitalId.ToString(),
+                Timestamp = DateTime.UtcNow
+            };
+            await _auditRepo.AddAsync(log);
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        public async Task<List<ClinicalDispatchDto>> GetLiveDispatchesAsync()
+        {
+            var active = await _dispatchRepo.GetAllActiveAsync();
+            var dtos = new List<ClinicalDispatchDto>();
+
+            foreach (var d in active)
+            {
+                // REAL-TIME LOOKUP: Fetch member to check live status
+                var member = await _memberRepo.GetByIdWithPolicyAsync(d.MemberId);
+                if (member == null || !member.Status) continue;
+
+                // If dependent dispatch, check dependent status too
+                if (d.DependentId.HasValue)
+                {
+                    var dep = member.Dependents.FirstOrDefault(x => x.Id == d.DependentId.Value);
+                    if (dep == null || !dep.IsActive) continue;
+                }
+
+                // BALANCES SYNC: Fetch live coverage summary for remaining dispatches
+                var summary = await GetCoverageSummaryAsync(d.MemberId, d.DependentId);
+                
+                dtos.Add(new ClinicalDispatchDto
+                {
+                    Id = d.Id,
+                    HospitalName = d.Hospital?.Name ?? "Unknown",
+                    PatientName = d.PatientName,
+                    EmployeeCode = d.EmployeeCode,
+                    PolicyNo = d.PolicyNo,
+                    CoverageSummary = JsonSerializer.Serialize(summary.CoverageBreakdown),
+                    DispatchDate = d.DispatchDate,
+                    Status = d.Status,
+                    HospitalId = d.HospitalId,
+                    MemberId = d.MemberId,
+                    DependentId = d.DependentId
+                });
+            }
+
+            return dtos;
         }
     }
 }

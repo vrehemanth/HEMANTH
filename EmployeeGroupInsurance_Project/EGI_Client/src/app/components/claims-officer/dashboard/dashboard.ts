@@ -11,12 +11,16 @@ import { Chart, registerables } from 'chart.js';
 import { OverviewTabComponent } from './tabs/overview/overview';
 import { QueueTabComponent } from './tabs/queue/queue';
 import { HistoryTabComponent } from './tabs/history/history';
+import { DispatchesTabComponent } from './tabs/dispatches/dispatches';
+import { HealthCheckupTabComponent } from './tabs/health-checkups/health-checkups';
+import { NotificationService } from '../../../core/services/notification.service';
+import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 Chart.register(...registerables);
 
 @Component({
   selector: 'app-claims-officer-dashboard',
   standalone: true,
-  imports: [CommonModule, OverviewTabComponent, QueueTabComponent, HistoryTabComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, OverviewTabComponent, QueueTabComponent, HistoryTabComponent, DispatchesTabComponent, HealthCheckupTabComponent],
   templateUrl: './dashboard.html'
 })
 export class ClaimsOfficerDashboardComponent implements OnInit, OnDestroy {
@@ -24,19 +28,24 @@ export class ClaimsOfficerDashboardComponent implements OnInit, OnDestroy {
   router = inject(Router);
   toastService = inject(ToastService);
   authService = inject(AuthService);
+  notificationService = inject(NotificationService);
+  fb = inject(FormBuilder);
   private routerSub?: Subscription;
 
   private decisionChart?: Chart;
   private adjudicationChart?: Chart;
   private typeChart?: Chart;
 
-  activeTab = signal<'overview' | 'queue' | 'history'>('overview');
+  activeTab = signal<'overview' | 'queue' | 'history' | 'dispatches' | 'health-checkups'>('overview');
   pageTitle = signal('Claims Adjudication Dashboard');
   isLoading = signal(false);
 
   summary = signal<any>(null);
   pendingClaims = signal<any[]>([]);
   claimHistory = signal<any[]>([]);
+  liveDispatches = signal<any[]>([]);
+  currentDispatch = signal<any | null>(null);
+  pendingHealthCheckups = signal<any[]>([]);
 
   // Filtering signals
   pendingSearchTerm = signal('');
@@ -45,6 +54,26 @@ export class ClaimsOfficerDashboardComponent implements OnInit, OnDestroy {
   historySearchTerm = signal('');
   historyStatusFilter = signal('All');
   historySortConfig = signal<{ column: string, direction: 'asc' | 'desc' }>({ column: 'date', direction: 'desc' });
+
+  dispatchSearchTerm = signal('');
+
+  // Partnership Claim Form Signals
+  showPartnershipForm = signal(false);
+  partnershipStep = signal(1);
+  selectedMemberForClaim = signal<any>(null);
+  isInvalidMember = signal(false);
+  selectedPartnershipFiles = signal<{ file: File, type: string }[]>([]);
+
+  partnershipForm = this.fb.group({
+    employeeCode: ['', Validators.required],
+    dependentId: [''],
+    claimType: ['', Validators.required],
+    claimAmount: ['', Validators.required],
+    claimReason: ['', Validators.required],
+    hospitalId: [null as string | null]
+  });
+
+  hospitals = signal<any[]>([]);
 
   // Computed filtered lists
   filteredPendingClaims = computed(() => {
@@ -69,6 +98,19 @@ export class ClaimsOfficerDashboardComponent implements OnInit, OnDestroy {
       }
       return sort.direction === 'asc' ? comparison : -comparison;
     });
+  });
+
+  filteredLiveDispatches = computed(() => {
+    let result = this.liveDispatches();
+    const search = this.dispatchSearchTerm().toLowerCase().trim();
+    if (search) {
+      result = result.filter(d => 
+        (d.patientName && d.patientName.toLowerCase().includes(search)) ||
+        (d.hospitalName && d.hospitalName.toLowerCase().includes(search)) ||
+        (d.employeeCode && d.employeeCode.toLowerCase().includes(search))
+      );
+    }
+    return result;
   });
 
   filteredClaimHistory = computed(() => {
@@ -136,6 +178,7 @@ export class ClaimsOfficerDashboardComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.updateTab(this.router.url);
+    this.notificationService.startPolling();
     this.routerSub = this.router.events.pipe(
       filter(e => e instanceof NavigationEnd)
     ).subscribe((e: any) => this.updateTab(e.urlAfterRedirects));
@@ -145,14 +188,17 @@ export class ClaimsOfficerDashboardComponent implements OnInit, OnDestroy {
     this.officerService.getSummary().subscribe((res: any) => this.summary.set(res?.data || res));
     this.loadPendingClaims();
     this.loadHistory();
+    this.loadLiveDispatches();
+    this.notificationService.fetchUnreadCount();
   }
 
   ngOnDestroy() {
     this.routerSub?.unsubscribe();
+    this.notificationService.stopPolling();
   }
 
   updateTab(url: string) {
-    let tab: 'overview' | 'queue' | 'history' = 'overview';
+    let tab: 'overview' | 'queue' | 'history' | 'dispatches' | 'health-checkups' = 'overview';
     this.pageTitle.set('Claims Adjudication Dashboard');
 
     if (url.includes('/queue')) {
@@ -161,6 +207,12 @@ export class ClaimsOfficerDashboardComponent implements OnInit, OnDestroy {
     } else if (url.includes('/history')) {
       tab = 'history';
       this.pageTitle.set('Review History');
+    } else if (url.includes('/dispatches')) {
+      tab = 'dispatches';
+      this.pageTitle.set('Digital Intake Protocol');
+    } else if (url.includes('/health-checkups')) {
+      tab = 'health-checkups';
+      this.pageTitle.set('Health Checkup Management');
     }
 
     this.activeTab.set(tab);
@@ -181,11 +233,57 @@ export class ClaimsOfficerDashboardComponent implements OnInit, OnDestroy {
       });
       // Load history in parallel for analytics/charts
       this.lazyLoadTab('history');
+      this.loadPendingHealthCheckups();
     } else if (tab === 'queue' && this.pendingClaims().length === 0) {
       this.loadPendingClaims();
     } else if (tab === 'history' && this.claimHistory().length === 0) {
       this.loadHistory();
+    } else if (tab === 'dispatches' && this.liveDispatches().length === 0 && !this.pendingReqs.has('dispatches')) {
+      this.loadLiveDispatches();
+    } else if (tab === 'health-checkups' && this.pendingHealthCheckups().length === 0) {
+      this.loadPendingHealthCheckups();
     }
+  }
+
+  loadLiveDispatches() {
+    if (this.pendingReqs.has('dispatches')) return;
+    this.pendingReqs.add('dispatches');
+    this.officerService.getLiveDispatches().subscribe({
+      next: res => {
+        this.liveDispatches.set(this.extractArray(res));
+        this.pendingReqs.delete('dispatches');
+      },
+      error: () => this.pendingReqs.delete('dispatches')
+    });
+  }
+
+  initiateIntakeFromDispatch(dispatch: any) {
+    this.isLoading.set(true);
+    this.officerService.searchMember(dispatch.employeeCode).subscribe({
+      next: (res) => {
+        const found = res?.data || res;
+        this.selectedMemberForClaim.set(found);
+        this.currentDispatch.set(dispatch); 
+        this.loadHospitals(); 
+        
+        this.partnershipForm.patchValue({
+          employeeCode: dispatch.employeeCode,
+          dependentId: dispatch.dependentId || '',
+          hospitalId: dispatch.hospitalId,
+          claimType: 'Health'
+        });
+        this.partnershipForm.get('hospitalId')?.disable(); // Lock it
+        this.showPartnershipForm.set(true);
+        this.partnershipStep.set(2); 
+        this.isLoading.set(false);
+      },
+      error: () => {
+        this.isLoading.set(false);
+        this.toastService.error("Cloud registry offline. Manual data entry required.");
+        this.partnershipForm.patchValue({ employeeCode: dispatch.employeeCode });
+        this.showPartnershipForm.set(true);
+      }
+    });
   }
 
   loadPendingClaims() {
@@ -200,6 +298,112 @@ export class ClaimsOfficerDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  onMemberCodeInput(event: Event) {
+    const code = (event.target as HTMLInputElement).value.trim();
+    if (code.length >= 4) {
+      this.officerService.searchMember(code).subscribe({
+        next: (res) => {
+           const found = res?.data || res;
+           if (found && found.dependents) {
+             found.dependents = this.extractArray(found.dependents);
+           }
+           this.selectedMemberForClaim.set(found);
+           this.isInvalidMember.set(false);
+           
+           // If it's a dependent ID, auto-patch the form for that patient
+           if (found.dependentId) {
+              this.partnershipForm.patchValue({ dependentId: found.dependentId });
+           } else {
+              this.partnershipForm.patchValue({ dependentId: '' });
+           }
+        },
+        error: () => {
+           this.selectedMemberForClaim.set(null);
+           this.isInvalidMember.set(true);
+        }
+      });
+    } else {
+       this.selectedMemberForClaim.set(null);
+       this.isInvalidMember.set(false);
+    }
+  }
+
+  submitPartnershipClaim() {
+    if (this.partnershipForm.invalid || !this.selectedMemberForClaim()) return;
+    
+    this.isLoading.set(true);
+    const formValue = this.partnershipForm.getRawValue();
+    const formData = new FormData();
+    
+    // Map fields to SubmitClaimDto
+    formData.append('PolicyAssignmentId', this.selectedMemberForClaim().policyAssignmentId || '');
+    formData.append('MemberId', this.selectedMemberForClaim().memberId || '');
+    if (formValue.dependentId) {
+      formData.append('DependentId', formValue.dependentId);
+    }
+    formData.append('ClaimType', formValue.claimType || 'Health');
+    formData.append('ClaimAmount', formValue.claimAmount?.toString() || '0');
+    formData.append('ClaimReason', formValue.claimReason || '');
+    formData.append('IncidentDate', new Date().toISOString());
+    formData.append('NetworkHospitalId', formValue.hospitalId || '');
+    
+    if (this.currentDispatch()) {
+        formData.append('DispatchId', this.currentDispatch().id);
+    }
+
+    this.selectedPartnershipFiles().forEach(f => {
+      formData.append('Documents', f.file);
+      formData.append('DocumentTypes', '2'); // MedicalReport
+    });
+
+    this.officerService.submitPartnershipClaim(formData).subscribe({
+      next: (res: any) => {
+        this.isLoading.set(false);
+        this.showPartnershipForm.set(false);
+        this.currentDispatch.set(null); // Clear
+        this.loadHistory(); 
+        this.liveDispatches.set([]); // Reset to trigger lazy-load on next tab visit or refresh manually
+        this.lazyLoadTab('dispatches'); // Refresh dispatches list
+        alert(res?.message || 'Bill registered safely for Admin review.');
+      },
+      error: (err) => {
+        this.isLoading.set(false);
+        alert(err.error?.message || 'Error syncing ledger.');
+      }
+    });
+  }
+
+  togglePartnershipForm() {
+    this.showPartnershipForm.set(!this.showPartnershipForm());
+    if (this.showPartnershipForm()) {
+      this.partnershipStep.set(1);
+      this.partnershipForm.reset();
+      this.partnershipForm.get('hospitalId')?.enable(); // Unlock it
+      this.selectedMemberForClaim.set(null);
+      this.currentDispatch.set(null); // Clear on close
+      this.selectedPartnershipFiles.set([]);
+      this.loadHospitals();
+    }
+  }
+
+  loadHospitals() {
+    if (this.hospitals().length === 0) {
+      this.officerService.getHospitals().subscribe({
+        next: (res) => this.hospitals.set(this.extractArray(res)),
+        error: () => this.hospitals.set([])
+      });
+    }
+  }
+
+  onPartnershipDocsSelect(event: any) {
+    const files = event.target.files;
+    if (files) {
+      const newFiles = Array.from(files).map((f: any) => ({ file: f, type: '1' }));
+      this.selectedPartnershipFiles.update(current => [...current, ...newFiles]);
+    }
+  }
+
+
   loadHistory() {
     if (this.pendingReqs.has('history')) return;
     this.pendingReqs.add('history');
@@ -210,6 +414,57 @@ export class ClaimsOfficerDashboardComponent implements OnInit, OnDestroy {
       },
       error: () => this.pendingReqs.delete('history')
     });
+  }
+
+  loadPendingHealthCheckups() {
+    this.officerService.getPendingHealthCheckups().subscribe({
+      next: res => this.pendingHealthCheckups.set(this.extractArray(res)),
+      error: () => this.pendingHealthCheckups.set([])
+    });
+  }
+
+  async verifyHealthCheckupActuals(client: any) {
+    const { value: formValues } = await Swal.fire({
+      title: 'Verify Participation Counts',
+      html: `
+        <div class="p-4 bg-gray-50 rounded-2xl text-left">
+          <p class="text-[10px] font-black uppercase text-gray-400 mb-4 tracking-widest text-center">Syncing Hospital Feedback with Ledger</p>
+          <div class="mb-4">
+            <label class="block text-xs font-bold mb-1 uppercase">Actual Employees Treated</label>
+            <input id="swal-input1" class="w-full p-3 border-2 border-gray-100 rounded-xl" type="number" value="${client.healthCheckupActualMemberCount || 0}">
+          </div>
+          <div>
+            <label class="block text-xs font-bold mb-1 uppercase">Actual Dependents Treated</label>
+            <input id="swal-input2" class="w-full p-3 border-2 border-gray-100 rounded-xl" type="number" value="${client.healthCheckupActualDependentCount || 0}">
+          </div>
+          <p class="text-[9px] text-gray-500 mt-4 leading-tight italic">By clicking synchronize, you confirm these counts match the formal attendance record sent by <b>${client.healthCheckupHospitalName || 'the medical center'}</b>.</p>
+        </div>
+      `,
+      focusConfirm: false,
+      confirmButtonText: 'Synchronize Data',
+      confirmButtonColor: '#10b981',
+      showCancelButton: true,
+      preConfirm: () => {
+        return [
+          (document.getElementById('swal-input1') as HTMLInputElement).value,
+          (document.getElementById('swal-input2') as HTMLInputElement).value
+        ];
+      }
+    });
+
+    if (formValues) {
+      const [mem, dep] = formValues;
+      this.officerService.updateHealthCheckupActuals(client.id, { 
+        memberCount: parseInt(mem), 
+        dependentCount: parseInt(dep) 
+      }).subscribe({
+        next: () => {
+          this.toastService.success("Attendance ledger updated successfully.");
+          this.loadPendingHealthCheckups();
+        },
+        error: () => this.toastService.error("Failed to update ledger.")
+      });
+    }
   }
 
   viewClaimDetails(id: string) {

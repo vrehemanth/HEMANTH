@@ -100,6 +100,17 @@ public class CorporateClientService : ICorporateClientService
             client.RejectionReason = null;
             client.ReviewedBy = Guid.Empty;
             client.ReviewedAt = null;
+            
+            // CLEAN SLATE: Remove all old rejected documents
+            var oldDocs = await _docRepo.GetByClientIdAsync(client.Id);
+            foreach (var oldDoc in oldDocs)
+            {
+                await _docRepo.DeleteAsync(oldDoc.Id);
+            }
+
+            // RESET AI Analysis for resubmission so we only judge the new data
+            client.KybAiAnalysis = null;
+            client.KybAiConfidenceScore = 0;
         }
         if (dto.IndustryType.HasValue)
         {
@@ -125,13 +136,15 @@ public class CorporateClientService : ICorporateClientService
         if (string.IsNullOrEmpty(client.KybAiAnalysis))
         {
             client.KybAiAnalysis = $"[DOCUMENT: {document.DocumentType}]\n{aiAnalysis}";
-            client.KybAiConfidenceScore = score;
+            client.KybAiConfidenceScore = Math.Max(1, score); // Ensure at least 1 for UI visibility
         }
         else
         {
             client.KybAiAnalysis += $"\n\n[DOCUMENT: {document.DocumentType}]\n{aiAnalysis}";
-            // Average out the confidence score for multiple documents
-            client.KybAiConfidenceScore = (client.KybAiConfidenceScore + score) / 2;
+            // For subsequent documents, we can either average or take the minimum/maximum.
+            // Let's take the minimum score to be more conservative, ensuring all documents meet a certain threshold.
+            client.KybAiConfidenceScore = Math.Min(client.KybAiConfidenceScore, score);
+            if (client.KybAiConfidenceScore < 1) client.KybAiConfidenceScore = 1;
         }
 
         // REAL FIX: Move from Draft to Pending only after at least one document is uploaded!
@@ -204,10 +217,9 @@ public class CorporateClientService : ICorporateClientService
             client.Status = VerificationStatus.Rejected;
             client.RejectionReason = dto.RejectionReason;
             client.ReSubmissionCount++; // Increment count on rejection
-            
-            user.Status = UserStatus.Inactive; // keep inactive
+            user.Status = UserStatus.Active; // Ensure they can login to resubmit
 
-            if (client.ReSubmissionCount >= 3)
+            if (client.ReSubmissionCount >= 4)
             {
                 client.IsBlocked = true;
                 user.Status = UserStatus.Inactive; // Ensure blocked users can't login easily

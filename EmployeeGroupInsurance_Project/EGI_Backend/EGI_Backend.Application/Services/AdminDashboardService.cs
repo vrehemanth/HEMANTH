@@ -143,11 +143,28 @@ namespace EGI_Backend.Application.Services
                 return totalSalary;
             });
 
+            var objMembersTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IMemberRepository>().CountActiveAsync();
+            });
+
+            var objDependentsTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IMemberRepository>().CountActiveDependentsAsync();
+            });
+
+            var totalEndorsementsTask = Task.Run(async () => {
+                using var scope = _scopeFactory.CreateScope();
+                var repo = scope.ServiceProvider.GetRequiredService<IPolicyEndorsementRepository>();
+                var all = await repo.GetAllAsync();
+                return all.Count;
+            });
+
             await Task.WhenAll(
                 agentCountTask, customerCountTask, officerCountTask, pendingClientsTask,
                 totalClaimsTask, pendingClaimsTask, totalPoliciesTask, totalRevenueTask,
                 totalPayoutsTask, totalCommissionTask, approvalRateTask, avgClaimTask,
-                recentLogsCountTask, topLogsTask, salaryPayoutTask
+                recentLogsCountTask, topLogsTask, salaryPayoutTask, objMembersTask, objDependentsTask, totalEndorsementsTask
             );
 
             var summary = new DashboardSummaryDto
@@ -159,6 +176,9 @@ namespace EGI_Backend.Application.Services
                 TotalClaimsCount = totalClaimsTask.Result,
                 PendingClaimsCount = pendingClaimsTask.Result,
                 TotalPoliciesCount = totalPoliciesTask.Result,
+                TotalMembersCount = objMembersTask.Result,
+                TotalDependentsCount = objDependentsTask.Result,
+                TotalEndorsementsCount = totalEndorsementsTask.Result,
                 TotalRevenue = totalRevenueTask.Result,
                 TotalPayouts = totalPayoutsTask.Result,
                 TotalCommissionPayouts = totalCommissionTask.Result,
@@ -330,6 +350,21 @@ namespace EGI_Backend.Application.Services
                 }
             }
             return dtos;
+        }
+        public async Task<bool> UpdateHealthCheckupActualsAsync(Guid corporateClientId, int memberCount, int dependentCount)
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<ICorporateClientRepository>();
+            var client = await repo.GetByIdAsync(corporateClientId);
+            
+            if (client == null) return false;
+
+            client.HealthCheckupActualMemberCount = memberCount;
+            client.HealthCheckupActualDependentCount = dependentCount;
+            client.IsHealthCheckupClaimPending = false; // Successfully verified
+
+            await repo.SaveChangesAsync();
+            return true;
         }
     }
 }

@@ -1,6 +1,6 @@
-<div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+<div class="grid grid-cols-1 md:grid-cols-5 gap-6">
     @if (p.isLoading() && !p.summary()) {
-    @for (i of [1,2,3,4]; track i) {
+    @for (i of [1,2,3,4,5]; track i) {
     <div
         class="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden">
         <div class="absolute inset-0 animate-shimmer"></div>
@@ -51,8 +51,71 @@
         <h3 class="text-3xl font-black mt-2 text-red-600 dark:text-red-400 relative z-10">₹{{
             p.formatINR(p.summary()?.totalPremiumDue) }}</h3>
     </div>
+    <div class="premium-hover bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm relative group overflow-hidden cursor-pointer border-l-4 border-l-violet-500"
+        (click)="p.setActiveTab('policies')">
+        <div
+            class="absolute right-0 top-0 w-20 h-20 bg-violet-500/5 rounded-bl-full -mr-4 -mt-4 group-hover:scale-110 transition-transform duration-500">
+        </div>
+        <p class="text-xs font-black uppercase tracking-widest text-violet-600 dark:text-violet-400 relative z-10">Pending Credit</p>
+        <h3 class="text-3xl font-black mt-2 text-violet-700 dark:text-violet-400 relative z-10">₹{{
+            p.formatINR(p.summary()?.totalPendingCredit) }}</h3>
+    </div>
     }
 </div>
+
+<!-- DYNAMIC BENEFITS (PREMIUM EXCLUSIVE) -->
+@if (p.isHealthCheckEligible() && (p.isHealthCheckCooldownOver() || p.isHealthCheckActive())) {
+<div class="mt-8 animate-in slide-in-from-top-4 duration-700">
+    <div class="bg-gradient-to-r from-emerald-600 to-teal-500 rounded-3xl p-8 text-white shadow-2xl shadow-emerald-500/20 relative overflow-hidden group">
+        <div class="absolute right-0 top-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl group-hover:scale-110 transition-transform duration-700"></div>
+        <div class="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+            <div class="flex items-center gap-6">
+                <div class="w-20 h-20 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/30 shadow-inner">
+                    <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="text-2xl font-black tracking-tight leading-none mb-2 uppercase">Annual Health Check Unlocked</h2>
+                    <p class="text-emerald-50 font-bold text-sm tracking-wide opacity-90 italic">Exclusive benefit for your Premium Corporate Shield Tier</p>
+                    <div class="flex items-center gap-4 mt-4">
+                        <span class="px-3 py-1 bg-white/10 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/20">Full Diagnostics</span>
+                        <span class="px-3 py-1 bg-white/10 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/20">Doctor Consult</span>
+                        <span class="px-3 py-1 bg-white/10 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/20">100% Complementary</span>
+                    </div>
+                </div>
+            </div>
+            @if (p.isHealthCheckCooldownOver()) {
+            <button (click)="p.claimHealthCheck()" class="px-10 py-4 bg-white text-emerald-700 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-emerald-50 transition-all active:scale-95 whitespace-nowrap">
+                Activate Health Protocol
+            </button>
+            } @else if (p.isHealthCheckActive()) {
+            <div class="flex flex-col items-end gap-3 text-right">
+                <div class="px-6 py-4 bg-white/20 backdrop-blur-md rounded-2xl border border-white/30">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-emerald-50 mb-1">Authorization Active</p>
+                    <p class="text-xl font-black text-white italic">Visit {{ p.selectedHealthCheckHospital()?.name }}</p>
+                    <div class="mt-3 pt-3 border-t border-white/10 flex items-center justify-between gap-4">
+                         <div class="flex items-center gap-2">
+                             <span class="text-[9px] font-bold text-emerald-100 uppercase tracking-widest leading-none">Valid Until:</span>
+                             <span class="text-xs font-black text-white leading-none">{{ p.healthCheckExpiryDate() | date:'MMM dd, yyyy' }}</span>
+                         </div>
+                         <button (click)="p.generateSimpleVoucher()" 
+                            class="px-4 py-2 bg-white text-emerald-700 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-50 transition-all active:scale-95 shadow-lg flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            Download PDF
+                         </button>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span class="text-[9px] font-black uppercase tracking-widest text-white/70 italic leading-none">Released {{ p.healthCheckClaimedDate() | date:'mediumDate' }}</span>
+                </div>
+            </div>
+            }
+        </div>
+    </div>
+</div>
+}
 
 <!-- INTELLIGENCE & ANALYTICS -->
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
@@ -236,3 +299,104 @@
         </div>
     </div>
 </div>
+
+<!-- Health Check Confirmation Modal -->
+@if (p.showHealthCheckModal()) {
+<div class="fixed inset-0 bg-black/80 backdrop-blur-xl z-[120] flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white dark:bg-gray-900 rounded-[3rem] w-full max-w-2xl shadow-2xl p-10 transform animate-in zoom-in duration-500 relative border border-white/5">
+        <div class="absolute -top-12 -left-12 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl"></div>
+        
+        <div class="relative z-10">
+            <div class="flex items-center gap-5 mb-8">
+                <div class="w-16 h-16 bg-emerald-600 text-white rounded-[2rem] flex items-center justify-center shadow-2xl shadow-emerald-500/30">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                </div>
+                <div>
+                    <h2 class="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter italic">Confirm Deployment</h2>
+                    <p class="text-[10px] text-emerald-600 font-bold uppercase tracking-[0.3em]">Health Check Protocol Authorization</p>
+                </div>
+            </div>
+
+            <div class="p-8 rounded-[2rem] bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800 mb-8">
+                <h4 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-4 italic">Participating Personnel</h4>
+                <div class="grid grid-cols-2 gap-4 max-h-[160px] overflow-y-auto pr-2 custom-scrollbar">
+                    @for (m of p.members(); track m.id) {
+                        @if (m.status) {
+                        <!-- Primary Member -->
+                        <div class="p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                            <div>
+                                <p class="text-xs font-black dark:text-white uppercase tracking-tight">{{ m.fullName }}</p>
+                                <p class="text-[9px] text-gray-400 font-bold">PRIMARY · {{ m.employeeCode }}</p>
+                            </div>
+                            <div class="w-3 h-3 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/20"></div>
+                        </div>
+
+                        <!-- Eligible Dependents (Spouse/Parents) -->
+                        @for (d of m.dependents; track d.id) {
+                            @if (d.relationship === 0 || d.relationship === 2 || d.relationship === 3 || d.relationship === 'Spouse' || d.relationship === 'Father' || d.relationship === 'Mother') {
+                            <div class="p-4 bg-gray-50/50 dark:bg-gray-800/30 rounded-2xl border border-gray-100 dark:border-gray-700/50 flex items-center justify-between">
+                                <div>
+                                    <p class="text-xs font-black dark:text-white uppercase tracking-tight opacity-70">{{ d.fullName }}</p>
+                                    <p class="text-[8px] text-primary-500 font-black uppercase tracking-widest">{{ d.relationship === 0 || d.relationship === 'Spouse' ? 'Spouse' : 'Parent' }}</p>
+                                </div>
+                                <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 opacity-60"></div>
+                            </div>
+                            }
+                        }
+                        }
+                    } @empty {
+                        <div class="col-span-2 p-8 text-center bg-white/50 dark:bg-gray-800/50 rounded-2xl border-2 border-dashed border-gray-100 dark:border-gray-800">
+                            <div class="flex flex-col items-center gap-2 animate-pulse">
+                                <div class="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                                <span class="text-[9px] font-black uppercase text-gray-400">Loading Active Personnel...</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <h4 class="text-xs font-black text-gray-400 uppercase tracking-widest mt-8 mb-4 italic">Target Medical Facility</h4>
+                <div class="grid grid-cols-2 gap-4">
+                    @for (h of p.hospitals() | slice:0:4; track h.id) {
+                        <div (click)="p.selectedHealthCheckHospital.set(h)" 
+                            class="p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden group"
+                            [ngClass]="p.selectedHealthCheckHospital()?.id === h.id ? 'bg-emerald-50 border-emerald-400 dark:bg-emerald-900/20' : 'bg-white border-gray-100 dark:bg-gray-800 dark:border-gray-700 hover:border-emerald-200'">
+                            @if (p.selectedHealthCheckHospital()?.id === h.id) {
+                                <div class="absolute top-2 right-2 w-2 h-2 bg-emerald-500 rounded-full animate-ping"></div>
+                            }
+                            <p class="text-[10px] font-black uppercase text-emerald-800 dark:text-emerald-400 mb-1 tracking-tighter">{{ h.name }}</p>
+                            <p class="text-[9px] text-gray-500 font-bold uppercase">{{ h.city }}</p>
+                        </div>
+                    } @empty {
+                        <div class="col-span-2 p-8 text-center bg-white/50 dark:bg-gray-800/50 rounded-2xl border-2 border-dashed border-gray-100 dark:border-gray-800">
+                            <div class="flex flex-col items-center gap-2 animate-pulse">
+                                <div class="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                                <span class="text-[9px] font-black uppercase text-gray-400">Fetching Partner Network...</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+                <div class="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center font-black">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-widest">Protocol Validity</p>
+                            <p class="text-xs font-black dark:text-white">14 Calendar Days</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <button (click)="p.confirmHealthCheckExecution()" class="flex-1 py-5 bg-emerald-600 text-white rounded-3xl font-black uppercase tracking-[0.2em] text-xs shadow-2xl shadow-emerald-500/20 transition hover:bg-emerald-700 active:scale-95">
+                    Confirm & Release Artifacts
+                </button>
+                <button (click)="p.showHealthCheckModal.set(false)" class="px-10 py-5 bg-gray-100 dark:bg-gray-800 text-gray-500 rounded-3xl font-black uppercase tracking-widest text-xs transition hover:bg-gray-200 active:scale-95">
+                    Abort
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+}

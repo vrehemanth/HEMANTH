@@ -14,5 +14,6 @@ namespace EGI_Backend.Application.Interfaces
         Task SendBlockNotificationEmailAsync(string email);
         Task SendClaimApprovedEmailAsync(string email, string memberName, string claimNumber, decimal amount, byte[] invoicePdf, string pdfFileName);
         Task SendInvoiceGeneratedEmailAsync(string email, string companyName, string invoiceNo, decimal amount, DateTime dueDate, byte[] invoicePdf, string pdfFileName);
+        Task SendHealthCheckupNotificationToHospitalAsync(string hospitalEmail, string hospitalName, string companyName, int memberCount, int dependentCount, DateTime expectedDate);
     }
 }

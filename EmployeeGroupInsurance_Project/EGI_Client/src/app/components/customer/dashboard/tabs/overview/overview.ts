@@ -1,11 +1,41 @@
 import {
-  Component, Input, OnDestroy, OnInit, viewChild, ElementRef, effect, ChangeDetectionStrategy
+  Component, Input, OnDestroy, viewChild, ElementRef, effect, ChangeDetectionStrategy
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Chart, registerables } from 'chart.js';
-import { CustomerDashboardComponent } from '../../dashboard';
 
 Chart.register(...registerables);
+
+/**
+ * Enterprise Interface for Dashboard State Management
+ * Resolves Circular Dependency (Template <-> Tab <-> Dashboard)
+ */
+export interface IDashboard {
+  profileData: () => any;
+  summary: () => any;
+  invoices: () => any[];
+  claims: () => any[];
+  policies: () => any[];
+  hospitals: () => any[];
+  members: () => any[];
+  endorsements: () => any[];
+  isLoading: () => boolean;
+  isPremiumDueSoon: () => boolean;
+  selectedHealthCheckHospital: any;
+  healthCheckClaimedDate: () => any;
+  healthCheckExpiryDate: () => any;
+  showHealthCheckModal: any;
+  isHealthCheckEligible: () => boolean;
+  isHealthCheckCooldownOver: () => boolean;
+  isHealthCheckActive: () => boolean;
+  formatINR: (n: any) => string;
+  claimHealthCheck: () => void;
+  confirmHealthCheckExecution: () => void;
+  generateSimpleVoucher: () => void;
+  getEligiblePersonnelCount: () => any;
+  viewClaimDetail: (claim: any) => void;
+  setActiveTab: (tab: string) => void;
+}
 
 @Component({
   selector: 'app-overview-tab',
@@ -15,7 +45,7 @@ Chart.register(...registerables);
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class OverviewTabComponent implements OnDestroy {
-  @Input() p!: CustomerDashboardComponent;
+  @Input() p!: IDashboard;
 
   premiumCanvas = viewChild<ElementRef<HTMLCanvasElement>>('premiumChart');
   claimsCanvas = viewChild<ElementRef<HTMLCanvasElement>>('claimsChart');
@@ -24,12 +54,9 @@ export class OverviewTabComponent implements OnDestroy {
   private claimsChart?: Chart;
   private chartTimeout: any;
 
-  // Re-initialize charts whenever the canvas refs or data signals change
   private chartEffect = effect(() => {
     const pCanvas = this.premiumCanvas();
     const cCanvas = this.claimsCanvas();
-    const invoices = this.p?.invoices();
-    const claims = this.p?.claims();
     const summary = this.p?.summary();
 
     if (pCanvas && cCanvas && summary) {
@@ -54,18 +81,18 @@ export class OverviewTabComponent implements OnDestroy {
     const month = now.getMonth();
     const year = now.getFullYear();
 
-    const monthlyInvoices = this.p.invoices().filter(inv => {
+    const monthlyInvoices = this.p.invoices().filter((inv: any) => {
       const d = new Date(inv.invoiceDate);
       return d.getMonth() === month && d.getFullYear() === year;
     });
 
     const totalPaid = monthlyInvoices
-      .filter(inv => inv.status === 'Paid')
-      .reduce((sum, i) => sum + (i.amount || 0), 0);
+      .filter((inv: any) => inv.status === 'Paid')
+      .reduce((sum: number, i: any) => sum + (i.amount || 0), 0);
 
     const totalDue = monthlyInvoices
-      .filter(inv => inv.status !== 'Paid')
-      .reduce((sum, i) => sum + (i.amount || 0), 0);
+      .filter((inv: any) => inv.status !== 'Paid')
+      .reduce((sum: number, i: any) => sum + (i.amount || 0), 0);
 
     this.premiumChart = new Chart(ctx, {
       type: 'doughnut',
@@ -107,12 +134,12 @@ export class OverviewTabComponent implements OnDestroy {
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       months.push(d.toLocaleString('default', { month: 'short' }));
-      const mClaims = this.p.claims().filter(c => {
+      const mClaims = this.p.claims().filter((c: any) => {
         const cd = new Date(c.claimDate);
         return cd.getMonth() === d.getMonth() && cd.getFullYear() === d.getFullYear();
       });
       totalData.push(mClaims.length);
-      approvedData.push(mClaims.filter(c => c.status === 'Approved').length);
+      approvedData.push(mClaims.filter((c: any) => c.status === 'Approved').length);
     }
 
     this.claimsChart = new Chart(ctx, {

@@ -11,6 +11,7 @@ namespace EGI_Backend.Domain.Entities
         public decimal BasePremium { get; set; }
         public string Description { get; set; } = string.Empty;
         public bool Status { get; set; } = true;
+        public bool HasHealthCheckup { get; set; } = false;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         // Navigation property for coverages

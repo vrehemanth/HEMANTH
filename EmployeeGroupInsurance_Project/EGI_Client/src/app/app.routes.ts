@@ -59,7 +59,8 @@ export const routes: Routes = [
                     { path: 'policies', loadComponent: () => import('./components/admin/dashboard/dashboard').then(m => m.AdminDashboardComponent) },
                     { path: 'claims', loadComponent: () => import('./components/admin/dashboard/dashboard').then(m => m.AdminDashboardComponent) },
                     { path: 'logs', loadComponent: () => import('./components/admin/dashboard/dashboard').then(m => m.AdminDashboardComponent) },
-                    { path: 'approvals', loadComponent: () => import('./components/admin/dashboard/dashboard').then(m => m.AdminDashboardComponent) }
+                    { path: 'approvals', loadComponent: () => import('./components/admin/dashboard/dashboard').then(m => m.AdminDashboardComponent) },
+                    { path: 'hospitals', loadComponent: () => import('./components/admin/dashboard/dashboard').then(m => m.AdminDashboardComponent) }
                 ]
             },
             {
@@ -91,6 +92,7 @@ export const routes: Routes = [
                     { path: 'invoices', loadComponent: () => import('./components/customer/dashboard/dashboard').then(m => m.CustomerDashboardComponent) },
                     { path: 'claims', loadComponent: () => import('./components/customer/dashboard/dashboard').then(m => m.CustomerDashboardComponent) },
                     { path: 'revisions', loadComponent: () => import('./components/customer/dashboard/dashboard').then(m => m.CustomerDashboardComponent) },
+                    { path: 'hospitals', loadComponent: () => import('./components/customer/dashboard/dashboard').then(m => m.CustomerDashboardComponent) },
                     { path: 'premium-error', loadComponent: () => import('./components/customer/premium-error/premium-error').then(m => m.PremiumErrorComponent) }
                 ]
             },
@@ -101,7 +103,9 @@ export const routes: Routes = [
                 children: [
                     { path: 'dashboard', loadComponent: () => import('./components/claims-officer/dashboard/dashboard').then(m => m.ClaimsOfficerDashboardComponent) },
                     { path: 'queue', loadComponent: () => import('./components/claims-officer/dashboard/dashboard').then(m => m.ClaimsOfficerDashboardComponent) },
-                    { path: 'history', loadComponent: () => import('./components/claims-officer/dashboard/dashboard').then(m => m.ClaimsOfficerDashboardComponent) }
+                    { path: 'dispatches', loadComponent: () => import('./components/claims-officer/dashboard/dashboard').then(m => m.ClaimsOfficerDashboardComponent) },
+                    { path: 'history', loadComponent: () => import('./components/claims-officer/dashboard/dashboard').then(m => m.ClaimsOfficerDashboardComponent) },
+                    { path: 'health-checkups', loadComponent: () => import('./components/claims-officer/dashboard/dashboard').then(m => m.ClaimsOfficerDashboardComponent) }
                 ]
             }
         ]

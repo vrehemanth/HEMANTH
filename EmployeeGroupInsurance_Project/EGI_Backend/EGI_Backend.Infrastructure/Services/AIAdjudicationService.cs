@@ -252,17 +252,38 @@ namespace EGI_Backend.Infrastructure.Services
 
             sb.AppendLine("\n### 6. MANDATORY AUDIT CHECKLIST");
             sb.AppendLine("You must perform these 5 checks and report the result for EACH in your 'technicalAnalysis':");
-            sb.AppendLine("1. [Identity]: Does the patient name and hospital match between form and medical text?");
-            sb.AppendLine("2. [Temporal]: Does the treatment date ({claim.IncidentDate:yyyy-MM-dd}) match the medical notes?");
-            sb.AppendLine("3. [Medical]: Is the treatment provided medically necessary for the diagnosed condition?");
-            sb.AppendLine("4. [Financial]: Is the bill amount (INR {claim.ClaimAmount:N2}) consistent with the procedures described?");
-            sb.AppendLine("5. [Policy]: Does the claim fall within the plan's coverage scope?");
+            
+            if (claim.ClaimType == CoverageType.Life)
+            {
+                sb.AppendLine("1. [Identity]: Does the patient name match between form and medical text? (Hospital match is NOT required for Life claims).");
+                sb.AppendLine("2. [Temporal]: Does the date of death match the medical notes?");
+                sb.AppendLine("3. [Medical]: Is the cause of death clearly stated and consistent with policy scope?");
+                sb.AppendLine("4. [Financial]: OK (Skip check: Bill amount is not applicable for lump-sum Life benefits).");
+                sb.AppendLine("5. [Policy]: Does the cause of death fall within the plan's coverage scope?");
+            }
+            else
+            {
+                sb.AppendLine("1. [Identity]: Does the patient name and hospital match between form and medical text?");
+                sb.AppendLine("2. [Temporal]: Does the treatment date ({claim.IncidentDate:yyyy-MM-dd}) match the medical notes?");
+                sb.AppendLine("3. [Medical]: Is the treatment provided medically necessary for the diagnosed condition?");
+                sb.AppendLine("4. [Financial]: Is the bill amount (INR {claim.ClaimAmount:N2}) consistent with the procedures described?");
+                sb.AppendLine("5. [Policy]: Does the claim fall within the plan's coverage scope?");
+            }
 
             sb.AppendLine("\n### 7. FINAL VERDICT RULES");
-            sb.AppendLine("- REJECT immediately if [CRITICAL WARNING] is present and text does not provide a 100% convincing medical override.");
-            sb.AppendLine("- REJECT if any Date Mismatch is > 48 hours.");
-            sb.AppendLine("- REJECT if hospital name in text is DIFFERENT from the claimed hospital.");
-            
+            if (claim.ClaimType == CoverageType.Life)
+            {
+                sb.AppendLine("- DO NOT REJECT based on 'Hospital mismatch' or 'Unknown Bill Amount'. These are irrelevant for Life claims.");
+                sb.AppendLine("- REJECT if Patient Name is a different individual.");
+                sb.AppendLine("- REJECT if Cause of Death is explicitly listed as an exclusion (e.g., suicide within 1yr if per-policy).");
+            }
+            else
+            {
+                sb.AppendLine("- REJECT immediately if [CRITICAL WARNING] is present and text does not provide a 100% convincing medical override.");
+                sb.AppendLine("- REJECT if any Date Mismatch is > 48 hours.");
+                sb.AppendLine("- REJECT if hospital name in text is DIFFERENT from the claimed hospital.");
+            }
+
             sb.AppendLine("\nReturn ONLY a JSON object with this exact structure (The 'reasoning' MUST be a comprehensive list of ALL findings, separated by semicolons):");
             sb.AppendLine("{");
             sb.AppendLine("  \"decision\": \"Approved\" or \"Rejected\",");
@@ -382,13 +403,19 @@ namespace EGI_Backend.Infrastructure.Services
                                      $"3. YOUR GOAL:\n" +
                                      $"Analyze the extracted text and cross-check the details against the User-Submitted Data.\n\n" +
                                      $"4. OUTPUT MANDATE:\n" +
-                                     $"Provide a short, structured summary for the Admin.\n" +
-                                     $"NO MARKDOWN: Do NOT use bolding (**), headers (###), or asterisks for list items (*).\n" +
+                                     $"Analyze the extracted text with EXTREME SKEPTICISM. Compare the Company Name and Address character-for-character.\n" +
+                                     $"\n" +
+                                     $"ZERO TOLERANCE RULE: If the Company Name in the document is DIFFERENT from '{client.CompanyName}' or the Address does NOT match '{client.Address}', you MUST output RECOMMENDATION: Reject.\n" +
+                                     $"\n" +
+                                     $"FORBIDDEN PHRASES: Do NOT say 'minor discrepancies', 'can be verified manually', or 'similar enough'. If it doesn't match perfectly, it is a FATAL ERROR and must be REJECTED.\n" +
+                                     $"\n" +
+                                     $"NO MARKDOWN: Do NOT use bolding (**), headers (###), or asterisks (*).\n" +
+                                     $"\n" +
                                      $"Use the following EXACT format (No Markdown):\n" +
-                                     $"SCORE: [0-100]\n" +
-                                     $"SUMMARY: [1-2 sentences summarizing findings]\n" +
-                                     $"RECOMMENDATION: [Approve / Flag for Manual Review] - [Reason]\n" +
-                                     $"DISCREPANCIES: [List any mismatches or say 'None detected']";
+                                     $"SCORE: [0-40 if mismatched, 90-100 if matching]\n" +
+                                     $"SUMMARY: [Identify the exact mismatch and state documents are invalid]\n" +
+                                     $"RECOMMENDATION: Reject - [Reason: MANDATORY REJECT due to Name/Address Mismatch]\n" +
+                                     $"DISCREPANCIES: [Detailed list of mismatches]";
 
                         var pdfReqBody = new
                         {
@@ -451,13 +478,19 @@ namespace EGI_Backend.Infrastructure.Services
                              $"2. YOUR GOAL:\n" +
                              $"Analyze the attached image and cross-check the extracted details against the User-Submitted Data. Look for matches in Company Name and Registration structures.\n\n" +
                              $"3. OUTPUT MANDATE:\n" +
-                             $"Provide a short, structured summary for the Admin.\n" +
-                             $"NO MARKDOWN: Do NOT use bolding (**), headers (###), or asterisks for list items (*).\n" +
+                             $"Analyze the image with EXTREME SKEPTICISM. Look for the Company Name and Address.\n" +
+                             $"\n" +
+                             $"ZERO TOLERANCE RULE: If the Company Name in the image is DIFFERENT from '{client.CompanyName}' or the Address does NOT match '{client.Address}', you MUST output RECOMMENDATION: Reject.\n" +
+                             $"\n" +
+                             $"FORBIDDEN PHRASES: Do NOT say 'minor discrepancies', 'can be verified manually', or 'similar enough'. If it doesn't match perfectly, it is a FATAL ERROR and must be REJECTED.\n" +
+                             $"\n" +
+                             $"NO MARKDOWN: Do NOT use bolding (**), headers (###), or asterisks (*).\n" +
+                             $"\n" +
                              $"Use the following EXACT format (No Markdown):\n" +
-                             $"SCORE: [0-100]\n" +
-                             $"SUMMARY: [1-2 sentences summarizing findings]\n" +
-                             $"RECOMMENDATION: [Approve / Flag for Manual Review] - [Reason]\n" +
-                             $"DISCREPANCIES: [List any mismatches or say 'None detected']";
+                             $"SCORE: [0-40 if mismatched, 90-100 if matching]\n" +
+                             $"SUMMARY: [Identify the exact mismatch and state documents are invalid]\n" +
+                             $"RECOMMENDATION: Reject - [Reason: MANDATORY REJECT due to Name/Address Mismatch]\n" +
+                             $"DISCREPANCIES: [Detailed list of mismatches]";
 
                 var requestBody = new
                 {

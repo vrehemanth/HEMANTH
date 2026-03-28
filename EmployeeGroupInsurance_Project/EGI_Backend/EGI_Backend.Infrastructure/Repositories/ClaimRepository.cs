@@ -79,8 +79,8 @@ namespace EGI_Backend.Infrastructure.Repositories
         {
             var query = _context.Claims.AsQueryable();
  
-            // We count Approved AND all pending states to prevent race condition "draining"
-            var activeStatuses = new[] { ClaimStatus.Approved, ClaimStatus.Pending, ClaimStatus.InReview, ClaimStatus.PendingAdminApproval };
+            // We only count FINALIZED utilized claims (Approved or Settled) for the actual balance ledger.
+            var activeStatuses = new[] { ClaimStatus.Approved, ClaimStatus.Settled };
  
             query = query.Where(c => 
                 c.PolicyAssignmentId == policyAssignmentId &&
@@ -115,13 +115,15 @@ namespace EGI_Backend.Infrastructure.Repositories
 
         public async Task<int> CountPendingAsync()
         {
-            return await _context.Claims.CountAsync(c => c.Status == ClaimStatus.Pending);
+            var pendingStatuses = new[] { ClaimStatus.Pending, ClaimStatus.PendingAdminApproval, ClaimStatus.InReview };
+            return await _context.Claims.CountAsync(c => pendingStatuses.Contains(c.Status));
         }
 
         public async Task<decimal> GetTotalPayoutsAsync()
         {
+            var paidStatuses = new[] { ClaimStatus.Approved, ClaimStatus.Settled };
             return await _context.Claims
-                .Where(c => c.Status == ClaimStatus.Approved)
+                .Where(c => paidStatuses.Contains(c.Status))
                 .SumAsync(c => c.ClaimAmount);
         }
 

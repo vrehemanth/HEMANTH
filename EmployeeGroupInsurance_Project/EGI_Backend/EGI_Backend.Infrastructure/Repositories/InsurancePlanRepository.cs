@@ -60,5 +60,19 @@ namespace EGI_Backend.Infrastructure.Repositories
         {
             return await _context.PolicyAssignments.AnyAsync(pa => pa.InsurancePlanId == planId);
         }
+
+        public async Task<List<(Guid PlanId, string PlanName, int MemberCount)>> GetPlanEnrollmentStatsAsync()
+        {
+            return await _context.InsurancePlans
+                .AsNoTracking()
+                .Select(p => new
+                {
+                    p.Id,
+                    p.PlanName,
+                    Count = _context.Members.Count(m => m.PolicyAssignment.InsurancePlanId == p.Id)
+                })
+                .ToListAsync()
+                .ContinueWith(t => t.Result.Select(x => (x.Id, x.PlanName, x.Count)).ToList());
+        }
     }
 }

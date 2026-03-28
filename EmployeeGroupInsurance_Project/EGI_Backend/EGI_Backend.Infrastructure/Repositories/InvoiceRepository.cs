@@ -24,6 +24,11 @@ namespace EGI_Backend.Infrastructure.Repositories
             await _context.Invoices.AddAsync(invoice);
         }
 
+        public async Task UpdateAsync(Invoice invoice)
+        {
+            _context.Invoices.Update(invoice);
+        }
+
         public async Task<Invoice?> GetByIdAsync(Guid id)
         {
             return await _context.Invoices
@@ -97,6 +102,15 @@ namespace EGI_Backend.Infrastructure.Repositories
                 .OrderByDescending(i => i.BillingPeriodFrom)
                 .ToListAsync();
         }
+
+        public async Task<List<Invoice>> GetAllAsync()
+        {
+            return await _context.Invoices
+                .AsNoTracking()
+                .Include(i => i.PolicyAssignment)
+                .OrderByDescending(i => i.CreatedAt)
+                .ToListAsync();
+        }
         public async Task<Dictionary<Guid, decimal>> GetBalancesByClientsAsync(List<Guid> clientIds)
         {
             return await _context.Invoices
@@ -105,6 +119,13 @@ namespace EGI_Backend.Infrastructure.Repositories
                 .GroupBy(i => i.PolicyAssignment.CorporateClientId)
                 .Select(g => new { ClientId = g.Key, Balance = g.Sum(x => x.Amount - x.TotalPaid) })
                 .ToDictionaryAsync(x => x.ClientId, x => x.Balance);
+        }
+        public async Task<bool> HasUnpaidInvoicesAsync(Guid policyAssignmentId)
+        {
+            var unpaidStatuses = new[] { InvoiceStatus.Pending, InvoiceStatus.Overdue, InvoiceStatus.PartiallyPaid };
+            return await _context.Invoices.AnyAsync(i => 
+                i.PolicyAssignmentId == policyAssignmentId && 
+                unpaidStatuses.Contains(i.Status));
         }
     }
 }

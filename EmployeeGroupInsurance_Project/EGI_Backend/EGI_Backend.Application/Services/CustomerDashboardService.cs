@@ -27,6 +27,9 @@ namespace EGI_Backend.Application.Services
         private readonly IMemoryCache _cache;
         private readonly IServiceScopeFactory _scopeFactory;
 
+        private readonly IHospitalRepository _hospitalRepo;
+        private readonly IEmailService _emailService;
+
         public CustomerDashboardService(
             ICorporateClientRepository clientRepo,
             IPolicyAssignmentRepository policyRepo,
@@ -38,8 +41,12 @@ namespace EGI_Backend.Application.Services
             IPolicyAssignmentService policyService,
             IMapper mapper,
             IMemoryCache cache,
-            IServiceScopeFactory scopeFactory)
+            IServiceScopeFactory scopeFactory,
+            IHospitalRepository hospitalRepo,
+            IEmailService emailService)
         {
+            _hospitalRepo = hospitalRepo;
+            _emailService = emailService;
             _clientRepo = clientRepo;
             _policyRepo = policyRepo;
             _memberRepo = memberRepo;
@@ -70,14 +77,22 @@ namespace EGI_Backend.Application.Services
         public async Task<CustomerDashboardSummaryDto> GetSummaryAsync(Guid userId)
         {
             var clientId = await GetClientIdAsync(userId);
+            var policies = await _policyRepo.GetByClientIdAsync(clientId);
+
+            var membersForCount = await _memberRepo.GetByClientIdAsync(clientId);
+
+            var endorsements = await _endorsementRepo.GetByClientIdAsync(clientId);
 
             var summary = new CustomerDashboardSummaryDto
             {
-                TotalPolicies = await _policyRepo.CountByClientIdAsync(clientId),
-                TotalMembers = await _memberRepo.CountByClientIdAsync(clientId),
+                TotalPolicies = policies.Count(),
+                TotalMembers = membersForCount.Count(m => m.Status),
+                TotalDependents = membersForCount.Where(m => m.Status).Sum(m => m.Dependents.Count(d => d.IsActive)),
+                TotalEndorsements = endorsements.Count(),
                 PendingClaims = await _claimRepo.CountPendingForClientAsync(clientId),
                 UnpaidInvoices = await _invoiceRepo.CountUnpaidByClientAsync(clientId),
-                TotalPremiumDue = await _invoiceRepo.GetTotalBalanceByClientAsync(clientId)
+                TotalPremiumDue = await _invoiceRepo.GetTotalBalanceByClientAsync(clientId),
+                TotalPendingCredit = policies.Sum(p => p.PendingCredit)
             };
 
             return summary;
@@ -164,6 +179,48 @@ namespace EGI_Backend.Application.Services
             var clientId = await GetClientIdAsync(userId);
             var endorsements = await _endorsementRepo.GetByClientIdAsync(clientId);
             return _mapper.Map<List<EndorsementResponseDto>>(endorsements);
+        }
+
+        public async Task<bool> ClaimHealthCheckupAsync(Guid userId, Guid hospitalId)
+        {
+            var client = await _clientRepo.GetByUserIdAsync(userId);
+            if (client == null) throw new NotFoundException("Profile not found.");
+
+            // Strict Enforcement: Once every 365 days
+            if (client.LastHealthCheckupDate.HasValue && (DateTime.UtcNow - client.LastHealthCheckupDate.Value).TotalDays < 365)
+            {
+                throw new BadRequestException("Health checkup can only be claimed once per 365 days.");
+            }
+
+            var hospital = await _hospitalRepo.GetByIdAsync(hospitalId);
+            if (hospital == null) throw new NotFoundException("Target Hospital not found.");
+
+            // Calculate eligibility stats
+            var memberCount = await _memberRepo.CountByClientIdAsync(client.Id);
+            var dependents = await _memberRepo.GetByClientIdAsync(client.Id);
+            var dependentCount = dependents.Where(m => m.Status).Sum(m => m.Dependents.Count(d => d.IsActive));
+
+            // Commit to Database
+            client.LastHealthCheckupDate = DateTime.UtcNow;
+            client.HealthCheckupHospitalId = hospitalId;
+            client.IsHealthCheckupClaimPending = true; // Waiting for Claims Officer to enter actuals later
+            
+            // Note: We don't update Actual counts yet, as Claims Officer does that post-event
+            await _clientRepo.SaveChangesAsync();
+
+            // Notify Hospital
+            if (!string.IsNullOrEmpty(hospital.Email))
+            {
+                await _emailService.SendHealthCheckupNotificationToHospitalAsync(
+                    hospital.Email, 
+                    hospital.Name,
+                    client.CompanyName, 
+                    memberCount, 
+                    dependentCount, 
+                    DateTime.UtcNow.AddDays(7));
+            }
+
+            return true;
         }
     }
 }

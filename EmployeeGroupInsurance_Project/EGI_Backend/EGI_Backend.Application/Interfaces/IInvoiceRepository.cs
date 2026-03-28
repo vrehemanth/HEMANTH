@@ -8,6 +8,7 @@ namespace EGI_Backend.Application.Interfaces
     public interface IInvoiceRepository
     {
         Task AddAsync(Invoice invoice);
+        Task UpdateAsync(Invoice invoice);
         Task<Invoice?> GetByIdAsync(Guid id);
         Task<List<Invoice>> GetByPolicyAssignmentIdAsync(Guid policyAssignmentId);
 
@@ -25,5 +26,7 @@ namespace EGI_Backend.Application.Interfaces
         Task<decimal> GetTotalBalanceByClientAsync(Guid clientId);
         Task<Dictionary<Guid, decimal>> GetBalancesByClientsAsync(List<Guid> clientIds);
         Task<List<Invoice>> GetByClientIdAsync(Guid clientId);
+        Task<List<Invoice>> GetAllAsync();
+        Task<bool> HasUnpaidInvoicesAsync(Guid policyAssignmentId);
     }
 }

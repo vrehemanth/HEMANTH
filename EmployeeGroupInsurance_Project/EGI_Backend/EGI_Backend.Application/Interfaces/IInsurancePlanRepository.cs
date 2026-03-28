@@ -15,5 +15,6 @@ namespace EGI_Backend.Application.Interfaces
         void Delete(InsurancePlan plan);
         Task<List<InsurancePlan>> GetActivePlansAsync();
         Task<bool> IsPlanInUseAsync(Guid planId);
+        Task<List<(Guid PlanId, string PlanName, int MemberCount)>> GetPlanEnrollmentStatsAsync();
     }
 }

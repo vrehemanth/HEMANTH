@@ -27,6 +27,8 @@ namespace EGI_Backend.Application.Tests.Services
         private readonly Mock<IInvoiceService> _mockInvoiceService;
         private readonly Mock<IPolicyAssignmentService> _mockPolicyService;
         private readonly Mock<IServiceScopeFactory> _mockScopeFactory;
+        private readonly Mock<IHospitalRepository> _mockHospitalRepo;
+        private readonly Mock<IEmailService> _mockEmailService;
         private readonly CustomerDashboardService _service;
 
         public CustomerDashboardServiceTests()
@@ -51,6 +53,8 @@ namespace EGI_Backend.Application.Tests.Services
             _mockCache.Setup(x => x.TryGetValue(It.IsAny<object>(), out cacheEntry)).Returns(false);
  
             _mockScopeFactory = new Mock<IServiceScopeFactory>();
+            _mockHospitalRepo = new Mock<IHospitalRepository>();
+            _mockEmailService = new Mock<IEmailService>();
  
             _service = new CustomerDashboardService(
                 _mockClientRepo.Object,
@@ -63,7 +67,9 @@ namespace EGI_Backend.Application.Tests.Services
                 _mockPolicyService.Object,
                 _mockMapper.Object,
                 _mockCache.Object,
-                _mockScopeFactory.Object
+                _mockScopeFactory.Object,
+                _mockHospitalRepo.Object,
+                _mockEmailService.Object
             );
         }
 
@@ -99,14 +105,20 @@ namespace EGI_Backend.Application.Tests.Services
             var clientId = Guid.NewGuid();
             var client = new CorporateClient { Id = clientId, UserId = userId };
 
+            var policies = new List<PolicyAssignment> { 
+                new PolicyAssignment { PendingCredit = 100 },
+                new PolicyAssignment { PendingCredit = 50 }
+            };
+
             _mockClientRepo.Setup(x => x.GetByUserIdAsync(userId)).ReturnsAsync(client);
-            _mockPolicyRepo.Setup(x => x.CountByClientIdAsync(clientId)).ReturnsAsync(5);
+            _mockPolicyRepo.Setup(x => x.GetByClientIdAsync(clientId)).ReturnsAsync(policies);
             _mockMemberRepo.Setup(x => x.CountByClientIdAsync(clientId)).ReturnsAsync(20);
 
             var result = await _service.GetSummaryAsync(userId);
 
             Assert.NotNull(result);
-            Assert.Equal(5, result.TotalPolicies);
+            Assert.Equal(2, result.TotalPolicies); // 2 items in list
+            Assert.Equal(150, result.TotalPendingCredit); // Sum of credits
             Assert.Equal(20, result.TotalMembers);
         }
 

@@ -38,5 +38,8 @@ namespace EGI_Backend.Application.DTOs
 
         [Required]
         public List<ClaimDocumentType> DocumentTypes { get; set; } = new();
+
+        public Guid? NetworkHospitalId { get; set; }
+        public Guid? DispatchId { get; set; }
     }
 }

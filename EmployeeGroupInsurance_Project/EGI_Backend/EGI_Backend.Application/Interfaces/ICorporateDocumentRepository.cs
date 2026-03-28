@@ -10,5 +10,7 @@ namespace EGI_Backend.Application.Interfaces
     public interface ICorporateDocumentRepository
     {
         Task AddAsync(CorporateClientDocument document);
+        Task<List<CorporateClientDocument>> GetByClientIdAsync(Guid clientId);
+        Task DeleteAsync(Guid id);
     }
 }
